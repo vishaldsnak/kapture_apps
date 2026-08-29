@@ -1,0 +1,109 @@
+Performing migration from source [D:\WD\Workspaces\Kapture_Apps\MDM_1.3\build\mdmgt-javax.war] to destination [D:\WD\Workspaces\Kapture_Apps\MDM_1.3\mdmgt.war] with Jakarta EE specification profile [TOMCAT]
+Migration starting for archive [D:\WD\Workspaces\Kapture_Apps\MDM_1.3\build\mdmgt-javax.war] using streaming
+Migration starting for archive [GMS3_CUSTOM/ExportData/US_EN-US_MANUAL_TYPE_26072026_113111.zip] using streaming
+Migration finished for archive [GMS3_CUSTOM/ExportData/US_EN-US_MANUAL_TYPE_26072026_113111.zip]
+Migration starting for archive [SampleCSVs.zip] using streaming
+Migration finished for archive [SampleCSVs.zip]
+Migration starting for archive [WEB-INF/lib/activation-1.1.1.jar] using streaming
+Drop cryptographic signature file [META-INF/SUN_MICR.SF]
+Drop cryptographic signature file [META-INF/SUN_MICR.RSA]
+Migration finished for archive [WEB-INF/lib/activation-1.1.1.jar]
+Migration starting for archive [WEB-INF/lib/activation.jar] using streaming
+Migration finished for archive [WEB-INF/lib/activation.jar]
+Migration starting for archive [WEB-INF/lib/apache-log4j-extras-1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/apache-log4j-extras-1.1.jar]
+Migration starting for archive [WEB-INF/lib/c3p0-0.9.1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/c3p0-0.9.1.1.jar]
+Migration skipped for archive [WEB-INF/lib/commons-codec-1.9.jar] because it is excluded (the archive was copied unchanged)
+Migration starting for archive [WEB-INF/lib/commons-collections4-4.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-collections4-4.1.jar]
+Migration starting for archive [WEB-INF/lib/commons-fileupload-1.3.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-fileupload-1.3.1.jar]
+Migration starting for archive [WEB-INF/lib/commons-fileupload.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-fileupload.jar]
+Migration starting for archive [WEB-INF/lib/commons-io-1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-io-1.1.jar]
+Migration starting for archive [WEB-INF/lib/commons-io-2.4.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-io-2.4.jar]
+Migration starting for archive [WEB-INF/lib/commons-io-2.5.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-io-2.5.jar]
+Migration skipped for archive [WEB-INF/lib/commons-lang-2.4.jar] because it is excluded (the archive was copied unchanged)
+Migration skipped for archive [WEB-INF/lib/commons-lang-2.5.jar] because it is excluded (the archive was copied unchanged)
+Migration starting for archive [WEB-INF/lib/commons-logging-1.1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-logging-1.1.1.jar]
+Migration starting for archive [WEB-INF/lib/curvesapi-1.04.jar] using streaming
+Migration finished for archive [WEB-INF/lib/curvesapi-1.04.jar]
+Migration starting for archive [WEB-INF/lib/gson-2.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/gson-2.1.jar]
+Migration starting for archive [WEB-INF/lib/gson-2.2.4.jar] using streaming
+Migration finished for archive [WEB-INF/lib/gson-2.2.4.jar]
+Migration starting for archive [WEB-INF/lib/http_client.jar] using streaming
+Migration finished for archive [WEB-INF/lib/http_client.jar]
+Migration starting for archive [WEB-INF/lib/jaxrpc-1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/jaxrpc-1.1.jar]
+Migration starting for archive [WEB-INF/lib/jsoup-1.7.3.jar] using streaming
+Migration finished for archive [WEB-INF/lib/jsoup-1.7.3.jar]
+Migration starting for archive [WEB-INF/lib/jstl-1.2.jar] using streaming
+Migration finished for archive [WEB-INF/lib/jstl-1.2.jar]
+Migration starting for archive [WEB-INF/lib/jta-1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/jta-1.1.jar]
+Migration starting for archive [WEB-INF/lib/log4j-1.2.15.jar] using streaming
+Migration finished for archive [WEB-INF/lib/log4j-1.2.15.jar]
+Migration starting for archive [WEB-INF/lib/log4j-1.2.17.jar] using streaming
+Migration finished for archive [WEB-INF/lib/log4j-1.2.17.jar]
+Migration starting for archive [WEB-INF/lib/mail-1.4.3.jar] using streaming
+Migration finished for archive [WEB-INF/lib/mail-1.4.3.jar]
+Migration starting for archive [WEB-INF/lib/mail.jar] using streaming
+Migration finished for archive [WEB-INF/lib/mail.jar]
+Migration starting for archive [WEB-INF/lib/mysql-connector-java-8.0.13.jar] using streaming
+Migration finished for archive [WEB-INF/lib/mysql-connector-java-8.0.13.jar]
+Migration starting for archive [WEB-INF/lib/ojdbc6.jar] using streaming
+Migration finished for archive [WEB-INF/lib/ojdbc6.jar]
+Migration starting for archive [WEB-INF/lib/ooxml-schemas-1.3.jar] using streaming
+Migration finished for archive [WEB-INF/lib/ooxml-schemas-1.3.jar]
+Migration starting for archive [WEB-INF/lib/oraclepki.jar] using streaming
+Migration finished for archive [WEB-INF/lib/oraclepki.jar]
+Migration starting for archive [WEB-INF/lib/orai18n-11.2.0.2.0.jar] using streaming
+Migration finished for archive [WEB-INF/lib/orai18n-11.2.0.2.0.jar]
+Migration starting for archive [WEB-INF/lib/orawsdl.jar] using streaming
+Migration finished for archive [WEB-INF/lib/orawsdl.jar]
+Migration starting for archive [WEB-INF/lib/org.apache.poi.xwpf.converter.core-1.0.5.jar] using streaming
+Migration finished for archive [WEB-INF/lib/org.apache.poi.xwpf.converter.core-1.0.5.jar]
+Migration starting for archive [WEB-INF/lib/org.apache.poi.xwpf.converter.xhtml-1.0.5.jar] using streaming
+Migration finished for archive [WEB-INF/lib/org.apache.poi.xwpf.converter.xhtml-1.0.5.jar]
+Migration starting for archive [WEB-INF/lib/osdt_cert.jar] using streaming
+Migration finished for archive [WEB-INF/lib/osdt_cert.jar]
+Migration starting for archive [WEB-INF/lib/osdt_core.jar] using streaming
+Migration finished for archive [WEB-INF/lib/osdt_core.jar]
+Migration starting for archive [WEB-INF/lib/poi-3.15.jar] using streaming
+Migration finished for archive [WEB-INF/lib/poi-3.15.jar]
+Migration starting for archive [WEB-INF/lib/poi-ooxml-3.15.jar] using streaming
+Migration finished for archive [WEB-INF/lib/poi-ooxml-3.15.jar]
+Migration starting for archive [WEB-INF/lib/quick-json-1.0.2.3.jar] using streaming
+Migration finished for archive [WEB-INF/lib/quick-json-1.0.2.3.jar]
+Migration starting for archive [WEB-INF/lib/serializer-2.7.0.jar] using streaming
+Migration finished for archive [WEB-INF/lib/serializer-2.7.0.jar]
+Migration starting for archive [WEB-INF/lib/stax-1.2.0.jar] using streaming
+Migration finished for archive [WEB-INF/lib/stax-1.2.0.jar]
+Migration starting for archive [WEB-INF/lib/stax-api-1.0.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/stax-api-1.0.1.jar]
+Migration starting for archive [WEB-INF/lib/xalan-2.7.0.jar] using streaming
+Migration finished for archive [WEB-INF/lib/xalan-2.7.0.jar]
+Migration starting for archive [WEB-INF/lib/xercesImpl-2.7.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/xercesImpl-2.7.1.jar]
+Migration starting for archive [WEB-INF/lib/xml-apis-1.4.01.jar] using streaming
+Migration finished for archive [WEB-INF/lib/xml-apis-1.4.01.jar]
+Migration starting for archive [WEB-INF/lib/xmlbeans-2.6.0.jar] using streaming
+Migration finished for archive [WEB-INF/lib/xmlbeans-2.6.0.jar]
+Migration starting for archive [css/font-awesome-4.6.3.zip] using streaming
+Migration finished for archive [css/font-awesome-4.6.3.zip]
+Migration starting for archive [templates/MC_SIVIN_Import_Template.zip] using streaming
+Migration finished for archive [templates/MC_SIVIN_Import_Template.zip]
+Migration starting for archive [templates/MME_SIVIN_Import_Template.zip] using streaming
+Migration finished for archive [templates/MME_SIVIN_Import_Template.zip]
+Migration starting for archive [templates/MNAO_SIVIN_Import_Template.zip] using streaming
+Migration finished for archive [templates/MNAO_SIVIN_Import_Template.zip]
+Migration starting for archive [templates/SCH_MAIN_VIN_Mapping_Import_Template.zip] using streaming
+Migration finished for archive [templates/SCH_MAIN_VIN_Mapping_Import_Template.zip]
+Migration finished for archive [D:\WD\Workspaces\Kapture_Apps\MDM_1.3\build\mdmgt-javax.war]
+Migration completed successfully in [6,862] milliseconds

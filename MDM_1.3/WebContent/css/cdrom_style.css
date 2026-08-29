@@ -1,0 +1,230 @@
+@import ("css/style.css");
+body{font-family:"InterstateMazda-Regular",Arial;font-size:12px; font-weight:normal;color:#5C5B65;}
+
+/*
+#mainWrapper{width:100%; margin:0 auto; box-shadow: 1px 5px 10px #ccc; height:100vh !important; display: inline !important;}
+.errorMessage{
+	margin-left:40px;
+	margin-top:8px;
+}
+*/
+
+
+.help{
+/*position: absolute;
+	z-index: 15;
+  top: 46%;
+  left: 50%;
+  margin: -100px 0 0 -255px;
+*/
+  width: 600px;
+  height: 27px;
+  margin: auto;
+ }
+ .help span{
+ float: right;
+ }
+ .help h3{
+ margin-bottom: -16px;
+ }
+ .helpicon{
+ color:#fff;
+    background-color:#808080;
+    width:12px;
+    height:12px;
+    display:inline-block;
+    border-radius:100%;
+    font-size:10px;
+    text-align:center;
+    text-decoration:none;
+    -webkit-box-shadow: inset -1px -1px 1px 0px rgba(0,0,0,0.25);
+    -moz-box-shadow: inset -1px -1px 1px 0px rgba(0,0,0,0.25);
+    box-shadow: inset -1px -1px 1px 0px rgba(0,0,0,0.25);
+ }
+.first{
+/*position: absolute;
+	 z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -100px 0 0 -255px;
+*/
+  width: 600px;
+  height: 150px;
+  margin:auto;
+  padding:10px;
+  border:1px solid grey;
+ }
+ .center{
+position: absolute;
+  width: 600px;
+  height: 200px;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -100px 0 0 -255px;
+ }
+
+.first select{font-family:"InterstateMazda-Regular",Arial;color:#676767;border:1px solid #DADADA;}
+.first select{padding:5px; width:120px !important; margin:0 10px;}
+.first label{display:block; padding:5px 0; width:50px; margin-left:40px; float: left;}
+.first span{}
+
+.first form{
+margin-top: 30px;
+}
+.first button.blue_btn{background:url(../images/radbutbg.jpg) left top repeat-x; border:1px solid #4E80BC; padding:4px 10px; font-family:"InterstateMazda-Regular",Arial;font-size:13px; font-weight:normal; margin:10px 5px; color:#fff; box-shadow:1px 2px 4px #999;}
+
+.second input[type=checkbox]{margin-top:5px; margin-left:40px; width:35px;font-family:"InterstateMazda-Regular",Arial;}
+.heading{
+}
+.second .gear_button, .second .bluebutton{
+	width: 65px;
+}
+.second label {
+	font-size: 14px;
+	display: inline-block;
+	margin-bottom: 5px;
+}
+
+.second td{
+	width: 50%;
+}
+#CD_Rom_DataForm{
+	margin-left: 35px;
+	margin-right: 35px;
+}
+#CD_Rom_DataForm table{
+	border: 1px solid;
+}
+.second .gear_button{
+margin-bottom: 20px;}
+
+.third{
+position: absolute;
+  width: 600px;
+  height: 200px;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -100px 0 0 -255px;
+}
+
+
+#dialog .bluebutton, #dialog .gear_button{
+	width: 75px;
+}
+.third label{
+	font-size: 14px;
+}
+.third span{
+margin-left: 15px;
+}
+
+.resultheading{
+	position: absolute;
+  width: 600px;
+  height: 200px;
+  z-index: 15;
+  top: 43%;
+  left: 50%;
+  margin: -100px 0 0 -255px;
+}
+.firstTable{
+width:70%;
+border: 1px solid;
+}
+.insidetable td{
+	border : none !important;
+}
+.firstTable td{
+	height: 20px;
+	padding-left: 5px;
+    padding-right: 5px;
+}
+.third .gear_button, .third .bluebutton{
+	width:65px;
+}
+.third p{
+margin-left: 60px;
+}
+.settingsText
+{
+	color:#D0021B;
+	font-size:11.2px;
+	font-weight:normal !important;
+	font-style: normal !important;
+	text-align: left !important;
+	width: 476px;
+	padding-left: 5px;
+}
+.inputTable{border:1px solid #DADADA;} 
+.inputTable td{color: #4A4A4A;padding:20px; font-size:14px; text-align:center; word-wrap:break-word;}
+.inputTable td a{color:#4f81bd;}
+				
+.inputTable td  select{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;height:25px;color:#5C5B65;border-radius:2px;width: 200px;}
+.listBox {min-height:70px !important;}
+.inputTable td  input[type=text]{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;height:25px;color:#5C5B65;border-radius:2px;padding-left:10px;}
+.inputTable td  textarea.full{font-family:"InterstateMazda-Regular",Arial;font-size:14px;border:1px solid #DADADA;color:#5C5B65;border-radius:2px; padding-left:10px;}
+
+.historyTable{border-right:1px solid #DADADA !important;} 
+.historyTable td{padding:10px; border-top: 1px solid #DADADA; color:#34495E; font-size:12.2px; font-family:"InterstateMazda-Light",Arial;
+				text-align:left;font-weight:normal; word-wrap:break-word;background-color:#FAFAFA !important;height:35px;}
+.historyTable .selected td{background-color:#F1F1F1 !important;}
+.historyTable tr:last-child td{border-bottom:1px solid #DADADA}
+.historyTable td a{color:#34495E;font-family:"InterstateMazda-Light",Arial;font-size:12.2px; }
+
+.historyTable th{background-size:100% 100%; border-top: 1px solid #DADADA; border-bottom: 1px solid #DADADA; color: #BABABA; text-transform:uppercase;
+				font-size:10px; padding: 9px; text-align:left;font-family:"InterstateMazda-Light";font-weight:normal !important; height:25px;}
+
+.historyTable .codeClass{color:#34495E;font-size:10px;font-weight:normal}
+.historyTable .codeClass:after{content:" \f063";font-family:"FontAwesome";color:#34495E;font-size:10px;font-weight:normal;vertical-align:middle}
+.historyTable td  select{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;color:#676767; height:25px;width:100px;border-radius:2px;}
+.historyTable td  input[type=text]{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;color:#676767;height:25px;width:150px;border-radius:2px;padding-left:10px;}
+.historyTable td  textarea{font-family:"InterstateMazda-Regular",Arial;font-size:14px;border:1px solid #DADADA;color:#676767;border-radius:2px; padding-left:10px;}
+
+.status{
+position: absolute;
+  width: 600px;
+  height: 200px;
+  z-index: 15;
+  top: 50%;
+  left: 40%;
+  margin: -100px 0 0 -255px;
+ }
+ .status label{display:block; padding:5px 0;  float: left;}
+ 
+.downloadReports:before
+{
+	content: "\f019";
+	color:#34495E;
+	font-size: 20px;
+	font-family: "FontAwesome";
+	font-style: normal;
+}
+.historyFooter{
+	text-align: center;
+	margin-bottom: 15px;
+}
+
+.cdromdatafooter{
+	position: absolute;
+    bottom: 15px;
+    clear: both;
+    left: 40%;
+    right: 40%;
+}
+#example_first{
+	display: none !important;
+}
+.button-disabled{
+	color : grey !important;
+}
+
+.viewCDROMIcon:before
+{
+	content: "\f016";
+	color:#34495E;
+	font-size: 20px;
+	font-family: "FontAwesome";
+	font-style: normal;
+}

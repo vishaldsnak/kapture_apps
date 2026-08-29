@@ -1,0 +1,605 @@
+/* ==========================================================================
+   MDM - MY PAGE (DASHBOARD) LAYOUT
+   Ported from the finalized mockup dashboard-noicons.html.
+
+   Everything here is scoped under .mdmTopBar / .mdmPage so it cannot reach the
+   other screens, which still use style.css untouched. The top bar is kept in its
+   own block on purpose: the same markup is meant to be reused across the rest of
+   the application later, at which point only the include has to move.
+
+   This file is loaded AFTER style.css, so the few globals it needs to win
+   (font weight, box sizing) are declared inside the scoped blocks.
+   ========================================================================== */
+
+/* Bold face is shipped in css/ but style.css never declared it. */
+@font-face {
+	font-family: "InterstateMazda-Bold";
+	src: url(InterstateMazda-Bold.ttf);
+}
+
+/*
+ * Colours are written out literally rather than as CSS custom properties: dashboard.jsp still
+ * declares x-ua-compatible IE=11, and IE11 does not support var().
+ *   red #D0021B / red dark #A80016 / charcoal #2f333a / charcoal-2 #3b4048
+ *   ink #34495E / muted #8A929E / line #E6E8EB
+ */
+.mdmTopBar *, .mdmPage * {
+	box-sizing: border-box;
+}
+
+/* ------------------------------------------------------------------ TOP BAR */
+.mdmTopBar {
+	height: 62px;
+	background: #2f333a;
+	border-bottom: 1px solid rgba(255, 255, 255, .08);
+	position: relative;
+	z-index: 20;
+	display: block;
+	padding: 0 30px;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
+	font-family: "InterstateMazda-Regular", Arial, sans-serif;
+	white-space: nowrap;
+}
+
+.mdmTopBar .tbInner {
+	display: table;
+	width: 100%;
+	height: 62px;
+}
+
+.mdmTopBar .tbLeft, .mdmTopBar .tbNav, .mdmTopBar .tbRight {
+	display: table-cell;
+	vertical-align: middle;
+}
+
+.mdmTopBar .tbRight {
+	text-align: right;
+}
+
+/* brand */
+.mdmTopBar .tbLogo {
+	display: inline-block;
+	vertical-align: middle;
+}
+
+.mdmTopBar .tbLogo img {
+	height: 30px;
+	vertical-align: middle;
+	padding: 0;
+	margin: 0;
+}
+
+.mdmTopBar .tbDivider {
+	display: inline-block;
+	width: 1px;
+	height: 30px;
+	background: rgba(255, 255, 255, .18);
+	vertical-align: middle;
+	margin: 0 14px;
+}
+
+.mdmTopBar .tbTitle {
+	display: inline-block;
+	vertical-align: middle;
+	color: #fff;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-size: 14px;
+	letter-spacing: .3px;
+}
+
+/* navigation - only rendered when there is somewhere other than My Page to go */
+.mdmTopBar .tbNav ul {
+	list-style: none;
+	margin: 0 0 0 26px;
+	padding: 0;
+}
+
+.mdmTopBar .tbNav li {
+	display: inline-block;
+	margin: 0 2px;
+}
+
+.mdmTopBar .tbNav li a {
+	display: block;
+	padding: 8px 12px;
+	color: #c8ccd3;
+	font-size: 12.5px;
+	text-decoration: none;
+	border-radius: 4px;
+}
+
+.mdmTopBar .tbNav li a:hover {
+	background: #3b4048;
+	color: #fff;
+}
+
+.mdmTopBar .tbNav li.activeLink a {
+	color: #fff;
+	background: #3b4048;
+	box-shadow: inset 0 -2px 0 #D0021B;
+}
+
+/* right hand actions */
+.mdmTopBar .tbAction {
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 10px;
+	padding: 7px 12px;
+	border: 1px solid rgba(255, 255, 255, .2);
+	border-radius: 20px;
+	font-size: 12px;
+	color: #e4e6ea;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.mdmTopBar .tbAction:hover {
+	background: #3b4048;
+	color: #fff;
+}
+
+.mdmTopBar .tbUser {
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 18px;
+	text-align: left;
+}
+
+.mdmTopBar .tbUser .tbAvatar {
+	display: inline-block;
+	vertical-align: middle;
+	width: 36px;
+	height: 36px;
+	line-height: 36px;
+	text-align: center;
+	border-radius: 50%;
+	background: #D0021B;
+	color: #fff;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-size: 13px;
+	box-shadow: 0 3px 8px rgba(208, 2, 27, .35);
+}
+
+.mdmTopBar .tbUser .tbUserMeta {
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 10px;
+	line-height: 1.25;
+}
+
+.mdmTopBar .tbUser .tbUserMeta b {
+	display: block;
+	color: #fff;
+	font-size: 12.5px;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-weight: normal;
+}
+
+.mdmTopBar .tbUser .tbUserMeta span {
+	display: block;
+	color: #9aa2ad;
+	font-size: 10.5px;
+}
+
+/* ------------------------------------------------------------------- PAGE */
+.mdmPage {
+	max-width: 1320px;
+	margin: 0 auto;
+	padding: 22px 30px 34px;
+	font-family: "InterstateMazda-Regular", Arial, sans-serif;
+	color: #4A4A4A;
+	font-size: 13px;
+}
+
+.mdmPage .mdmWelcome {
+	margin: 2px 0 18px;
+}
+
+.mdmPage .mdmWelcome h1 {
+	font-size: 20px;
+	color: #34495E;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-weight: normal;
+	margin: 0;
+}
+
+.mdmPage .mdmWelcome h1 span {
+	color: #D0021B;
+}
+
+.mdmPage .mdmWelcome p {
+	color: #8A929E;
+	font-size: 12.5px;
+	margin-top: 4px;
+}
+
+/* --------------------------------------------------------- CATEGORY TABS */
+.mdmPage .mdmTabs {
+	display: -ms-flexbox;
+	display: flex;
+	-ms-flex-align: end;
+	align-items: flex-end;
+	position: relative;
+	z-index: 2;
+	margin-bottom: -1px;
+}
+
+/*
+ * FLEX, NOT table-cell - AND THAT IS THE WHOLE REASON THE ACTIVE TAB CAN BE TALLER.
+ *
+ * A table row equalises the height of every cell, so with display:table-cell the mockup's 55px
+ * active tab silently stretched all six tabs to 55px and the "lifted" tab disappeared. Flex lets
+ * one item be taller and align-items:flex-end keeps them sitting on the panel edge.
+ *
+ * IE11 NOTES - the -ms- prefixed properties are for it, `flex:1 1 0%` MUST carry the unit (IE11
+ * ignores a unitless flex-basis), and `gap` is NOT supported, so the spacing between icon, label
+ * and count is done with margins instead.
+ */
+.mdmPage .mdmTab {
+	-ms-flex: 1 1 0%;
+	flex: 1 1 0%;
+	min-width: 0;
+	height: 46px;
+	display: -ms-flexbox;
+	display: flex;
+	-ms-flex-align: center;
+	align-items: center;
+	-ms-flex-pack: center;
+	justify-content: center;
+	padding: 0 12px;
+	margin-left: -1px;
+	cursor: pointer;
+	color: #8A929E;
+	font-size: 12.5px;
+	white-space: nowrap;
+	overflow: hidden;
+	background: #f0f1f4;
+	border: 1px solid #2f333a;
+	border-radius: 0;
+	position: relative;
+}
+
+.mdmPage .mdmTab:first-child {
+	margin-left: 0;
+	border-top-left-radius: 6px;
+}
+
+.mdmPage .mdmTab:last-child {
+	border-top-right-radius: 6px;
+}
+
+.mdmPage .mdmTab .mdmTabIcon {
+	width: 20px;
+	height: 20px;
+	margin-right: 8px;
+	color: #8A929E;
+	-ms-flex: 0 0 auto;
+	flex: 0 0 auto;
+	display: -ms-flexbox;
+	display: flex;
+	-ms-flex-align: center;
+	align-items: center;
+	-ms-flex-pack: center;
+	justify-content: center;
+}
+
+.mdmPage .mdmTab .mdmTabIcon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.mdmPage .mdmTab .mdmTabLabel {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mdmPage .mdmTab .mdmTabCount {
+	margin-left: 8px;
+	font-size: 10px;
+	color: #8A929E;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	-ms-flex: 0 0 auto;
+	flex: 0 0 auto;
+}
+
+.mdmPage .mdmTab:hover {
+	background: #e6e8ec;
+	color: #34495E;
+}
+
+.mdmPage .mdmTab:hover .mdmTabIcon {
+	color: #34495E;
+}
+
+/* THE ACTIVE TAB STANDS 9px PROUD OF THE OTHERS AND MERGES INTO THE PANEL BELOW IT */
+.mdmPage .mdmTab.mdmTabOn {
+	background: #fff;
+	color: #34495E;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	height: 55px;
+	z-index: 1;
+	border-bottom-color: transparent;
+	box-shadow: 0 -4px 10px rgba(31, 45, 61, .07);
+}
+
+/* THE RED CAP. A SPAN RATHER THAN ::before SO IE11 CANNOT MISPLACE IT */
+.mdmPage .mdmTab.mdmTabOn .mdmTabTop {
+	position: absolute;
+	left: -1px;
+	right: -1px;
+	top: 0;
+	height: 4px;
+	background: #D0021B;
+}
+
+/* HIDES THE PANEL BORDER UNDER THE ACTIVE TAB SO THE TWO READ AS ONE SHAPE */
+.mdmPage .mdmTab.mdmTabOn:after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -1px;
+	height: 2px;
+	background: #fff;
+}
+
+.mdmPage .mdmTab.mdmTabOn .mdmTabIcon {
+	color: #D0021B;
+}
+
+.mdmPage .mdmTab.mdmTabOn .mdmTabCount {
+	color: #D0021B;
+}
+
+/* ------------------------------------------------------------ TAB PANELS */
+.mdmPage .mdmPanels {
+	border: 1px solid #2f333a;
+	border-radius: 0 0 6px 6px;
+	background: #fff;
+	position: relative;
+	z-index: 0;
+	padding: 20px 20px 22px;
+	box-shadow: 0 6px 20px rgba(31, 45, 61, .06);
+}
+
+.mdmPage .mdmPanel {
+	display: none;
+}
+
+.mdmPage .mdmPanel.mdmPanelOn {
+	display: block;
+	animation: mdmPanelFade .2s ease;
+}
+
+@keyframes mdmPanelFade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.mdmPage .mdmPanelHead {
+	margin-bottom: 14px;
+}
+
+.mdmPage .mdmPanelHead h2 {
+	font-size: 14px;
+	color: #34495E;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-weight: normal;
+	margin: 0;
+}
+
+.mdmPage .mdmPanelHead p {
+	font-size: 12px;
+	color: #8A929E;
+	margin-top: 3px;
+}
+
+/* ----------------------------------------------------------------- TILES
+ *
+ * TWO LAYOUTS ON PURPOSE.
+ *
+ * The mockup uses  grid-template-columns:repeat(auto-fill,minmax(176px,1fr))  which fits as many
+ * 176px tiles per row as the panel allows - six at the mockup's own width. IE11 has no usable
+ * grid (only the obsolete -ms- syntax, and no auto-fill), so the FLOAT rules below are the IE11
+ * fallback and the @supports block upgrades every other browser to the real thing. IE11 ignores
+ * @supports entirely, which is exactly what makes this safe.
+ *
+ * The float fallback is tuned to SIX per row so the two layouts agree at normal desktop widths.
+ */
+.mdmPage .mdmTiles:after {
+	content: "";
+	display: block;
+	clear: both;
+}
+
+.mdmPage .mdmTile {
+	float: left;
+	width: 15.833%;
+	margin: 0 1% 11px 0;
+	/*
+	 * UNIFORM TILE HEIGHT - THE MOCKUP DOES NOT NEED THIS AND THE REAL SCREEN DOES.
+	 *
+	 * dashboard.html SETS NO HEIGHT BECAUSE EVERY SAMPLE DESCRIPTION IN IT IS ABOUT THE SAME
+	 * LENGTH, SO EVERY CARD WRAPS TO THE SAME NUMBER OF LINES. THE REAL label.dashtile.*.desc
+	 * VALUES RUN FROM 12 TO 48 CHARACTERS, WHICH AT THIS WIDTH IS ONE LINE VERSUS THREE - SO
+	 * WITHOUT A FLOOR THE TILES COME OUT DIFFERENT HEIGHTS FROM TAB TO TAB.
+	 *
+	 * 140px = 14 + 12 PADDING, 40 + 9 ICON DISC, TWO LINES OF TITLE AND TWO OF DESCRIPTION.
+	 * CONTENT LONGER THAN THAT STILL GROWS THE TILE - grid-auto-rows BELOW THEN KEEPS THE WHOLE
+	 * ROW LEVEL RATHER THAN LEAVING ONE TILE STANDING PROUD.
+	 */
+	min-height: 140px;
+	background: #FFFFFF;
+	border: 1px solid #2f333a;
+	border-bottom: 3px solid #D0021B;
+	border-radius: 9px;
+	padding: 14px 13px 12px;
+	text-align: center;
+	cursor: pointer;
+	position: relative;
+	box-shadow: 0 3px 8px rgba(31, 45, 61, .05);
+	text-decoration: none;
+	display: block;
+	transition: .16s;
+}
+
+.mdmPage .mdmTile:nth-child(6n) {
+	margin-right: 0;
+}
+
+.mdmPage .mdmTile:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 10px 22px rgba(31, 45, 61, .13);
+	border-color: #3b4048;
+	border-bottom-color: #A80016;
+}
+
+/*
+ * THE ICON DISC. 20px GLYPH CENTRED IN A 40px CIRCLE - flex here, with the 10px top margin left
+ * on the svg as the IE11 fallback for the same centring.
+ */
+.mdmPage .mdmTile .mdmTileIcon {
+	display: -ms-flexbox;
+	display: flex;
+	-ms-flex-align: center;
+	align-items: center;
+	-ms-flex-pack: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin: 0 auto 9px;
+	border-radius: 50%;
+	background: #F4F6F8;
+	color: #2b3d5f;
+	transition: .16s;
+}
+
+.mdmPage .mdmTile .mdmTileIcon svg {
+	display: block;
+	width: 20px;
+	height: 20px;
+}
+
+.mdmPage .mdmTile:hover .mdmTileIcon {
+	background: #D0021B;
+	color: #FFFFFF;
+}
+
+.mdmPage .mdmTile h3 {
+	font-size: 11.5px;
+	color: #34495E;
+	text-transform: uppercase;
+	letter-spacing: .4px;
+	line-height: 1.3;
+	font-family: "InterstateMazda-Bold", "InterstateMazda-Regular", Arial, sans-serif;
+	font-weight: normal;
+	margin: 0;
+}
+
+/*
+ * NO h3 COLOUR CHANGE ON HOVER - dashboard.html dropped it because the icon disc now carries the
+ * hover state. Two red signals at once read as noise.
+ */
+.mdmPage .mdmTile p {
+	font-size: 10.5px;
+	color: #8A929E;
+	margin-top: 5px;
+	line-height: 1.4;
+}
+
+.mdmPage .mdmTile .mdmTileArrow {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	color: #E6E8EB;
+	line-height: 0;
+	transition: .16s;
+}
+
+.mdmPage .mdmTile .mdmTileArrow svg {
+	display: block;
+	width: 14px;
+	height: 14px;
+}
+
+.mdmPage .mdmTile:hover .mdmTileArrow {
+	color: #D0021B;
+}
+
+.mdmPage .mdmNoTiles {
+	color: #8A929E;
+	font-size: 12.5px;
+	padding: 18px 2px;
+}
+
+/* THE REAL LAYOUT, FOR EVERY BROWSER THAT IS NOT IE11 */
+@supports (display: grid) {
+	.mdmPage .mdmTiles {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+		/*
+		 * 1fr, NOT auto - EVERY ROW IN THE PANEL TAKES THE HEIGHT OF THE TALLEST TILE IN THE
+		 * PANEL, NOT MERELY OF ITS OWN ROW. WITHOUT IT A TAB WHOSE SECOND ROW HAPPENS TO HOLD
+		 * SHORTER LABELS DRAWS SHORTER TILES THAN ITS FIRST ROW.
+		 */
+		grid-auto-rows: 1fr;
+		gap: 11px;
+	}
+	.mdmPage .mdmTiles:after {
+		content: none;
+	}
+	.mdmPage .mdmTile, .mdmPage .mdmTile:nth-child(6n) {
+		float: none;
+		width: auto;
+		margin: 0;
+	}
+}
+
+/* ---------------------------------------------------------------- FOOTER */
+.mdmPage .mdmFooter {
+	margin-top: 22px;
+	padding-top: 14px;
+	border-top: 1px solid #E6E8EB;
+	text-align: center;
+	color: #8A929E;
+	font-size: 11px;
+	letter-spacing: .3px;
+}
+
+/* --------------------------------------------- NARROWER - FLOAT FALLBACK ONLY
+ * The grid handles narrow widths by itself through auto-fill, so these only need to correct the
+ * IE11 float layout.
+ */
+@media ( max-width : 1180px) {
+	.mdmPage .mdmTile {
+		width: 24%;
+		margin-right: 1.333%;
+	}
+	.mdmPage .mdmTile:nth-child(6n) {
+		margin-right: 1.333%;
+	}
+	.mdmPage .mdmTile:nth-child(4n) {
+		margin-right: 0;
+	}
+}
+
+@media ( max-width : 860px) {
+	.mdmTopBar {
+		padding: 0 16px;
+	}
+	.mdmPage {
+		padding: 18px 16px 28px;
+	}
+	.mdmPage .mdmTile, .mdmPage .mdmTile:nth-child(4n), .mdmPage .mdmTile:nth-child(6n)
+		{
+		width: 49%;
+		margin-right: 2%;
+	}
+	.mdmPage .mdmTile:nth-child(2n) {
+		margin-right: 0;
+	}
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SERVICE_INFORMATION>
+   <DOCUMENTID><![CDATA[Enter document id here....]]></DOCUMENTID>
+   <LOCALE><![CDATA[Enter locale here....]]></LOCALE>
+   <TITLE><![CDATA[Enter title here....]]></TITLE>
+   <SI_HISTORY><![CDATA[Enter content here....]]></SI_HISTORY>
+   <TI_SUMMARY><![CDATA[Enter content here....]]></TI_SUMMARY>
+   <BULLETIN_NOTES><![CDATA[Enter content here....]]></BULLETIN_NOTES>
+   <DESCRIPTION><![CDATA[Enter content here....]]></DESCRIPTION>
+   <REPAIR_PROCEDURE><![CDATA[Enter content here....]]></REPAIR_PROCEDURE>
+   <CALIBRATION><![CDATA[Enter content here....]]></CALIBRATION>
+   <PARTS_INFORMATION><![CDATA[Enter content here....]]></PARTS_INFORMATION>
+   <WARRANTY_INFORMATION><![CDATA[Enter content here....]]></WARRANTY_INFORMATION>
+</SERVICE_INFORMATION>

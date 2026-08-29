@@ -1,0 +1,2786 @@
+package com.mazda.gms3.mdm.servlet;
+
+import com.mazda.gms3.mdm.utils.DBConnectionHelper;
+import java.sql.Connection;
+import com.mazda.gms3.mdm.utils.ImportActionUtils;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import com.mazda.gms3.mdm.bean.EngineTypeBean;
+import com.mazda.gms3.mdm.bean.UserAccessBean;
+import com.mazda.gms3.mdm.dao.CountryLocaleDAO;
+import com.mazda.gms3.mdm.dao.EngineBookDAO;
+import com.mazda.gms3.mdm.dao.EngineTypeDAO;
+import com.mazda.gms3.mdm.dao.ManualLanguageDAO;
+import com.mazda.gms3.mdm.logging.LogManager;
+import com.mazda.gms3.mdm.logging.Logger;
+import com.mazda.gms3.mdm.utils.ApplicationProperties;
+import com.mazda.gms3.mdm.utils.CountryLocaleComparator;
+import com.mazda.gms3.mdm.utils.ManualLanguageComparator;
+import com.mazda.gms3.mdm.utils.MessageProperties;
+import com.mazda.gms3.mdm.utils.Utilities;
+import com.mazda.gms3.mdm.vo.AccessManagementInterface;
+import com.mazda.gms3.mdm.vo.CountryLocaleDetails;
+import com.mazda.gms3.mdm.vo.EngineTypeDetails;
+import com.mazda.gms3.mdm.vo.EngineBookDetails;
+import com.mazda.gms3.mdm.vo.ManualLanguageDetails;
+import com.mazda.gms3.mdm.vo.ModuleDetails;
+import com.mazda.gms3.mdm.vo.SelectItemDetails;
+import com.mazda.gms3.sst.utils.SSTUtils;
+
+/**
+ * Servlet implementation class EngineType
+ */
+public class EngineType extends HttpServlet {
+	private static final long serialVersionUID = 1L;
+	
+	static Logger logger = LogManager.getLogger(EngineType.class);
+    static String wslId=null;
+	static MessageProperties msgProps= null;
+	
+	String moduleRefKey=AccessManagementInterface.REF_KEY_ENGINE_TYPE;
+	String reportName=null;
+	
+    /**
+     * @see HttpServlet#HttpServlet()
+     */
+    public EngineType() {
+        super();
+    }
+
+	/**
+	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
+	 */
+	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
+	{
+		boolean useReqDis = true;
+		/*
+		 * Initialize bean
+		 */
+		EngineTypeBean sessionBean = getSessionBean(request);
+		try
+		{
+			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
+			{
+				// Get WSL ID From request Header and set in Variable
+				wslId = request.getHeader("iv-user");
+				if (null == wslId || "".equals(wslId)) {
+					/*
+					 * re direct to Error
+					 */
+					response.sendRedirect(request.getContextPath() + "/error");
+					useReqDis = false;
+				}
+				// EXPLICITY MAKE WSLID TO LOWERCASE
+				if(null!=wslId && !"".equals(wslId))
+				{
+					wslId = wslId.trim().toLowerCase();
+				}
+			}
+			msgProps = new MessageProperties(request.getSession().getAttribute("MDM_LS_Locale"));
+			/*
+			 * perform access check
+			 */
+			performAccessCheck(sessionBean, request);
+			if(sessionBean.isShowReadControls()==false && sessionBean.isShowWriteControls()==false)
+			{
+				// USER DOES NOT HAVE ACCESS TO THIS PAGE - REDIRECT TO NO ACCESS PAGE
+				response.sendRedirect(request.getContextPath() + "/noaccess");
+				useReqDis = false;
+			}
+			sessionBean.setCountryLocaleList(null);
+			sessionBean.setCountryLocaleId(null);
+			sessionBean.setLanguageList(null);
+			sessionBean.setBookList(null);
+			sessionBean.setManualLanguageId(null);
+			sessionBean.setBookId(null);
+			sessionBean.setTypeList(null);
+			sessionBean.setFlagList(null);
+			sessionBean.setFieldDetails(null);
+			sessionBean.setErrorMessage(null);
+			sessionBean.setSuccessMessage(null);
+			sessionBean.setSelectedRows(null);
+			sessionBean.setShowUpdate(false);
+			sessionBean.setDisplayPageLength(null);
+			sessionBean.setDisplayPageNo(null);
+			sessionBean.setReportViewPath(null);
+			sessionBean.setInfoMessage(null);
+			sessionBean.setTypeListToImport(null);
+			sessionBean.setUpdatedRows(null);
+			sessionBean.setActionClicked(null);
+			/*
+			 * call function to load all the Country Locale Data
+			 */
+			getCountryLocaleList(sessionBean, request);
+			
+			/*
+			 * call function to load flag status values
+			 */
+			getFlagList(sessionBean);
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "doGet()", e);
+		}
+		if(useReqDis==true)
+		{
+			/*
+			 * ALSO CHECK LAST TIME - IF TOP MENU LIST IN USER SESSION BEAN IS NULL
+			 * REDIRECT TO MY PAGE
+			 */
+			UserAccessBean userSessionBean = getUserSessionBean(request);
+			if(null==userSessionBean.getTopMenuList() || userSessionBean.getTopMenuList().size()<=0 || 
+					(null!=userSessionBean.getTopMenuList() && userSessionBean.getTopMenuList().size()==1))
+			{
+				response.sendRedirect(request.getContextPath()+"/mypage");
+			}
+			else
+			{
+				RequestDispatcher rs = request.getRequestDispatcher("/jsps/engineType.jsp");
+				rs.forward(request, response);
+			}
+		}
+	}
+
+	/**
+	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
+	 */
+	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
+	{
+		boolean useReqDis = true;
+		/*
+		 * Initialize bean
+		 */
+		EngineTypeBean sessionBean = getSessionBean(request);
+		try
+		{
+			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
+			{
+				// Get WSL ID From request Header and set in Variable
+				wslId = request.getHeader("iv-user");
+				if (null == wslId || "".equals(wslId)) {
+					/*
+					 * re direct to Error
+					 */
+					response.sendRedirect(request.getContextPath() + "/error");
+					useReqDis = false;
+				}
+				// EXPLICITY MAKE WSLID TO LOWERCASE
+				if(null!=wslId && !"".equals(wslId))
+				{
+					wslId = wslId.trim().toLowerCase();
+				}
+			}
+			msgProps = new MessageProperties(request.getSession().getAttribute("MDM_LS_Locale"));
+			/*
+			 * perform access check
+			 */
+			performAccessCheck(sessionBean, request);
+			if(sessionBean.isShowReadControls()==false && sessionBean.isShowWriteControls()==false)
+			{
+				// USER DOES NOT HAVE ACCESS TO THIS PAGE - REDIRECT TO NO ACCESS PAGE
+				response.sendRedirect(request.getContextPath() + "/noaccess");
+				useReqDis = false;
+			}
+			sessionBean.setErrorMessage("");
+			sessionBean.setSuccessMessage("");
+			sessionBean.setInfoMessage(null);
+			sessionBean.setDisplayPageLength(null);
+			sessionBean.setDisplayPageNo(null);
+			sessionBean.setReportViewPath(null);
+			
+			/*
+			 * call function to load flag status values
+			 */
+			getFlagList(sessionBean);
+			
+			/*
+			 * call function to read parameters from request
+			 */
+			readParamsFromRequest(sessionBean, request);
+			
+			if(null!=sessionBean.getActionClicked() && !"".equals(sessionBean.getActionClicked()))
+			{
+				if(sessionBean.getActionClicked().equals("COUNTRY_SELECTION"))
+				{
+					sessionBean.setShowUpdate(false);
+					sessionBean.setSelectedRows(null);
+					sessionBean.setBookId(null);
+					sessionBean.setManualLanguageId(null);
+					/*
+					 * call function to load all the Manual language data
+					 */
+					getLanguageList(sessionBean, request);
+					/*
+					 * call function to load engineBookDetails
+					 * also call engineTypeList to make it Blank, incase if Language changes.
+					 */
+					getBookList(sessionBean);
+					/*
+					 * call function to load engineTypeDetails
+					 */
+					getEngineTypeList(sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("LANGUAGE_SELECTION"))
+				{
+					sessionBean.setShowUpdate(false);
+					sessionBean.setSelectedRows(null);
+					/*
+					 * call function to load engineBookDetails
+					 * also call engineTypeList to make it Blank, incase if Language changes.
+					 */
+					getBookList(sessionBean);
+					sessionBean.setBookId(null);
+					getEngineTypeList(sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("BOOK_SELECTION"))
+				{
+					sessionBean.setShowUpdate(false);
+					sessionBean.setSelectedRows(null);
+					/*
+					 * call function to load engineTypeDetails
+					 */
+					getEngineTypeList(sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("SAVE"))
+				{
+					/*
+					 * Save Operation called
+					 */
+					saveTypeDetails(sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("EDIT"))
+				{
+					/*
+					 * Edit Operation called
+					 */
+					editTypeDetails(request, sessionBean);	
+				}
+				else if(sessionBean.getActionClicked().equals("UPDATE"))
+				{
+					/*
+					 * Update Operation called
+					 */
+					updateTypeDetails(request, sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("DELETE"))
+				{
+					/*
+					 * Delete Operation called
+					 */
+					deleteTypeDetails(request, sessionBean);	
+				}
+				else if(sessionBean.getActionClicked().equals("ACTIVE"))
+				{
+					/*
+					 * Active Operation called
+					 */
+					activeTypeDetails(request, sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("EXPORT"))
+				{
+					/*
+					 * Export Operation called
+					 */
+					exportTypeDetails(request, sessionBean);
+				}
+				else if(sessionBean.getActionClicked().equals("RESET"))
+				{
+					// reset some fields
+					sessionBean.setTypeList(null);
+					sessionBean.setFlagList(null);
+					sessionBean.setErrorMessage(null);
+					sessionBean.setSuccessMessage(null);
+					sessionBean.setSelectedRows(null);
+					sessionBean.setShowUpdate(false);
+					sessionBean.setDisplayPageLength(null);
+					sessionBean.setDisplayPageNo(null);
+					sessionBean.setInfoMessage(null);
+					sessionBean.setUpdatedRows(null);
+					sessionBean.setTypeListToImport(null);
+					/*
+					 * call getEngineTypeList
+					 */
+					getEngineTypeList(sessionBean);	
+				}
+			}
+			sessionBean.setActionClicked(null);
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "doPost()", e);
+		}
+		if(useReqDis==true)
+		{
+			/*
+			 * ALSO CHECK LAST TIME - IF TOP MENU LIST IN USER SESSION BEAN IS NULL
+			 * REDIRECT TO MY PAGE
+			 */
+			UserAccessBean userSessionBean = getUserSessionBean(request);
+			if(null==userSessionBean.getTopMenuList() || userSessionBean.getTopMenuList().size()<=0 || 
+					(null!=userSessionBean.getTopMenuList() && userSessionBean.getTopMenuList().size()==1))
+			{
+				response.sendRedirect(request.getContextPath()+"/mypage");
+			}
+			else
+			{
+				RequestDispatcher rs = request.getRequestDispatcher("/jsps/engineType.jsp");
+				rs.forward(request, response);
+			}
+		}
+	}
+	
+	private EngineTypeBean getSessionBean(HttpServletRequest request) 
+	{
+		EngineTypeBean sessionBean = null;
+		if (null != request.getSession().getAttribute("engineTypeBean") && !"".equals(request.getSession().getAttribute("engineTypeBean"))) 
+		{
+			sessionBean = (EngineTypeBean) request.getSession().getAttribute("engineTypeBean");
+		} 
+		else 
+		{
+			// initialize the sessionBean and set it in HTTP Session
+			sessionBean = new EngineTypeBean();
+			request.getSession().setAttribute("engineTypeBean", sessionBean);
+		}
+		return sessionBean;
+	}
+	
+	private void getCountryLocaleList(EngineTypeBean sessionBean, HttpServletRequest request)
+	{
+		try
+		{
+			UserAccessBean userSessionBean = getUserSessionBean(request);
+			sessionBean.setCountryLocaleList(new ArrayList<CountryLocaleDetails>());
+			ArrayList<CountryLocaleDetails> list = new ArrayList<CountryLocaleDetails>();
+			list = CountryLocaleDAO.getCountryLocaleDetailsListForCombo();
+			if(null!=list && list.size()>0)
+			{
+				/*
+				 * ITERATE LIST AND REMOVE ALL NON-WRITABLE MME COUNTRIES
+				 */
+				String nonWritableMMECountries=ApplicationProperties.getProperty("mme.not.writable.countries");
+				String[] tokens = nonWritableMMECountries.split(",");
+				if(null!=tokens && tokens.length>0)
+				{
+					for(int a=0;a<tokens.length;a++)
+					{
+						String ccCode = tokens[a];
+						if(null!=list && list.size()>0)
+						{
+							for(int b=0;b<list.size();b++)
+							{
+								CountryLocaleDetails clDetails = (CountryLocaleDetails)list.get(b);
+								if(clDetails.getCountryLocaleDesc().trim().toLowerCase().equals(ccCode.trim().toLowerCase()))
+								{
+									list.remove(b);
+									b--;
+									break;
+								}
+							}
+						}
+						ccCode = null;
+					}
+				}
+				tokens = null;
+				nonWritableMMECountries = null;
+			}
+			// PROCEED NOW
+			if(null!=list && list.size()>0)
+			{
+				if(userSessionBean.isSuperAdminUser()==true)
+				{
+					sessionBean.setCountryLocaleList(list);
+				}
+				else if(userSessionBean.isSuperAdminUser()==false)
+				{
+					ArrayList<CountryLocaleDetails> finalCountryList = new ArrayList<CountryLocaleDetails>();
+					// NOW CHECK FOR USER LOCALES
+					if(null!=userSessionBean.getUserLocalesList() && userSessionBean.getUserLocalesList().size()>0)
+					{
+						/*
+						 * CHECK IF USER LOCALE CONTIANS ANY MME LOCALES AND DOES NOT CONTAIN EN-UK LOCALE
+						 * THEN ALLOW EN-UK EXPLICITLY.
+						 */
+						String mmeNonWritableLoclaes=ApplicationProperties.getProperty("mme.not.writable.locales");
+						String[] localeTokens = mmeNonWritableLoclaes.split(",");
+						String enukLocale = ApplicationProperties.getProperty("en_uk");
+						enukLocale = enukLocale.replace("_", "-");
+						boolean containsMMELocale=false;
+						boolean containsENUKLocale=false;
+						for(String contentLocale : userSessionBean.getUserLocalesList())
+						{
+							for(int b=0;b<localeTokens.length;b++)
+							{
+								String loc = localeTokens[b];
+								loc = loc.replace("_", "-");
+								if(contentLocale.trim().toLowerCase().equals(loc.trim().toLowerCase()))
+								{
+									// USER CONTAINS MME LOCALE
+									containsMMELocale=true;
+									break;
+								}
+								loc = null;
+							}
+						}
+						
+						if(containsMMELocale==true)
+						{
+							// CHECK WHETHER USER CONTAIN ENUK LOCALE
+							for(String contentLocale : userSessionBean.getUserLocalesList())
+							{
+								if(contentLocale.trim().toLowerCase().equals(enukLocale.trim().toLowerCase()))
+								{
+									// USER CONTAINS ENUK LOCALE
+									containsENUKLocale=true;
+									break;
+								}
+							}
+						}
+						
+						// PROCEED FOR IDENTIFYING COUNTRIES FOR COMBO
+						for(String contentLocale : userSessionBean.getUserLocalesList())
+						{
+							if(contentLocale.lastIndexOf("-")!=-1)
+							{
+								String cCode = contentLocale.substring(contentLocale.lastIndexOf("-")+1, contentLocale.length());
+								if(null!=cCode && !"".equals(cCode))
+								{
+									for(CountryLocaleDetails cldDetails : list)
+									{
+										boolean addToList = false;
+										/*
+										 * IF MME LOCALE IS TRUE AND EN UK LOCALE IS FALSE
+										 * EXPLICITY ADD ENUK LOCALE AS WELL
+										 */
+										if(containsMMELocale==true && containsENUKLocale==false)
+										{
+											String ukCountry="";
+											if(enukLocale.lastIndexOf("-")!=-1)
+											{
+												ukCountry = enukLocale.substring(enukLocale.lastIndexOf("-")+1, enukLocale.length());
+											}
+											if(ukCountry.trim().toLowerCase().equals(cldDetails.getCountryLocaleDesc().trim().toLowerCase()))
+											{
+												// addToList
+												addToList= true;
+											}
+											ukCountry = null;
+										}
+										
+
+										// NORMAL FLOW - REMAINS AS IT IS
+										if(cCode.trim().toLowerCase().equals(cldDetails.getCountryLocaleDesc().trim().toLowerCase()))
+										{
+											// addToList
+											addToList= true;
+										}
+										
+										if(addToList==true)
+										{
+											boolean proceed = true;
+											if(null!=finalCountryList && finalCountryList.size()>0)
+											{
+												for(CountryLocaleDetails existDetails : finalCountryList)
+												{
+													if(existDetails.getCountryLocaleId()==cldDetails.getCountryLocaleId())
+													{
+														// alreadyAdded - proceed - false
+														proceed = false;
+														break;
+													}
+												}
+											}
+
+											if(proceed==true)
+											{
+												finalCountryList.add(cldDetails);
+											}
+										}
+										cldDetails = null;
+									}
+								}
+								cCode = null;
+							}
+							contentLocale = null;
+						}
+						mmeNonWritableLoclaes = null;
+						enukLocale = null;
+						localeTokens = null;
+					}
+
+					if(null!=finalCountryList && finalCountryList.size()>0)
+					{
+						CountryLocaleComparator countryLocaleComparator = new CountryLocaleComparator();
+						Collections.sort(finalCountryList,countryLocaleComparator);
+						sessionBean.setCountryLocaleList(finalCountryList);
+						countryLocaleComparator = null;
+					}
+					finalCountryList=  null;
+				}
+			}
+			list = null;
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "getCountryLocaleList()", e);
+		}
+	}
+	
+	private void getLanguageList(EngineTypeBean sessionBean, HttpServletRequest request)
+	{
+		try
+		{
+			sessionBean.setLanguageList(new ArrayList<ManualLanguageDetails>());
+			if(null!=sessionBean.getCountryLocaleId() && !"".equals(sessionBean.getCountryLocaleId()))
+			{
+				ArrayList<ManualLanguageDetails> list = new ArrayList<ManualLanguageDetails>();
+				list = ManualLanguageDAO.getManualLanguageDetailsListForCombo(sessionBean.getCountryLocaleId());
+				if(null!=list && list.size()>0)
+				{
+					/*
+					 * ITERATE LIST AND REMOVE ALL NON-WRITABLE MME LANGUAGES
+					 */
+					String nonWritableMMELocales=ApplicationProperties.getProperty("mme.not.writable.locales");
+					String[] tokens = nonWritableMMELocales.split(",");
+					if(null!=tokens && tokens.length>0)
+					{
+						for(int a=0;a<tokens.length;a++)
+						{
+							String lcCode = tokens[a];
+							if(null!=list && list.size()>0)
+							{
+								for(int b=0;b<list.size();b++)
+								{
+									ManualLanguageDetails mlDetails = (ManualLanguageDetails)list.get(b);
+									if(mlDetails.getManualLanguageName().trim().toLowerCase().equals(lcCode.trim().toLowerCase()))
+									{
+										list.remove(b);
+										b--;
+										break;
+									}
+								}
+							}
+							lcCode = null;
+						}
+					}
+					tokens = null;
+					nonWritableMMELocales = null;
+				}
+				
+				if(null!=list && list.size()>0)
+				{
+					UserAccessBean userSessionBean = getUserSessionBean(request);
+					if(userSessionBean.isSuperAdminUser()==true)
+					{
+						sessionBean.setLanguageList(list);
+					}
+					else if(userSessionBean.isSuperAdminUser()==false)
+					{
+						/*
+						 * ITERATE LIST AND CHECK FOR THE LOCALE CODE WHETHER EXISTS IN USER'S DEFAULT LOCALE AND CONTENT LOCALE OR NOT
+						 * IF EXISTS, THEN ONLY PROCEED. ELSE SKIP
+						 */
+						ArrayList<ManualLanguageDetails> finalLocaleList = new ArrayList<ManualLanguageDetails>();
+						// CHECK WITH USER LOCALES
+						if(null!=userSessionBean.getUserLocalesList() && userSessionBean.getUserLocalesList().size()>0)
+						{
+							/*
+							 * CHECK HERE IF USER CONTAINS ANY MME LOCALE BUT DOES NOT CONTAIN
+							 * ENUK LOCALE - ADD IT EXPLICITYLY 
+							 */
+							/*
+							 * CHECK IF USER LOCALE CONTIANS ANY MME LOCALES AND DOES NOT CONTAIN EN-UK LOCALE
+							 * THEN ALLOW EN-UK EXPLICITLY.
+							 */
+							String mmeNonWritableLoclaes=ApplicationProperties.getProperty("mme.not.writable.locales");
+							String[] localeTokens = mmeNonWritableLoclaes.split(",");
+							String enukLocale = ApplicationProperties.getProperty("en_uk");
+							enukLocale = enukLocale.replace("_", "-");
+							boolean containsMMELocale=false;
+							boolean containsENUKLocale=false;
+							for(String contentLocale : userSessionBean.getUserLocalesList())
+							{
+								for(int b=0;b<localeTokens.length;b++)
+								{
+									String loc = localeTokens[b];
+									loc = loc.replace("_", "-");
+									if(contentLocale.trim().toLowerCase().equals(loc.trim().toLowerCase()))
+									{
+										// USER CONTAINS MME LOCALE
+										containsMMELocale=true;
+										break;
+									}
+									loc = null;
+								}
+							}
+							
+							if(containsMMELocale==true)
+							{
+								// CHECK WHETHER USER CONTAIN ENUK LOCALE
+								for(String contentLocale : userSessionBean.getUserLocalesList())
+								{
+									if(contentLocale.trim().toLowerCase().equals(enukLocale.trim().toLowerCase()))
+									{
+										// USER CONTAINS ENUK LOCALE
+										containsENUKLocale=true;
+										break;
+									}
+								}
+							}
+							
+							
+							// PROCEED FOR IDENTIFYING LANGUAGES FOR COMBO
+							for(String contentLocale : userSessionBean.getUserLocalesList())
+							{
+								if(null!=contentLocale && !"".equals(contentLocale))
+								{
+									for(ManualLanguageDetails mldDetails : list)
+									{
+										boolean addToList = false;
+										
+										/*
+										 * IF MME LOCALE IS TRUE AND EN UK LOCALE IS FALSE
+										 * EXPLICITY ADD ENUK LOCALE AS WELL
+										 */
+										if(containsMMELocale==true && containsENUKLocale==false)
+										{
+											if(enukLocale.trim().toLowerCase().equals(mldDetails.getManualLanguageName().trim().toLowerCase()))
+											{
+												// addToList
+												addToList= true;
+											}
+										}
+										
+										// NORMAL FLOW - REMAINS AS IT IS
+										if(contentLocale.trim().toLowerCase().equals(mldDetails.getManualLanguageName().trim().toLowerCase()))
+										{
+											// addToList
+											addToList= true;
+										}
+									
+										if(addToList==true)
+										{
+											boolean proceed = true;
+											if(null!=finalLocaleList && finalLocaleList.size()>0)
+											{
+												for(ManualLanguageDetails existDetails : finalLocaleList)
+												{
+													if(existDetails.getManualLanguageId()==mldDetails.getManualLanguageId())
+													{
+														// alreadyAdded - proceed - false
+														proceed = false;
+														break;
+													}
+												}
+											}
+
+											if(proceed==true)
+											{
+												finalLocaleList.add(mldDetails);
+											}
+										}
+										mldDetails = null;
+									}
+								}
+								contentLocale = null;
+							}
+							
+							mmeNonWritableLoclaes = null;
+							enukLocale = null;
+							localeTokens = null;
+						}
+						
+						if(null!=finalLocaleList && finalLocaleList.size()>0)
+						{
+							ManualLanguageComparator manualLanguageComparator = new ManualLanguageComparator();
+							Collections.sort(finalLocaleList,manualLanguageComparator);
+							sessionBean.setLanguageList(finalLocaleList);
+							manualLanguageComparator = null;
+						}
+						finalLocaleList=  null;
+					}
+				}
+				list = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "getLanguageList()", e);
+		}
+	}
+	
+	private static void getBookList(EngineTypeBean sessionBean)
+	{
+		try
+		{
+			sessionBean.setBookList(new ArrayList<EngineBookDetails>());
+			if(null!=sessionBean.getManualLanguageId() && !"".equals(sessionBean.getManualLanguageId()))
+			{
+				ArrayList<EngineBookDetails> list = new ArrayList<EngineBookDetails>();
+				list = EngineBookDAO.getEngineBookDetailsListForCombo(sessionBean.getManualLanguageId());
+				if(null!=list && list.size()>0)
+				{
+					sessionBean.setBookList(list);
+				}
+				list = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "getBookList()", e);
+		}
+	}
+	
+	private static void getFlagList(EngineTypeBean sessionBean)
+	{
+		sessionBean.setFlagList(new ArrayList<SelectItemDetails>());
+		
+		sessionBean.setFlagList(Utilities.prepareFlagsList(msgProps));
+	}
+	
+	private static void getEngineTypeList(EngineTypeBean sessionBean)
+	{
+		try
+		{
+			sessionBean.setTypeList(new ArrayList<EngineTypeDetails>());
+			if(null!=sessionBean.getManualLanguageId() && !"".equals(sessionBean.getManualLanguageId()))
+			{
+				ArrayList<EngineTypeDetails> list = new ArrayList<EngineTypeDetails>();
+				list = EngineTypeDAO.getEngineTypeDetailsList(sessionBean.getManualLanguageId(), sessionBean.getBookId());
+				if(null!=list && list.size()>0)
+				{
+					for(int i=0;i<list.size();i++)
+					{
+						EngineTypeDetails typeDetails = (EngineTypeDetails)list.get(i);
+						if(null!=typeDetails.getFlag() && !"".equals(typeDetails.getFlag()))
+						{
+							// set Label
+							if(typeDetails.getFlag().equals(ApplicationProperties.getProperty("flag.value.active")))
+							{
+								typeDetails.setFlagLabel(msgProps.getProperty("flag.label.active"));
+							}
+							else if(typeDetails.getFlag().equals(ApplicationProperties.getProperty("flag.value.sleep")))
+							{
+								typeDetails.setFlagLabel(msgProps.getProperty("flag.label.sleep"));
+							}
+							else if(typeDetails.getFlag().equals(ApplicationProperties.getProperty("flag.value.draft")))
+							{
+								typeDetails.setFlagLabel(msgProps.getProperty("flag.label.draft"));
+							}
+							else if(typeDetails.getFlag().equals(ApplicationProperties.getProperty("flag.value.deprecated")))
+							{
+								typeDetails.setFlagLabel(msgProps.getProperty("flag.label.deprecated"));
+							}
+							else if(typeDetails.getFlag().equals(ApplicationProperties.getProperty("flag.value.delete")))
+							{
+								typeDetails.setFlagLabel(msgProps.getProperty("flag.label.delete"));
+							}
+						}
+						typeDetails  = null;
+					}
+					sessionBean.setTypeList(list);
+				}
+				list = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "getEngineTypeList()", e);
+		}
+	}
+	
+	private static boolean validate(EngineTypeDetails fieldDetails, EngineTypeBean sessionBean)
+	{
+		StringBuilder errorMessage = new StringBuilder();
+		if(null==sessionBean.getCountryLocaleId() || "".equals(sessionBean.getCountryLocaleId()) || 
+				null==sessionBean.getManualLanguageId() || "".equals(sessionBean.getManualLanguageId()) ||
+				null==sessionBean.getBookId() || "".equals(sessionBean.getBookId()) ||
+				null==fieldDetails.getTypeCode() || "".equals(fieldDetails.getTypeCode()) ||
+				null==fieldDetails.getTypeName() || "".equals(fieldDetails.getTypeName()))
+		{
+			errorMessage.append(msgProps.getProperty("error.mandatory.fields"));
+		}
+		
+		if(null!=fieldDetails.getTypeCode() && !"".equals(fieldDetails.getTypeCode()))
+		{
+			if(fieldDetails.getTypeCode().length()>10)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				errorMessage.append(msgProps.addMessage("error.length.greater.characters", msgProps.getProperty("label.enginetypecode"),"10"));
+			}
+		}
+		
+		if(null!=fieldDetails.getTypeName() && !"".equals(fieldDetails.getTypeName()))
+		{
+			if(fieldDetails.getTypeName().length()>200)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				errorMessage.append(msgProps.addMessage("error.length.greater.characters", msgProps.getProperty("label.enginetypename"),"200"));
+			}
+		}
+		
+		if(null!=fieldDetails.getGroupCode() && !"".equals(fieldDetails.getGroupCode()))
+		{
+			if(fieldDetails.getGroupCode().length()>200)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				errorMessage.append(msgProps.addMessage("error.length.greater.characters", msgProps.getProperty("label.grouptype"),"200"));
+			}
+		}
+		
+		
+		
+		
+		if(null!=fieldDetails.getTypeCode() && !"".equals(fieldDetails.getTypeCode()) 
+				&& null!=sessionBean.getTypeList() && sessionBean.getTypeList().size()>0)
+		{
+			for(int a=0;a<sessionBean.getTypeList().size();a++)
+			{
+				EngineTypeDetails typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+				if(typeDetails.getTypeCode().trim().toLowerCase().equals(fieldDetails.getTypeCode().trim().toLowerCase()))
+				{
+					if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+					{
+						errorMessage.append("<MSG_TOKEN>");
+					}
+					errorMessage.append(msgProps.addMessage("error.unique", msgProps.getProperty("label.enginetypecode")));
+					break;
+				}
+				typeDetails=  null;
+			}
+		}
+		
+		String messages=errorMessage.toString();
+		if(null!=messages && !"".equals(messages))
+		{
+			sessionBean.setErrorMessage(messages);
+			messages=  null;
+			errorMessage= null;
+			return false;
+		}
+		messages= null;
+		errorMessage = null;
+		return true;
+	}
+	
+	private static boolean validateUpdate(EngineTypeDetails fieldDetails, EngineTypeBean sessionBean)
+	{
+		StringBuilder errorMessage = new StringBuilder();
+		if(null==fieldDetails.getTypeCode() || "".equals(fieldDetails.getTypeCode()) ||
+				 null==fieldDetails.getTypeName() || "".equals(fieldDetails.getTypeName()))
+		{
+			errorMessage.append(msgProps.addMessage("error.mandatory.fields.for.row", String.valueOf(fieldDetails.getSrNo())));
+		}
+		
+		if(null!=fieldDetails.getTypeCode() && !"".equals(fieldDetails.getTypeCode()))
+		{
+			if(fieldDetails.getTypeCode().length()>10)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				String data = msgProps.getProperty("label.enginetypecode")+",10,"+String.valueOf(fieldDetails.getSrNo());
+				String[] id = data.split(",");
+				errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+				data = null;
+				id = null;
+			}
+		}
+
+		if(null!=fieldDetails.getTypeName() && !"".equals(fieldDetails.getTypeName()))
+		{
+			if(fieldDetails.getTypeName().length()>200)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				String data = msgProps.getProperty("label.enginetypename")+",200,"+String.valueOf(fieldDetails.getSrNo());
+				String[] id = data.split(",");
+				errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+				data = null;
+				id = null;
+
+			}
+		}
+		
+		if(null!=fieldDetails.getGroupCode() && !"".equals(fieldDetails.getGroupCode()))
+		{
+			if(fieldDetails.getGroupCode().length()>200)
+			{
+				if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+				{
+					errorMessage.append("<MSG_TOKEN>");
+				}
+				String data = msgProps.getProperty("label.grouptype")+",200,"+String.valueOf(fieldDetails.getSrNo());
+				String[] id = data.split(",");
+				errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+				data = null;
+				id = null;
+
+			}
+		}
+		
+		if(null!=fieldDetails.getTypeCode() && !"".equals(fieldDetails.getTypeCode()) 
+				&& null!=sessionBean.getTypeList() && sessionBean.getTypeList().size()>0)
+		{
+			for(int a=0;a<sessionBean.getTypeList().size();a++)
+			{
+				EngineTypeDetails typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+				if(typeDetails.getTypeId().longValue()!=fieldDetails.getTypeId().longValue() && typeDetails.getBookId().longValue()==fieldDetails.getBookId().longValue() && 
+						typeDetails.getTypeCode().trim().toLowerCase().equals(fieldDetails.getTypeCode().trim().toLowerCase()))
+				{
+					if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+					{
+						errorMessage.append("<MSG_TOKEN>");
+					}
+					String data = msgProps.getProperty("label.enginetypecode")+","+String.valueOf(fieldDetails.getSrNo());
+					String[] id = data.split(",");
+					errorMessage.append(msgProps.getMessage(id, "error.unique.update"));
+					data = null;
+					id = null;
+					break;
+				}
+				typeDetails=  null;
+			}
+		}
+		
+		String messages=errorMessage.toString();
+		if(null!=messages && !"".equals(messages))
+		{
+			sessionBean.setErrorMessage(messages);
+			messages=  null;
+			errorMessage= null;
+			return false;
+		}
+		messages= null;
+		errorMessage = null;
+		return true;
+	}
+	
+	private static void saveTypeDetails(EngineTypeBean sessionBean)
+	{
+		try
+		{
+			if(validate(sessionBean.getFieldDetails(), sessionBean))
+			{
+				/*
+				 * call database function
+				 * before that set flag as Active
+				 */
+				sessionBean.getFieldDetails().setCountryLocaleId(new Long(sessionBean.getCountryLocaleId()).longValue());
+				sessionBean.getFieldDetails().setManualLanguageId(new Long(sessionBean.getManualLanguageId()).longValue());
+				sessionBean.getFieldDetails().setBookId(new Long(sessionBean.getBookId()).longValue());
+				sessionBean.getFieldDetails().setFlag(ApplicationProperties.getProperty("flag.value.draft"));
+				boolean bool = EngineTypeDAO.saveEngineTypeDetails(sessionBean.getFieldDetails());
+				if(bool==true)
+				{
+					logger.info("saveTypeDetails :: Engine Type Details inserted successfully.");
+					sessionBean.setSuccessMessage(msgProps.addMessage("entry.success", msgProps.getProperty("label.enginetype")));
+					// reset fields
+					sessionBean.setErrorMessage(null);
+					sessionBean.setFieldDetails(null);
+					sessionBean.setTypeList(null);
+					sessionBean.setSelectedRows(null);
+					sessionBean.setShowUpdate(false);
+					/*
+					 * call getTypeList
+					 */
+					getEngineTypeList(sessionBean);
+				}
+				else
+				{
+					logger.info("saveTypeDetails :: Insertion Fails. ");
+					// set errorMessage
+					sessionBean.setErrorMessage(msgProps.addMessage("error.message.operation.save", msgProps.getProperty("label.enginetype")));
+				}
+			}
+			else
+			{
+				logger.info("saveTypeDetails :: Validation Fails :: Error Messages :: > " + sessionBean.getErrorMessage());
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "saveTypeDetails()", e);
+		}
+	}
+	
+	private static void editTypeDetails(HttpServletRequest request, EngineTypeBean sessionBean)
+	{
+		try
+		{
+			sessionBean.setShowUpdate(false);
+			// set editableFlag for all rows to false
+			if(null!=sessionBean.getTypeList() && !"".equals(sessionBean.getTypeList().size()>0))
+			{
+				for(int a=0;a<sessionBean.getTypeList().size();a++)
+				{
+					EngineTypeDetails typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+					typeDetails.setEditableFlag(false);
+				}
+			}
+			if(null!=sessionBean.getSelectedRows() && !"".equals(sessionBean.getSelectedRows()))
+			{
+				/*
+				 * set the EDITABLE FLAG TO TRUE in LANGUAGE LIST
+				 */
+				if(null!=sessionBean.getTypeList() && !"".equals(sessionBean.getTypeList().size()>0))
+				{
+					String[] rows = sessionBean.getSelectedRows().split(",");
+					if(null!=rows && rows.length>0)
+					{
+						for(int i=0;i<rows.length;i++)
+						{
+							String rowId = String.valueOf(rows[i]);
+							for(int a=0;a<sessionBean.getTypeList().size();a++)
+							{
+								EngineTypeDetails typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+								if(rowId.equals(String.valueOf(typeDetails.getTypeId())))
+								{
+									logger.info("editTypeDetails :: Making Row No {"+typeDetails.getSrNo()+"} Editable.");
+									typeDetails.setEditableFlag(true);
+									break;
+								}
+							}
+							rowId=  null;
+						}
+					}
+					rows = null;
+				}
+				// show Update Button
+				sessionBean.setShowUpdate(true);
+			}
+			else
+			{
+				logger.info("editTypeDetails :: No Row selected for Edit, throwing message.");
+				String errorMessage = msgProps.getProperty("error.select.onerow.edit");
+				sessionBean.setErrorMessage(errorMessage);
+				errorMessage  =null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "editTypeDetails()", e);
+		}
+	}
+
+	private static void deleteTypeDetails(HttpServletRequest request, EngineTypeBean sessionBean)
+	{
+		try
+		{
+			if(null!=sessionBean.getSelectedRows() && !"".equals(sessionBean.getSelectedRows()))
+			{
+				String deleteIds=sessionBean.getSelectedRows();
+				if(null!=deleteIds && !"".equals(deleteIds))
+				{
+					if(deleteIds.endsWith(","))
+					{
+						deleteIds = deleteIds.substring(0,deleteIds.length()-1);
+					}
+					boolean bool = EngineTypeDAO.deleteEngineTypeDetails(deleteIds);
+					if(bool==true)
+					{
+						sessionBean.setSuccessMessage(msgProps.addMessage("delete.success", msgProps.getProperty("label.enginetype")));
+						/*
+						 * call getCarList
+						 */
+						getEngineTypeList(sessionBean);
+					}
+					else
+					{
+						sessionBean.setErrorMessage(msgProps.addMessage("error.message.operation.delete", msgProps.getProperty("label.enginetype")));
+					}
+				}
+			}
+			else
+			{
+				logger.info("deleteTypeDetails :: No Row selected for Edit, throwing message.");
+				String errorMessage = msgProps.getProperty("error.select.onerow.delete");
+				sessionBean.setErrorMessage(errorMessage);
+				errorMessage  =null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "deleteTypeDetails()", e);
+		}
+	}
+
+	private static void updateTypeDetails(HttpServletRequest request, EngineTypeBean sessionBean)
+	{
+		try
+		{
+			if(null!=sessionBean.getUpdatedRows() && !"".equals(sessionBean.getUpdatedRows()))
+			{
+				ArrayList<EngineTypeDetails> updateDataList = new ArrayList<EngineTypeDetails>();
+				String updatedRows=sessionBean.getUpdatedRows();
+				String[] updatedRowsTokens=updatedRows.split("<MDM_FS>");
+				if(null!=updatedRowsTokens && updatedRowsTokens.length>0)
+				{
+					if(null!=sessionBean.getTypeList() && sessionBean.getTypeList().size()>0)
+					{
+						EngineTypeDetails typeDetails = new EngineTypeDetails();
+						for(int i=0;i<sessionBean.getTypeList().size();i++)
+						{
+							typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(i);
+							if(typeDetails.isEditableFlag()==true)
+							{
+								// set fields empty 
+								typeDetails.setTypeName("");
+								typeDetails.setFlag("");
+								typeDetails.setTypeCode("");
+								typeDetails.setGroupCode("");
+
+								/*
+								 * fetch the values from request
+								 * and set in LanguageList
+								 */
+								String typeCodeId="ET_TypeList_Code"+String.valueOf(typeDetails.getTypeId());
+								String carNameEnId="ET_TypeList_Name"+String.valueOf(typeDetails.getTypeId());
+								String flag="ET_LangList_Flag_"+String.valueOf(typeDetails.getTypeId());
+								String groupTypeId="ET_TypeList_GroupCode"+String.valueOf(typeDetails.getTypeId());
+								if(null!=updatedRowsTokens && updatedRowsTokens.length>0)
+								{
+									for(int t=0;t<updatedRowsTokens.length;t++)
+									{
+										String token = updatedRowsTokens[t];
+										String key=token.substring(0,token.indexOf("<MDM_TS>"));
+										if(key.equals(typeCodeId))
+										{
+											typeDetails.setTypeCode(token.substring(token.indexOf("<MDM_TS>")+8, token.length()));
+										}
+										else if(key.equals(carNameEnId))
+										{
+											typeDetails.setTypeName(token.substring(token.indexOf("<MDM_TS>")+8, token.length()));
+										}
+										else if(key.equals(flag))
+										{
+											typeDetails.setFlag(token.substring(token.indexOf("<MDM_TS>")+8, token.length()));	
+										}
+										else if(key.equals(groupTypeId))
+										{
+											typeDetails.setGroupCode(token.substring(token.indexOf("<MDM_TS>")+8, token.length()));
+										}
+										key = null;
+										token=  null;
+									}
+								}
+
+								// set all request params ids to null
+								typeCodeId = null;
+								carNameEnId = null;
+								flag= null;
+								groupTypeId = null;
+							}
+							typeDetails = null;
+						}
+
+						typeDetails = new EngineTypeDetails();
+						for(int i=0;i<sessionBean.getTypeList().size();i++)
+						{
+							typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(i);
+							if(typeDetails.isEditableFlag()==true)
+							{
+								/*
+								 * add to Update List
+								 * Before adding validate data for each Row.
+								 * validate typeDetails Object
+								 */
+								if(validateUpdate(typeDetails, sessionBean))
+								{
+									/*
+									 * add data to updateList
+									 */
+									updateDataList.add(typeDetails);
+								}
+								else
+								{
+									// set updateList to null;
+									updateDataList=  null;
+									break;
+								}
+							}
+							typeDetails = null;
+						}
+
+						if(null!=updateDataList && updateDataList.size()>0)
+						{
+							logger.info("updateTypeDetails :: Selected Rows Size for Update are :: >  " + updateDataList.size());
+							/*
+							 * Iterate UpdateList and update each row one by one.
+							 */
+							String errorMessage="";
+							String successMessage="";
+							
+							updateDataList = EngineTypeDAO.updateEngineTypeDetails(updateDataList);
+							typeDetails = new EngineTypeDetails();
+							for(int a=0;a<updateDataList.size();a++)
+							{
+								typeDetails = (EngineTypeDetails)updateDataList.get(a);
+								if(typeDetails.isSaveStatusWhileImport())
+								{
+									logger.info("updateTypeDetails :: Type Details updated successfully for Row No :: > " + typeDetails.getSrNo());
+									successMessage = successMessage+String.valueOf(typeDetails.getSrNo())+",";
+								}
+								else
+								{
+									logger.info("updateTypeDetails :: Failed to Update Type Details for Row No :: >  "+ typeDetails.getSrNo());
+									errorMessage = errorMessage+String.valueOf(typeDetails.getSrNo())+",";	
+								}
+								typeDetails=  null;
+							}
+
+							if(null!=successMessage && !"".equals(successMessage))
+							{
+								if(successMessage.endsWith(","))
+								{
+									successMessage= successMessage.substring(0,successMessage.length()-1);
+								}
+								successMessage = "("+successMessage+")";
+								sessionBean.setSuccessMessage(msgProps.addMessage("update.success", msgProps.getProperty("label.enginetype"), successMessage));
+							}
+
+							if(null!=errorMessage && !"".equals(errorMessage))
+							{
+								if(errorMessage.endsWith(","))
+								{
+									errorMessage= errorMessage.substring(0,errorMessage.length()-1);
+								}
+								errorMessage = "("+errorMessage+")";
+								sessionBean.setErrorMessage(msgProps.addMessage("error.message.operation.update", msgProps.getProperty("label.enginetype"), errorMessage));
+							}
+							if(null==errorMessage || "".equals(errorMessage))
+							{
+								logger.info("updateTypeDetails :: No errors reported resetting the form.");
+								// reset fields
+								sessionBean.setErrorMessage(null);
+								sessionBean.setTypeList(null);
+								sessionBean.setSelectedRows(null);
+								sessionBean.setShowUpdate(false);
+								/*
+								 * call getBookList
+								 */
+								getEngineTypeList(sessionBean);
+							}
+							else if(null!=errorMessage && !"".equals(errorMessage))
+							{
+								logger.info("updateTypeDetails :: Error found in rows :: > " + errorMessage);
+								/*
+								 * then only make the update fields viewable
+								 */
+								if(null!=sessionBean.getTypeList() && sessionBean.getTypeList().size()>0)
+								{
+									String tokens[] = errorMessage.split(",");
+									if(null!=tokens && tokens.length>0)
+									{
+										typeDetails = new EngineTypeDetails();
+										for(int a=0;a<sessionBean.getTypeList().size();a++)
+										{
+											typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+											typeDetails.setEditableFlag(false);
+											for(int b=0;b<tokens.length;b++)
+											{
+												if(tokens[b].toString().equals(String.valueOf(typeDetails.getSrNo())))
+												{
+													typeDetails.setEditableFlag(true);
+													break;
+												}
+											}
+											typeDetails = null;
+										}
+									}
+									tokens= null;
+								}
+							}
+							successMessage= null;
+							errorMessage= null;
+						}
+						updateDataList= null;
+					}
+				}
+				updatedRows = null;
+				updatedRowsTokens = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "updateTypeDetails()", e);
+		}
+	}
+	
+	private UserAccessBean getUserSessionBean(HttpServletRequest request) 
+	{
+		UserAccessBean sessionBean = null;
+		if (null != request.getSession().getAttribute("userAccessBean") && !"".equals(request.getSession().getAttribute("userAccessBean"))) 
+		{
+			sessionBean = (UserAccessBean) request.getSession().getAttribute("userAccessBean");
+		} 
+		else 
+		{
+			// initialize the sessionBean and set it in HTTP Session
+			sessionBean = new UserAccessBean();
+			request.getSession().setAttribute("userAccessBean", sessionBean);
+		}
+		return sessionBean;
+	}
+	
+	private void performAccessCheck(EngineTypeBean sessionBean, HttpServletRequest request)
+	{
+		/*
+		 * Check User Has access to this Functionality or Not.
+		 * Identify if User is Super Admin - then enable Read / Write Access on this page
+		 * else - check if user has access to this functionality
+		 * 		check for the accessType
+		 * 			if READ ACCESS - SHOW READ CONTROLS
+		 * 			if WRITE ACCESS - SHOW WRITE CONTROLS
+		 * 			if READ & WRITE ACCESS - SHOW READ & WRITE CONTROLS
+		 */
+		try
+		{
+			UserAccessBean userSessionBean = getUserSessionBean(request);
+			sessionBean.setShowReadControls(false);
+			sessionBean.setShowWriteControls(false);
+			if(userSessionBean.isSuperAdminUser()==true)
+			{
+				sessionBean.setShowReadControls(true);
+				sessionBean.setShowWriteControls(true);
+			}
+			else if(userSessionBean.isSuperAdminUser()==false)
+			{
+				if(null!=userSessionBean.getUserAllModulesList() && userSessionBean.getUserAllModulesList().size()>0)
+				{
+					for(int a=0;a<userSessionBean.getUserAllModulesList().size();a++)
+					{
+						ModuleDetails modDetails = (ModuleDetails)userSessionBean.getUserAllModulesList().get(a);
+						if(modDetails.getModuleRefkey().trim().toLowerCase().equals(moduleRefKey.trim().toLowerCase()))
+						{
+							// USER HAS ACCESS TO THIS SCREEN. CHECK FOR ACCESS TYPE
+							if(modDetails.getAccessType()==AccessManagementInterface.ONLY_READ_ACCESS)
+							{
+								sessionBean.setShowReadControls(true);
+							}
+							else if(modDetails.getAccessType()==AccessManagementInterface.ONLY_WRITE_ACCESS)
+							{
+								sessionBean.setShowWriteControls(true);
+							}
+							else if(modDetails.getAccessType()==AccessManagementInterface.READ_AND_WRITE_ACCESS)
+							{
+								sessionBean.setShowReadControls(true);
+								sessionBean.setShowWriteControls(true);
+							}
+							else
+							{
+								sessionBean.setShowReadControls(false);
+								sessionBean.setShowWriteControls(false);
+							}
+							break;
+						}
+					}
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "performAccessCheck()", e);
+		}
+	}
+
+	
+	private  void exportTypeDetails(HttpServletRequest request, EngineTypeBean sessionBean)
+	{
+		sessionBean.setReportViewPath(null);
+		try
+		{
+			if(null!=sessionBean.getSelectedRows() && !"".equals(sessionBean.getSelectedRows()))
+			{
+				String selectedRows=sessionBean.getSelectedRows();
+				ArrayList<EngineTypeDetails> exportDataList = new ArrayList<EngineTypeDetails>();
+				/*
+				 * set the EDITABLE FLAG TO TRUE in LANGUAGE LIST
+				 */
+				if(null!=sessionBean.getTypeList() && !"".equals(sessionBean.getTypeList().size()>0))
+				{
+					String[] rows = selectedRows.split(",");
+					if(null!=rows && rows.length>0)
+					{
+						for(int i=0;i<rows.length;i++)
+						{
+							String rowId = String.valueOf(rows[i]);
+							for(int a=0;a<sessionBean.getTypeList().size();a++)
+							{
+								EngineTypeDetails typeDetails = (EngineTypeDetails)sessionBean.getTypeList().get(a);
+								if(rowId.equals(String.valueOf(typeDetails.getTypeId())))
+								{
+									// add to export List
+									exportDataList.add(typeDetails);
+									break;
+								}
+							}
+							rowId=  null;
+						}
+					}
+					rows = null;
+				}
+				
+				if(null!=exportDataList && exportDataList.size()>0)
+				{
+					/*
+					 * CALL FUNCTION TO GENERATE EXCEL FOR THE SELECTED ROWS
+					 */
+					writeEngineTypeExcel(exportDataList, sessionBean);
+					/*
+					 * PREARE VIN REORT PATH AND MAKE IT DOWNLOAD
+					 */
+					if(null!=reportName && !"".equals(reportName))
+					{
+						// set in SESSION BEAN
+						String path = ApplicationProperties.getProperty("EXPORT_DATA_WB_PATH");
+						if(!path.endsWith("/"))
+						{
+							path = path+"/";
+						}
+						path = path+reportName;
+						sessionBean.setReportViewPath(path);
+						path = null;
+					}
+					reportName = null;
+				}
+				else
+				{
+					logger.info("exportTypeDetails :: No Row selected for EXPORT, throwing message.");
+					String errorMessage = msgProps.getProperty("error.select.onerow.export");
+					sessionBean.setErrorMessage(errorMessage);
+					errorMessage  =null;
+				}
+				exportDataList = null;
+				selectedRows  =null;
+			}
+			else
+			{
+				logger.info("exportTypeDetails :: No Row selected for EXPORT, throwing message.");
+				String errorMessage = msgProps.getProperty("error.select.onerow.export");
+				sessionBean.setErrorMessage(errorMessage);
+				errorMessage  =null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "exportTypeDetails()", e);
+		}
+	}
+
+	private void writeEngineTypeExcel(ArrayList<EngineTypeDetails> typeList, EngineTypeBean sessionBean)
+	{
+		try
+		{
+			String path = ApplicationProperties.getProperty("EXPORT_DATA_PHYSICAL_PATH");
+			if(null!=path && !"".equals(path))
+			{
+				if(!path.endsWith("\\"))
+				{
+					path = path+"\\";
+				}
+				// add VIN DATA NAME
+				String name = "";
+				/*
+				 * add SELECTED COUNTRY LOCALE CODE, ADD MANUAL LANGUAGE CODE, ADD MODEL CODE
+				 * add Current Time Stamp in Format - DDMMYYYY HHMMSS
+				 * 
+				 * So the final Name will be - US_EN-US_ND_VIN_DDMMYYYY_HHMMSS.XSLX
+				 */
+				
+				String countryLocaleCode = "";
+				if(null!=sessionBean.getCountryLocaleId() && !"".equals(sessionBean.getCountryLocaleId()))
+				{
+					countryLocaleCode = CountryLocaleDAO.getCountryLocaleCode(sessionBean.getCountryLocaleId());
+					if(null!=countryLocaleCode && !"".equals(countryLocaleCode))
+					{
+						name= countryLocaleCode.trim().toUpperCase();
+					}
+				}
+				countryLocaleCode = null;
+				String manualLanguageCode="";
+				if(null!=sessionBean.getManualLanguageId() && !"".equals(sessionBean.getManualLanguageId()))
+				{
+					manualLanguageCode = ManualLanguageDAO.getManualLanguageCode(sessionBean.getManualLanguageId());
+					if(null!=manualLanguageCode && !"".equals(manualLanguageCode))
+					{
+						if(null!=name && !"".equals(name))
+						{
+							name = name.trim()+"_";
+						}
+						name = name.trim()+manualLanguageCode.trim().toUpperCase();
+					}
+				}
+				manualLanguageCode = null;
+				
+				if(null!=name && !"".equals(name))
+				{
+					name = name.trim()+"_";
+				}
+				name = name.trim()+ApplicationProperties.getProperty("EXPORT_DATA_ENGINE_TYPE_NAME");
+				SimpleDateFormat sdf = new SimpleDateFormat("ddMMyyyy_HHmmss");
+				String displayValue = sdf.format(new Date());
+				// ADD ZIP NAME.
+				String zipName = name.trim()+"_"+displayValue+ApplicationProperties.getProperty("EXPORT_DATA_EXTENSION_ZIP");
+				// ADD ZIP PATH
+				String zipPath = path+zipName;
+				name = name.trim()+"_"+displayValue+ApplicationProperties.getProperty("EXPORT_DATA_EXTENSION");
+				path= path+name;
+				
+				// SET REPORT NAME TO ZIP FILE NAME INSTEAD OF EXCEL FILE
+				reportName = zipName;
+				name = null;
+				zipName = null;
+				File excelFile = new File(path);
+				// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
+				SXSSFWorkbook myWorkBook = new SXSSFWorkbook(100);
+				// Create a new sheet
+				Sheet mySheet = myWorkBook.createSheet("EXPORTED DATA");
+				Row headerRow = mySheet.createRow(0);
+				
+				Cell codeCell = headerRow.createCell(0);
+				codeCell.setCellValue("ENGINE BOOK CODE");
+				Cell typeCodeCell = headerRow.createCell(1);
+				typeCodeCell.setCellValue("ENGINE TYPE CODE");
+				Cell namCell = headerRow.createCell(2);
+				namCell.setCellValue("ENGINE TYPE NAME");
+				Cell groupTypeCell = headerRow.createCell(3);
+				groupTypeCell.setCellValue("GROUP TYPE");
+				int rowCount=0;
+				if(null!=typeList && typeList.size()>0)
+				{
+					for(int i=0;i<typeList.size();i++)
+					{
+						EngineTypeDetails details = (EngineTypeDetails)typeList.get(i);
+						rowCount++;
+						Row row = mySheet.createRow(rowCount);
+						
+						Cell cell0 = row.createCell(0);
+						Cell cell1 = row.createCell(1);
+						Cell cell2 = row.createCell(2);
+						Cell cell3 = row.createCell(3);
+						
+						cell0.setCellValue("");
+						cell1.setCellValue("");
+						cell2.setCellValue("");
+						cell3.setCellValue("");
+						
+						if(null!=details.getBookCode() && !"".equals(details.getBookCode()))
+						{
+							cell0.setCellValue(details.getBookCode().trim());
+						}
+						if(null!=details.getTypeCode() && !"".equals(details.getTypeCode()))
+						{
+							cell1.setCellValue(details.getTypeCode().trim());
+						}
+						if(null!=details.getTypeName() && !"".equals(details.getTypeName()))
+						{
+							cell2.setCellValue(details.getTypeName().trim());
+						}
+						if(null!=details.getGroupCode() && !"".equals(details.getGroupCode()))
+						{
+							cell3.setCellValue(details.getGroupCode().trim());
+						}
+						
+						cell0 = null;
+						cell1 = null;
+						cell2 = null;
+						cell3 = null;
+						row = null;
+						details = null;
+					}
+					
+					headerRow =  null;
+					codeCell = null;
+					typeCodeCell = null;
+					namCell= null;
+					groupTypeCell=  null;
+					/*
+					 * Before Writing check for size if equals to or more than 10 MB
+					 * then generate a file with a extension to it.
+					 */
+
+					FileOutputStream os = new FileOutputStream(excelFile);
+					myWorkBook.write(os);
+					os.flush();
+					os.close();
+
+					// set mySheet to null
+					mySheet = null;
+					// set myWorkBook to null
+					myWorkBook = null;
+					// set path to null
+					path = null;
+					// set sdf to null
+					sdf = null;
+					/*
+					 * CONVERT THIS FILE TO ZIP FILE.
+					 */
+					Utilities.createReportsZip(zipPath, excelFile);
+					
+					// set excelFile to null
+					excelFile = null;
+					// set zipPath to null
+					zipPath=  null;
+				}
+			}
+			
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "writeEngineTypeExcel()", e);
+		}
+	}
+	
+	private  void activeTypeDetails(HttpServletRequest request, EngineTypeBean sessionBean)
+	{
+		try
+		{
+			if(null!=sessionBean.getSelectedRows() && !"".equals(sessionBean.getSelectedRows()))
+			{
+				String activeIds=sessionBean.getSelectedRows();
+				if(null!=activeIds && !"".equals(activeIds))
+				{
+					if(activeIds.endsWith(","))
+					{
+						activeIds = activeIds.substring(0,activeIds.length()-1);
+					}
+					/*
+					 * for each active id - fetch Old status from the carlineList
+					 */
+					List<Map<String, String>> activeIdsList = new ArrayList<Map<String, String>>();
+					String[] tok = activeIds.split(",");
+					EngineTypeDetails cDetails = null;
+					Map<String,String> dataMap = null;
+					if(null!=tok && tok.length>0)
+					{
+						for(int a=0;a<tok.length;a++)
+						{
+							if(null!=sessionBean.getTypeList() && sessionBean.getTypeList().size()>0)
+							{
+								cDetails  =null;
+								for(int b=0;b<sessionBean.getTypeList().size();b++)
+								{
+									cDetails=  (EngineTypeDetails)sessionBean.getTypeList().get(b);
+									if(String.valueOf(cDetails.getTypeId()).equals(tok[a]))
+									{
+										dataMap= new HashMap<String, String>();
+										dataMap.put("ID", tok[a]);
+										dataMap.put("FLAG", cDetails.getOldFlag());
+										activeIdsList.add(dataMap);
+										dataMap=  null;
+									}
+									cDetails = null;
+								}
+							}
+						}
+					}
+					tok = null;
+					dataMap=  null;
+					boolean bool = EngineTypeDAO.activeEngineTypeDetails(activeIdsList);
+					if(bool==true)
+					{
+						sessionBean.setSuccessMessage(msgProps.addMessage("active.success", msgProps.getProperty("label.enginetype")));
+						/*
+						 * call getEngineTypeList
+						 */
+						getEngineTypeList(sessionBean);
+					}
+					else
+					{
+						sessionBean.setErrorMessage(msgProps.addMessage("error.message.operation.active", msgProps.getProperty("label.enginetype")));
+					}
+					activeIdsList = null;
+				}
+				activeIds = null;
+			}
+			else
+			{
+				logger.info("activeTypeDetails :: No Row selected for Active, throwing message.");
+				String errorMessage = msgProps.getProperty("error.select.onerow.active");
+				sessionBean.setErrorMessage(errorMessage);
+				errorMessage  =null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "activeTypeDetails()", e);
+		}
+	}
+
+
+	private void readParamsFromRequest(EngineTypeBean sessionBean, HttpServletRequest request)
+	{
+		try
+		{
+			sessionBean.setFieldDetails(new EngineTypeDetails());
+			sessionBean.setDisplayPageLength(null);
+			sessionBean.setDisplayPageNo(null);
+			sessionBean.setSelectedRows(null);
+			sessionBean.setActionClicked(null);
+			sessionBean.setUpdatedRows(null);
+			sessionBean.setCountryLocaleId(null);
+			sessionBean.setManualLanguageId(null);
+			sessionBean.setTypeListToImport(null);
+			sessionBean.setBookId(null);
+			
+			// Create FileItemFactory instance
+			DiskFileItemFactory fileItemFactory = new DiskFileItemFactory();
+			// By using fileItemFactory instance get the ServletFileUpload
+			// object
+			// as
+			ServletFileUpload servletFileUpload = new ServletFileUpload(fileItemFactory);
+			// Now get the list of all files by parsing the request
+			List<FileItem> fileItems = servletFileUpload.parseRequest(request);
+			// iterate fileItems and check for the Image File
+			Iterator<FileItem> iterator = fileItems.iterator();
+//			logger.info("readParamsFromRequest() :: iterating File Items");
+			while (iterator.hasNext()) 
+			{
+				FileItem fileItem = iterator.next();
+				if (fileItem.isFormField())
+				{
+//					logger.info("readParamsFromRequest() :: When Fields are Not Form Fields. Check each File Name and set the values accordingly in each attribute.");
+					String fieldName = fileItem.getFieldName();
+					if (null != fieldName && !"".equals(fieldName)) 
+					{
+						if (fieldName.equals("ET_UpdatedRows")) 
+						{
+							// set the value in sessionBean.displayPageNo
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setUpdatedRows(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						
+						if(fieldName.equals("ET_SelectedRows"))
+						{
+							// set the value in sessionBean.setSelectedRows
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setSelectedRows(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						/*
+						 * set displayPageNo and displayPageLenght
+						 */
+						if (fieldName.equals("ET_DataTabel_displayPageNo")) 
+						{
+							// set the value in sessionBean.displayPageNo
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setDisplayPageNo(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_DataTabel_displayPageLen")) 
+						{
+							// set the value in sessionBean.displayPageLenght
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setDisplayPageLength(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_SelectedRows")) 
+						{
+							// set the value in sessionBean.selectedRows
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setSelectedRows(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_CountryLocale_Code")) 
+						{
+							// set the value in sessionBean.setCountryLocaleId
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setCountryLocaleId(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_Lang_Code")) 
+						{
+							// set the value in sessionBean.setManualLanguageId
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setManualLanguageId(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_Book_Code")) 
+						{
+							// set the value in sessionBean.setBookId
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setBookId(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_Type_Code")) 
+						{
+							// set the value in sessionBean.getFieldDetails().setTypeCode
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.getFieldDetails().setTypeCode(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_Type_Name")) 
+						{
+							// set the value in sessionBean.getFieldDetails().setTypeName
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.getFieldDetails().setTypeName(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						if (fieldName.equals("ET_Group_Type")) 
+						{
+							// set the value in sessionBean.getFieldDetails().setGroupCode
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.getFieldDetails().setGroupCode(value);
+							}
+							// set value to null
+							value = null;
+						}
+						
+						
+						if (fieldName.equals("ET_ActionClicked")) 
+						{
+							// set the value in sessionBean.actionClicked
+							String value = fileItem.getString("UTF-8");
+							if (null != value && !"".equals(value) && !"''".equals(value) && !"\"\"".equals(value) && !"null".equals(value)) 
+							{
+								sessionBean.setActionClicked(value);
+							}
+							// set value to null
+							value = null;
+						}
+					}
+				}
+				else if (!fileItem.isFormField()) 
+				{
+					if(null!=sessionBean.getActionClicked() && !"".equals(sessionBean.getActionClicked())
+							&& sessionBean.getActionClicked().equals("FILE_UPLOAD"))
+					{
+						if(validateFileUpload(sessionBean))
+						{
+							String fileName = fileItem.getName();
+							byte[] data = fileItem.get();
+							if(null!=fileName && !"".equals(fileName) && null!=data)
+							{
+								/*
+								 * check for CSV
+								 */
+								String extension="";
+								if(fileName.lastIndexOf(".")!=-1)
+								{
+									extension = fileName.substring(fileName.lastIndexOf(".")+1, fileName.length());
+									if(null!=extension && !"".equals(extension))
+									{
+										if(extension.trim().toLowerCase().equals("xlsx") || extension.trim().toLowerCase().equals("xls"))
+										{
+											/*
+											 * call function to operate on uploaded excel
+											 */
+											executeExcelOperation(sessionBean, data, extension);
+										}
+										else
+										{
+											logger.info("readParamsFromRequest() :: Extension is not EXCEL. Throw Message - Uploaded file not supported."); 
+											sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+										}
+									}
+									else
+									{
+										logger.info("readParamsFromRequest() :: File Name does not contain valid extension. Throw message - Please upload a valid Excel File.");
+										sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+									}
+								}
+								else
+								{
+									logger.info("readParamsFromRequest() :: File Name does not contain any extension. Throw message - Please upload a valid Excel File.");
+									sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+								}
+								extension = null;
+							}	
+							else
+							{
+								logger.info("readParamsFromRequest() :: File Name / Size is null. Throw message - Please upload a valid Excel File.");
+								sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+							}
+							fileName=  null;
+							data = null;
+						}
+					}
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "readParamsFromRequest(", e);
+		}
+	}
+	
+	private boolean validateFileUpload(EngineTypeBean sessionBean)
+	{
+		
+		StringBuilder errorMessage = new StringBuilder();
+		if(null==sessionBean.getCountryLocaleId() || "".equals(sessionBean.getCountryLocaleId()))
+		{
+			if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+			{
+				errorMessage.append("<MSG_TOKEN>");
+			}
+			errorMessage.append(msgProps.addMessage("error.mandatory.fields.specific", msgProps.getProperty("label.countrylocale")));
+		}
+		
+		if(null==sessionBean.getManualLanguageId() || "".equals(sessionBean.getManualLanguageId()))
+		{
+			if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+			{
+				errorMessage.append("<MSG_TOKEN>");
+			}
+			errorMessage.append(msgProps.addMessage("error.mandatory.fields.specific", msgProps.getProperty("label.language")));
+		}
+		/*
+		 * BOOK IS NOT MANDATORY HERE
+		 */
+		String messages=errorMessage.toString();
+		if(null!=messages && !"".equals(messages))
+		{
+			sessionBean.setErrorMessage(messages);
+			messages=  null;
+			errorMessage= null;
+			return false;
+		}
+		messages= null;
+		errorMessage = null;
+		return true;
+	}
+
+	private void readExcelData(byte[] data, EngineTypeBean sessionBean,String extension)
+	{
+		sessionBean.setTypeListToImport(new ArrayList<EngineTypeDetails>());
+		try
+		{
+			if(null!=data)
+			{
+				InputStream is = new ByteArrayInputStream(data);
+				XSSFWorkbook workbook  = null;
+				XSSFSheet sheet = null;
+				HSSFWorkbook xlsWorkBook = null;
+				HSSFSheet xlsSheet = null;
+				Iterator<Row> rowIterator = null;
+				
+				if(null!=extension && extension.equals("xlsx"))
+				{
+					//Create Workbook instance holding reference to .xlsx file
+					workbook = new XSSFWorkbook(is);
+					//Get first/desired sheet from the workbook
+					sheet = workbook.getSheetAt(0);
+					//Iterate through each rows one by one
+					rowIterator = sheet.iterator();
+				}
+				else if(null!=extension && extension.equals("xls"))
+				{
+					// Create workbook instance holding reference to .xls file
+					xlsWorkBook = new HSSFWorkbook(is);
+					//Get first/desired sheet from the workbook
+					xlsSheet=  xlsWorkBook.getSheetAt(0);
+					//Iterate through each rows one by one
+					rowIterator = xlsSheet.iterator();
+				}
+				long rowCount=0;
+				/*
+				 * ROW COLUMNS HAS TO BE IN FOLLOWING SEQUENCE
+				 * BOOK CODE
+				 * TYPE CODE
+				 * TYPE NAME
+				 * GROUP CODE
+				 */
+				EngineTypeDetails details = new EngineTypeDetails();
+				while(null!=rowIterator && rowIterator.hasNext())
+				{
+					Row row = rowIterator.next();
+					if(rowCount>0)
+					{
+						details = new EngineTypeDetails();
+						Object dataCell = SSTUtils.readCellValue(row.getCell(0));
+						if(null!=dataCell && !"".equals(dataCell))
+						{
+							details.setBookCode(String.valueOf(dataCell).trim());
+						}
+						dataCell = null;
+						
+						dataCell = SSTUtils.readCellValue(row.getCell(1));
+						if(null!=dataCell && !"".equals(dataCell))
+						{
+							details.setTypeCode(String.valueOf(dataCell).trim());
+						}
+						dataCell = null;
+
+						dataCell = SSTUtils.readCellValue(row.getCell(2));
+						if(null!=dataCell && !"".equals(dataCell))
+						{
+							details.setTypeName(String.valueOf(dataCell).trim());
+						}
+						dataCell = null;
+						
+						dataCell = SSTUtils.readCellValue(row.getCell(3));
+						if(null!=dataCell && !"".equals(dataCell))
+						{
+							details.setGroupCode(String.valueOf(dataCell).trim());
+						}
+						dataCell = null;
+
+						/*
+						 * NEW ACTION / MARKER COLUMN (last column of the import template).
+						 * A/ADD (create), U/UPDATE (update), D/DELETE (soft delete).
+						 * Blank or any non-delete value falls through to the existing
+						 * create-or-update path, so an OLD template still imports.
+						 */
+						dataCell = SSTUtils.readCellValue(row.getCell(4));
+						if(null!=dataCell && !"".equals(dataCell))
+						{
+							details.setImportAction(String.valueOf(dataCell).trim());
+						}
+						dataCell = null;
+						
+						/*
+						 * add details to vinList for import
+						 */
+						if(null==sessionBean.getTypeListToImport() || sessionBean.getTypeListToImport().size()<=0)
+						{
+							sessionBean.setTypeListToImport(new ArrayList<EngineTypeDetails>());
+						}
+
+						sessionBean.getTypeListToImport().add(details);
+						details= null;
+					}
+					// INCREMENT ROW COUNT BY 1
+					rowCount++;
+					row = null;
+				}
+				sheet = null;
+				workbook = null;
+				xlsWorkBook=  null;
+				xlsSheet = null;
+				rowIterator  = null;
+				is.close();
+				is = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "readExcelData()", e);
+		}
+	}
+
+	private void decideErrorDisplay(EngineTypeBean sessionBean, StringBuilder errorMessage, int errorCount)
+	{
+		/*
+		 * HERE Check, if the Error Count is more than 10, then do not show error Messages on the screen.
+		 * Instead, show a message, Multiple errors found while performing the transaction. Please Click <a>here</a> to view the details.
+		 */
+		if(errorCount>10)
+		{
+			long currentTime = new Timestamp(new Date().getTime()).getTime();
+			// WRITE ALL THE ERROR MESAGES TO A TEXT FILE  , NAME IT ON THE BASIS OF VIN_TIMESTAMP.TXT
+			String eFPath = ApplicationProperties.getProperty("EXPORT_ERROR_PHYSICAL_PATH");
+			String eFName = ApplicationProperties.getProperty("EXPORT_DATA_ENGINE_TYPE_NAME")+"_"+String.valueOf(currentTime)+ApplicationProperties.getProperty("EXPORT_ERROR_EXTENSION");
+			File errorFile = new File(eFPath+eFName);
+			try {
+				String data = errorMessage.toString();
+				data = data.replace("<MSG_TOKEN>", "\n");
+				
+				FileOutputStream fos = new FileOutputStream(errorFile);
+				fos.write(data.getBytes());
+				fos.flush();
+				fos.close();
+				fos = null;
+				data = null;
+			} catch (FileNotFoundException e) {
+				Utilities.printStackTraceToLogs(EngineType.class.getName(), "validateExcelRowData()", e);
+			} catch (IOException e) {
+				e.printStackTrace();
+				Utilities.printStackTraceToLogs(EngineType.class.getName(), "validateExcelRowData()", e);
+			}
+			errorFile=null;
+			String webPath = ApplicationProperties.getProperty("EXPORT_ERROR_WB_PATH")+eFName;
+			
+			// label.error.screen.help.text.start
+			// label.here
+			// label.view.the.details
+			String message=msgProps.addMessage("error.import.invalid.custom.message", String.valueOf(errorCount));
+			message = message + " "+msgProps.getProperty("label.error.screen.help.text.start");
+			message = message+ " <a href=\""+webPath+"\" target=\"_blank\">" +msgProps.getProperty("label.here")+"</a>";
+			message = message +" " +msgProps.getProperty("label.view.the.details");
+			
+			// set message in errorMessage
+			sessionBean.setErrorMessage(message);
+			message = null;
+			eFPath = null;
+			eFName=  null;
+			webPath = null;
+		}
+		else
+		{
+			String messages=errorMessage.toString();
+			if(null!=messages && !"".equals(messages))
+			{
+				sessionBean.setErrorMessage(messages);
+				messages=  null;
+				errorMessage= null;
+			}
+		}
+	}
+
+	private void executeExcelOperation(EngineTypeBean sessionBean, byte[] data, String extension)
+	{
+		try
+		{
+			/*
+			 * proceed for uploading and parsing.
+			 */
+			readExcelData(data, sessionBean, extension);
+			
+			/*
+			 * call function to validate ALL THE EXCEL ROWS
+			 */
+			if(validateExcelRowData(sessionBean))
+			{
+				StringBuilder errorMessage = new StringBuilder();
+				int errorCount=0;
+				String duplicateRowNo="";
+				int duplicateRowsCount=0;
+				int failureCount=0;
+				ArrayList<EngineTypeDetails> listToSave = new ArrayList<EngineTypeDetails>();
+				// ACTION=D rows are collected separately - they are a DELETE, not a save.
+				ArrayList<EngineTypeDetails> listToDelete = new ArrayList<EngineTypeDetails>();
+				EngineTypeDetails fieldDetails = new EngineTypeDetails();
+				EngineTypeDetails existingDetails = new EngineTypeDetails();
+				String keyFromOriData="";
+				String keyFromExistData="";
+				for(int i=0;i<sessionBean.getTypeListToImport().size();i++)
+				{
+					fieldDetails = (EngineTypeDetails)sessionBean.getTypeListToImport().get(i);
+					fieldDetails.setSrNo((i+1+1));
+
+					/*
+					 * ACTION = D -> this row is a delete. Keep it out of listToSave so
+					 * the existing create-or-update logic stays exactly as it was.
+					 */
+					if(ImportActionUtils.isDeleteAction(fieldDetails.getImportAction()))
+					{
+						listToDelete.add(fieldDetails);
+						continue;
+					}
+					boolean addToList = true;
+					
+					keyFromOriData=fieldDetails.getBookCode()+"_"+fieldDetails.getTypeCode()+"_"+fieldDetails.getTypeName();
+					if(null!=fieldDetails.getGroupCode() && !"".equals(fieldDetails.getGroupCode()))
+					{
+						keyFromOriData= keyFromOriData+"_"+fieldDetails.getGroupCode();
+					}
+					
+					if(null!=listToSave && listToSave.size()>0)
+					{
+						for(int j=0;j<listToSave.size();j++)
+						{
+							existingDetails = (EngineTypeDetails)listToSave.get(j);
+							/*
+							 * IDENTIY DUPLICATE ON THE BASIS OF 
+							 *  ABBREVIATION CODE
+							 */
+							keyFromExistData=existingDetails.getBookCode()+"_"+existingDetails.getTypeCode()+"_"+existingDetails.getTypeName();
+							if(null!=existingDetails.getGroupCode() && !"".equals(existingDetails.getGroupCode()))
+							{
+								keyFromExistData=keyFromExistData+ "_"+existingDetails.getGroupCode();
+							}
+							if(keyFromOriData.equals(keyFromExistData))
+							{
+								if(null!=duplicateRowNo && !"".equals(duplicateRowNo))
+								{
+									duplicateRowNo = duplicateRowNo+",";
+								}
+								duplicateRowNo = duplicateRowNo+String.valueOf(fieldDetails.getSrNo());
+								// already Added = SKIP IT
+								addToList = false;
+								break;
+							}
+							existingDetails = null;
+							keyFromExistData = null;
+						}
+					}
+					if(addToList==true)
+					{
+						listToSave.add(fieldDetails);
+					}
+					fieldDetails = null;
+					keyFromOriData = null;
+				}
+				keyFromOriData = null;
+				keyFromExistData = null;
+				
+				if(null!=duplicateRowNo && !"".equals(duplicateRowNo))
+				{
+					if(duplicateRowNo.endsWith(","))
+					{
+						duplicateRowNo = duplicateRowNo.substring(0, duplicateRowNo.length()-1);
+					}
+					String[] rows = duplicateRowNo.split(",");
+					if(null!=rows && rows.length>0)
+					{
+						duplicateRowsCount = rows.length;
+						for(int a=0;a<rows.length;a++)
+						{
+							// increment errorCount by 1
+							errorCount++;
+							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+							{
+								errorMessage.append("<MSG_TOKEN>");
+							}
+							errorMessage.append(msgProps.addMessage("error.excel.duplicate.lines", msgProps.getProperty("label.enginetype"), String.valueOf(rows[a])));
+						}
+					}
+					rows = null;
+				}
+				duplicateRowNo = null;
+				
+				
+				if(null!=listToSave && listToSave.size()>0)
+				{
+					/*
+					 * ITERATE AND START SAVING EACH ROW
+					 */
+					String successLineNo="";
+					String errorLineNo="";
+					int successCount=0;
+					fieldDetails = new EngineTypeDetails();
+					for(int i=0;i<listToSave.size();i++)
+					{
+						fieldDetails = (EngineTypeDetails)listToSave.get(i);
+						
+						fieldDetails.setCountryLocaleId(new Long(sessionBean.getCountryLocaleId()).longValue());
+						fieldDetails.setManualLanguageId(new Long(sessionBean.getManualLanguageId()).longValue());
+						fieldDetails.setFlag(ApplicationProperties.getProperty("flag.value.draft"));
+					}
+					
+					
+					listToSave = EngineTypeDAO.importEngineTypeDetails(listToSave);
+					fieldDetails = new EngineTypeDetails();
+					for(int i=0;i<listToSave.size();i++)
+					{
+						fieldDetails = (EngineTypeDetails)listToSave.get(i);
+						if(fieldDetails.isSaveStatusWhileImport() == true)
+						{
+							logger.info("readParamsFromRequest() :: Engine Type Data for Line No {"+(i+1+1)+"}. Saved Successfully.");
+							if(null!=successLineNo && !"".equals(successLineNo))
+							{
+								successLineNo = successLineNo+",";
+							}
+							successLineNo = successLineNo+String.valueOf(fieldDetails.getSrNo());
+						}
+						else
+						{
+							logger.info("readParamsFromRequest() :: Failed to Import Engine Type Data for Line No {"+(i+1+1)+"}.");
+							if(null!=errorLineNo && !"".equals(errorLineNo))
+							{
+								errorLineNo = errorLineNo+",";
+							}
+							errorLineNo = errorLineNo+String.valueOf(fieldDetails.getSrNo());
+						}
+						fieldDetails= null;
+					}
+
+					if(null!=successLineNo && !"".equals(successLineNo))
+					{
+						if(successLineNo.endsWith(","))
+						{
+							successLineNo = successLineNo.substring(0, successLineNo.length()-1);
+						}
+						String[] successRows = successLineNo.split(",");
+						if(null!=successRows && successRows.length>0)
+						{
+							successCount = successRows.length;
+						}
+						if(successCount>0)
+						{
+							sessionBean.setSuccessMessage(msgProps.addMessage("import.success.count.message", String.valueOf(successCount)));
+						}
+						successRows= null;
+//						successLineNo = "( "+successLineNo+" )";
+//						sessionBean.setSuccessMessage(msgProps.addMessage("import.success",msgProps.getProperty("label.enginetype"), successLineNo ));
+						sessionBean.setSelectedRows(null);
+						sessionBean.setShowUpdate(false);
+						/*
+						 * call function to load updated vin list
+						 */
+						getEngineTypeList(sessionBean);
+					}
+					
+					if(null!=errorLineNo && !"".equals(errorLineNo))
+					{
+						if(errorLineNo.endsWith(","))
+						{
+							errorLineNo= errorLineNo.substring(0, errorLineNo.length()-1);
+						}
+						String[] errorRows = errorLineNo.split(",");
+						if(null!=errorRows && errorRows.length>0)
+						{
+							failureCount = errorRows.length;
+							for(int a=0;a<errorRows.length;a++)
+							{
+								// increment errorCount by 1
+								errorCount++;
+								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+								{
+									errorMessage.append("<MSG_TOKEN>");
+								}
+								errorMessage.append(msgProps.addMessage("error.import", msgProps.getProperty("label.enginetype"), String.valueOf(errorRows[a])));
+							}
+						}
+						errorRows = null;
+//						errorLineNo= "( "+errorLineNo+ " )";
+//						sessionBean.setErrorMessage(msgProps.addMessage("error.import", msgProps.getProperty("label.enginetype"), errorLineNo));
+					}
+					
+					successLineNo = null;
+					errorLineNo = null;		
+				}
+				// only complain about an empty file when there is nothing to delete either
+				else if(null==listToDelete || listToDelete.size()<=0)
+				{
+					/*
+					 * NO DATA FOUND TO IMPORT
+					 */
+					if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+					{
+						errorMessage.append("<MSG_TOKEN>");
+					}
+					// increment erroCount by 1
+					errorCount++;
+					errorMessage.append(msgProps.addMessage("error.no.data.found.excel.import", msgProps.getProperty("label.enginetype")));
+				}
+				/*
+				 * ACTION = D ROWS - SOFT DELETE.
+				 *
+				 * The Excel carries no primary key, so each row is located with the SAME
+				 * unique combination the create-or-update path uses, and the ids are handed
+				 * to this screen's EXISTING delete method - so the import delete behaves
+				 * identically to the on-screen delete (sync status, related tables, ...).
+				 */
+				if(null!=listToDelete && listToDelete.size()>0)
+				{
+					String deleteSuccessLineNo="";
+					String deleteErrorLineNo="";
+					java.util.List<Long> deleteIdList = new ArrayList<Long>();
+					Connection deleteConn = null;
+					try
+					{
+						deleteConn = DBConnectionHelper.getConnection();
+						for(int i=0;i<listToDelete.size();i++)
+						{
+							EngineTypeDetails deleteDetails = (EngineTypeDetails)listToDelete.get(i);
+							deleteDetails.setCountryLocaleId(new Long(sessionBean.getCountryLocaleId()).longValue());
+							deleteDetails.setManualLanguageId(new Long(sessionBean.getManualLanguageId()).longValue());
+							long existingId = 0;
+							try
+							{
+								existingId = EngineTypeDAO.findExistingIdForImport(deleteDetails, deleteConn);
+							}
+							catch(Exception e)
+							{
+								Utilities.printStackTraceToLogs(EngineType.class.getName(), "executeExcelOperation()", e);
+							}
+							if(existingId>0)
+							{
+								deleteIdList.add(new Long(existingId));
+								if(null!=deleteSuccessLineNo && !"".equals(deleteSuccessLineNo))
+								{
+									deleteSuccessLineNo = deleteSuccessLineNo+",";
+								}
+								deleteSuccessLineNo = deleteSuccessLineNo+String.valueOf(deleteDetails.getSrNo());
+							}
+							else
+							{
+								/* NO ACTIVE ROW MATCHES - REPORT IT, never a silent no-op */
+								if(null!=deleteErrorLineNo && !"".equals(deleteErrorLineNo))
+								{
+									deleteErrorLineNo = deleteErrorLineNo+",";
+								}
+								deleteErrorLineNo = deleteErrorLineNo+String.valueOf(deleteDetails.getSrNo());
+							}
+							deleteDetails = null;
+						}
+					}
+					catch(Exception e)
+					{
+						Utilities.printStackTraceToLogs(EngineType.class.getName(), "executeExcelOperation()", e);
+					}
+					finally
+					{
+						try
+						{
+							if(null!=deleteConn)
+							{
+								deleteConn.close();
+							}
+						}
+						catch(Exception e)
+						{
+							Utilities.printStackTraceToLogs(EngineType.class.getName(), "executeExcelOperation()", e);
+						}
+						deleteConn = null;
+					}
+					int deleteSuccessCount=0;
+					String deleteIds = ImportActionUtils.buildDeleteIds(deleteIdList);
+					if(null!=deleteIds && !"".equals(deleteIds))
+					{
+						boolean deleted = false;
+						try
+						{
+							deleted = EngineTypeDAO.deleteEngineTypeDetails(deleteIds);
+						}
+						catch(Exception e)
+						{
+							Utilities.printStackTraceToLogs(EngineType.class.getName(), "executeExcelOperation()", e);
+						}
+						if(deleted==true)
+						{
+							deleteSuccessCount = deleteIdList.size();
+							getEngineTypeList(sessionBean);
+						}
+						else
+						{
+							/* the delete itself failed - every row it covered is a failure */
+							if(null!=deleteSuccessLineNo && !"".equals(deleteSuccessLineNo))
+							{
+								if(null!=deleteErrorLineNo && !"".equals(deleteErrorLineNo))
+								{
+									deleteErrorLineNo = deleteErrorLineNo+",";
+								}
+								deleteErrorLineNo = deleteErrorLineNo+deleteSuccessLineNo;
+							}
+							deleteSuccessLineNo = "";
+						}
+					}
+					if(deleteSuccessCount>0)
+					{
+						/* successMessage is a single escaped c:out on the JSP - join with a SPACE */
+						String existingMsg = sessionBean.getSuccessMessage();
+						String deleteMsg = msgProps.addMessage("import.delete.success.count.message", String.valueOf(deleteSuccessCount));
+						if(null!=existingMsg && !"".equals(existingMsg))
+						{
+							deleteMsg = existingMsg+" "+deleteMsg;
+						}
+						sessionBean.setSuccessMessage(deleteMsg);
+					}
+					if(null!=deleteErrorLineNo && !"".equals(deleteErrorLineNo))
+					{
+						String[] deleteErrorRows = deleteErrorLineNo.split(",");
+						if(null!=deleteErrorRows && deleteErrorRows.length>0)
+						{
+							failureCount = failureCount+deleteErrorRows.length;
+							for(int a=0;a<deleteErrorRows.length;a++)
+							{
+								errorCount++;
+								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+								{
+									errorMessage.append("<MSG_TOKEN>");
+								}
+								errorMessage.append(msgProps.addMessage("error.import.delete", msgProps.getProperty("label.enginetype"), String.valueOf(deleteErrorRows[a])));
+							}
+						}
+						deleteErrorRows = null;
+					}
+					deleteSuccessLineNo = null;
+					deleteErrorLineNo = null;
+					deleteIdList = null;
+				}
+				listToDelete = null;
+
+				listToSave = null;
+				
+				if(errorCount>0 )
+				{
+					decideErrorDisplay(sessionBean, errorMessage, errorCount);
+				}
+				
+				
+				/*
+				 * also check if duplicateCount or failureCount is more than 0
+				 * then set infoMessage
+				 */
+				String mess="";
+
+				if(duplicateRowsCount>0)
+				{
+					mess = msgProps.addMessage("error.excel.duplicate.rows.count", String.valueOf(duplicateRowsCount));
+				}
+				
+				if(failureCount>0)
+				{
+					if(null!=mess && !"".equals(mess))
+					{
+						mess = mess+" ";
+					}
+					mess = mess+msgProps.addMessage("error.excel.failure.rows.count", String.valueOf(failureCount));
+				}
+				
+				if(null!=mess && !"".equals(mess))
+				{
+					sessionBean.setInfoMessage(mess);
+				}
+				mess = null;
+			
+				errorMessage = null;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(EngineType.class.getName(), "executeExcelOperation()", e);
+		}
+	}
+
+	private boolean validateExcelRowData(EngineTypeBean sessionBean)
+	{
+		StringBuilder errorMessage = new StringBuilder();
+		int errorCount=0;
+		if(null!=sessionBean.getTypeListToImport() && sessionBean.getTypeListToImport().size()>0)
+		{
+			for(int i=0;i<sessionBean.getTypeListToImport().size();i++)
+			{
+				EngineTypeDetails fieldDetails = (EngineTypeDetails) sessionBean.getTypeListToImport().get(i);
+				// EXTRA 1 BECAUSE WHILE READING EXCEL, HEADER ROW WAS SKIPPED
+				int rowNo = i+1+1;
+
+				/*
+				 * NEW ACTION / MARKER COLUMN - an unrecognised value is a HARD ERROR here,
+				 * before any database work, so a mistyped marker can never be silently
+				 * treated as create-or-update. Blank stays allowed.
+				 */
+				if(!ImportActionUtils.isValidAction(fieldDetails.getImportAction()))
+				{
+					if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+					{
+						errorMessage.append("<MSG_TOKEN>");
+					}
+					errorMessage.append(msgProps.addMessage("error.excel.unknown.action", String.valueOf(rowNo)));
+					errorCount++;
+				}
+				
+				if(null==fieldDetails.getBookCode() || "".equals(fieldDetails.getBookCode()) || 
+						null==fieldDetails.getTypeCode() || "".equals(fieldDetails.getTypeCode()) ||
+						null==fieldDetails.getTypeName() || "".equals(fieldDetails.getTypeName()))
+				{
+					if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+					{
+						errorMessage.append("<MSG_TOKEN>");
+					}
+					/*
+					 * INCOMPLETE DATA FOR VIN AT ROW NO . rowNo
+					 */
+					String data = msgProps.getProperty("label.enginetype")+","+String.valueOf(rowNo);
+					String[] id = data.split(",");
+					errorMessage.append(msgProps.getMessage(id, "error.excel.improper.lines"));
+					data = null;
+					id = null;
+					// increment errorCount by 1
+					errorCount++;
+				}
+				
+				if(null!=fieldDetails.getBookCode() && !"".equals(fieldDetails.getBookCode()))
+				{
+					boolean matchFound = false;
+					if(null!=sessionBean.getBookList() && sessionBean.getBookList().size()>0)
+					{
+						for(int a=0;a<sessionBean.getBookList().size();a++)
+						{
+							EngineBookDetails si = (EngineBookDetails)sessionBean.getBookList().get(a);
+							if(fieldDetails.getBookCode().trim().toLowerCase().equals(si.getBookCode().trim().toLowerCase()))
+							{
+								matchFound =true;
+								fieldDetails.setBookId(si.getBookId());
+								break;
+							}
+							si  =null;
+						}
+					}
+					
+					if(matchFound==false)
+					{
+
+						if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+						{
+							errorMessage.append("<MSG_TOKEN>");
+						}
+						//error.excel.improper.lines
+						String data = msgProps.getProperty("label.enginebook")+","+String.valueOf(rowNo);
+						String[] id = data.split(",");
+						errorMessage.append(msgProps.getMessage(id, "error.excel.improper.lines"));
+						data = null;
+						id = null;
+						// increment errorCount by 1
+						errorCount++;
+					
+					}
+				}
+				
+				if(null!=fieldDetails.getTypeCode() && !"".equals(fieldDetails.getTypeCode()))
+				{
+					if(fieldDetails.getTypeCode().length()>10)
+					{
+						if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+						{
+							errorMessage.append("<MSG_TOKEN>");
+						}
+						String data = msgProps.getProperty("label.enginetypecode")+",10,"+String.valueOf(rowNo);
+						String[] id = data.split(",");
+						errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+						data = null;
+						id = null;
+						// increment errorCount by 1
+						errorCount++;
+					}
+				}
+				
+				if(null!=fieldDetails.getTypeName() && !"".equals(fieldDetails.getTypeName()))
+				{
+					if(fieldDetails.getTypeName().length()>200)
+					{
+						if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+						{
+							errorMessage.append("<MSG_TOKEN>");
+						}
+						String data = msgProps.getProperty("label.enginetypename")+",200,"+String.valueOf(rowNo);
+						String[] id = data.split(",");
+						errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+						data = null;
+						id = null;
+						// increment errorCount by 1
+						errorCount++;
+					}
+				}
+				
+				if(null!=fieldDetails.getGroupCode() && !"".equals(fieldDetails.getGroupCode()))
+				{
+					if(fieldDetails.getGroupCode().length()>200)
+					{
+						if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
+						{
+							errorMessage.append("<MSG_TOKEN>");
+						}
+						String data = msgProps.getProperty("label.grouptype")+",200,"+String.valueOf(rowNo);
+						String[] id = data.split(",");
+						errorMessage.append(msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+						data = null;
+						id = null;
+						// increment errorCount by 1
+						errorCount++;
+					}
+				}
+			}
+		}
+		else
+		{
+			errorMessage.append(msgProps.addMessage("error.no.data.found.excel.import", msgProps.getProperty("label.enginetype")));
+			// increment errorCount by 1
+			errorCount++;
+		}
+		
+		
+		/*
+		 * HERE Check, if the Error Count is more than 10, then do not show error Messages on the screen.
+		 * Instead, show a message, Multiple errors found while performing the transaction. Please Click <a>here</a> to view the details.
+		 */
+		if(errorCount>0)
+		{
+			decideErrorDisplay(sessionBean, errorMessage, errorCount);
+			return false;
+		}
+		errorMessage = null;
+		return true;
+	}
+}

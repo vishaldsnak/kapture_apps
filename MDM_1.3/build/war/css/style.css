@@ -1,0 +1,1247 @@
+@font-face {
+    font-family: "InterstateMazda-Regular";
+    src: url(InterstateMazda-Regular.ttf);
+}
+@font-face {
+    font-family: "InterstateMazda-Light";
+    src: url(InterstateMazda-Light.ttf);
+}
+@font-face {
+    font-family: "FontAwesome";
+    src: url(font-awesome/fonts/fontawesome-webfont.ttf);
+}
+@font-face{
+	font-family: "Lucida-Grande";
+	src: url(Lucida-Grande.ttf);
+}
+
+*{margin:0; padding:0;}
+.fl{float:left;}
+.fr{float:right;}
+.cb{clear:both;}
+
+body{font-family:"InterstateMazda-Regular",Arial;font-size:12px; font-weight:normal;color:#5C5B65;}
+button{cursor:pointer;}
+.mandatory{color:#D0021B;}
+.errorMessage{color:#D0021B;font-size:12px;font-family:"InterstateMazda-Regular",Arial;padding-top: 3px;width: 750px; word-wrap:break-word;}
+.successMessage{color:#138026;font-size:12px;font-family:"InterstateMazda-Regular",Arial;padding-top: 3px;width: 750px; word-wrap:break-word;}
+.errorWarningMessage{color:#FFA500;font-size:12px;font-family:"InterstateMazda-Regular",Arial;padding-top: 3px;width: 750px; word-wrap:break-word;}
+.warningMessage{font-size:10px;font-family:"InterstateMazda-Regular",Arial;color:#D0021B !important;float: left;vertical-align: middle;margin-top: -5px;}
+#mainWrapper{width:100%; margin:0 auto; /*box-shadow: 1px 5px 10px #ccc;*/}
+.header{ width:100%; display:block; background-repeat:no-repeat;background-color:#FFF}
+.header img{padding-left:25px;height:40px;margin:11px;}
+/*
+.header div{float: right;vertical-align: middle;height: 30px; display: table-cell;font-size: 23px;text-transform: uppercase; padding-right: 75px;padding-top: 15px;color:#555555;
+}
+*/
+.header span img{height:auto !important; padding:0px !important;}
+.margin-left-20
+{
+	margin-left:20px;
+}
+
+.topMenu{background-color:#555555;}
+.topMenu ul{/*margin:0px 25px;*/}
+.topMenu ul li{float:left; list-style:none;
+	border-top:1px solid #555555;
+	border-bottom:1px solid #555555;
+	border-right:1px solid #CECECE; 
+	
+	}
+
+.topMenu ul li a{
+	padding: 6px 10px 7px 10px;
+    color:#fff; 
+    display: inline-block;
+    text-decoration: none;
+    font-family:"InterstateMazda-Light",Arial; font-size:12px ; font-weight:normal; 
+	text-align:left;
+}
+
+.topMenu ul li:last-child {border-right:0px ;}
+
+.activeALink
+{
+	background-size:100% 100%; 
+	background-color:#CECECE; 
+	font-weight:normal; 
+	color:#555555 !important;
+}
+
+.topMenu ul li.activeLink a, .topMenu ul li a:hover{
+	background-size:100% 100%; 
+	background-color:#CECECE; 
+	font-weight:normal; 
+	color:#555555;
+	height:17px;
+}
+
+
+.topMenu ul li div{
+	display:block;
+    color:#fff; 
+    text-decoration: none;
+    font-family:"InterstateMazda-Light",Arial; 
+	text-align:left;
+	float:right;
+	padding-top:5px;
+	padding-right:25px;
+	font-size:13.5px;
+}
+
+.topMenu .welcome
+{
+	float:right;
+}
+
+/* Sub Menu */
+.topMenu ul li{
+	position:relative;
+	height:30px;
+}
+
+.topMenu ul li ul li {
+	float:none;
+	border-top:1px solid #CECECE;
+	border-left:1px solid #CECECE;
+	border-right:1px solid #CECECE;
+}
+
+.topMenu ul li ul li a{
+	display:block;
+    color:#fff; 
+    text-decoration: none;
+    font-family:"InterstateMazda-Light",Arial; font-size:12px ; font-weight:normal;
+	text-align:left;
+	width:145px;
+}
+
+.topMenu ul li ul li.activeLink a, .topMenu ul li ul li a:hover{
+	background-size:100% 100%; 
+	background-color:#CECECE; 
+	font-weight:normal; 
+	color:#555555;
+	
+}
+
+.topMenu ul li ul{
+	display:none;
+	position:absolute;
+	left:0;
+	top:100%;
+	background-color: #555555;
+	border-top:1px solid #555555 !important;
+	
+}
+.topMenu ul li:hover ul{
+	display:block;
+} 
+
+
+.topMenu ul li ul li:first-child {border-left:1px solid #CECECE !important;}
+.topMenu ul li ul li:last-child {border-right:1px solid #CECECE !important;border-bottom:1px solid #CECECE !important}
+
+
+.langCombo{float:right; vertical-align:middle !important;}
+.langCombo label{font-weight: bold; font-size:11px;}
+.langCombo select{height: 30px;margin-top: 2px; width:75px; font-family:"InterstateMazda-Regular",Arial;}
+.header .langPref{height: auto;padding-top: 16px;float: right;content: "\f1ab";font-family:"FontAwesome";color:#95A5A6;font-size:20px;}
+
+.userInfo{color:#595959; font-size:14px; font-weight:bold;  padding:0 20px; width:110px;}
+.userInfo span{margin:6px 30px 0 0; float:left;}
+.logoutBtn button{color:#224b7e; font-size:16px; font-weight:bold; background:none; border:none; cursor:pointer; margin-top:2px;}
+.contentTitle{font-size:18px; font-weight:bold; margin-bottom:5px;}
+.padder{padding:20px; min-height:480px;}
+
+.inputTable{border:1px solid #DADADA;} 
+.inputTable td{color: #4A4A4A;padding:20px; font-size:14px; text-align:center; word-wrap:break-word;}
+.inputTable td a{color:#4f81bd;}
+				
+.inputTable td  select{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;height:25px;color:#5C5B65;border-radius:2px;}
+.inputTable td  input[type=text]{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;height:25px;color:#5C5B65;border-radius:2px;padding-left:10px;}
+.inputTable td  textarea{font-family:"InterstateMazda-Regular",Arial;font-size:14px;border:1px solid #DADADA;color:#5C5B65;border-radius:2px; padding-left:10px;}
+
+.historyTable{border-right:1px solid #DADADA !important;} 
+.historyTable td{padding:10px; border-top: 1px solid #DADADA; color:#34495E; font-size:12.2px; font-family:"InterstateMazda-Light",Arial;
+				text-align:left;font-weight:normal; word-wrap:break-word;background-color:#FAFAFA !important;height:35px;}
+.historyTable .selected td{background-color:#F1F1F1 !important;}
+.historyTable tr:last-child td{border-bottom:1px solid #DADADA}
+.historyTable td a{color:#34495E;font-family:"InterstateMazda-Light",Arial;font-size:12.2px; }
+
+.historyTable th{/*background-size:100% 100%;*/ border-top: 1px solid #DADADA; border-bottom: 1px solid #DADADA; color: #BABABA; text-transform:uppercase;
+				font-size:10px; padding: 9px; text-align:left;font-family:"InterstateMazda-Light";font-weight:normal !important; height:25px;}
+
+.historyTable .codeClass{color:#34495E;font-size:10px;font-weight:normal}
+.historyTable .codeClass:after{content:" \f063";font-family:"FontAwesome";color:#34495E;font-size:10px;font-weight:normal;vertical-align:middle}
+.historyTable td  select{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;color:#676767; height:25px;width:100px;border-radius:2px;}
+.historyTable td  input[type=text]{font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;color:#676767;height:25px;width:150px;border-radius:2px;padding-left:10px;}
+.historyTable td  textarea{font-family:"InterstateMazda-Regular",Arial;font-size:14px;border:1px solid #DADADA;color:#676767;border-radius:2px; padding-left:10px;}
+
+.noRecordTable
+{
+	border: 1px solid #DADADA;
+	padding:25px;
+	background-color:#F4F4F4;
+}
+
+.noRecordTable td{
+	text-align:center;
+	vertical-align:middle;
+}
+.noRecordText
+{
+	color: #8A8A8E;
+	font-size: 28px;
+	font-family: "Lucida-Grande";
+}
+.noRecordIcon:before
+{
+	content:"\f0a6";
+	font-family:"FontAwesome";
+	font-size:80px;
+	font-style:normal;
+	color:#AAAAAA;
+}
+
+.gear_button_dialog{background:url(../images/formBtn.jpg)!important; background-size:100% 100% !important; border:1px solid #7f7f7f !important; 
+border-radius:2px !important; padding:2px 5px !important; font-size:12.2px !important; font-family: OpenSans!important;
+font-weight:normal!important; /*box-shadow:1px 2px 4px #999;*/}
+
+.bluebutton_dialog
+{
+	background-color:#D0021B !important; border:1px solid #D0021B !important;  
+border-radius:2px !important; padding:2px 10px !important; font-size:12.2px !important; font-family:OpenSans !important;
+font-weight:normal!important; color:#fff!important;background:#D0021B !important;/*box-shadow:1px 2px 4px #999;*/
+}
+
+				
+.bottomBox{background-color:#ececec; border:1px solid #ccc; padding:10px 20px; margin:20px 10px 10px 10px;}
+.paggingBtns{width:300px; margin:0 auto;}
+.pageSize{margin-top: 4px; width: 250px;}
+.totalRecords{margin-top: 6px; width:120px;}
+.pageSize select{width:50px; margin-right:5px;}
+.paggingBtns button{height:26px; width:55px; margin:0 2px;}
+.historyInfobox{/*border:1px solid #385d8a; */margin:15px 0; background:#fff;}
+
+/* Convert Page */
+.convertInfobox{/*background:url(../images/shadowImg.jpg) no-repeat center top; padding:10px; margin:20px 0 0;*/}
+.formElement_row{margin:15px 0 0 0;}
+.formElement_row label{display:block; float:left; padding:5px 0; width:250px; margin-left:50px;}
+.formElement_row select{font-family:"InterstateMazda-Regular",Arial;color:#676767;border:1px solid #DADADA;}
+.formElement_row input[type=text]{padding:5px; width:230px;font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;}
+.formElement_row textarea.full{width:98%; height:200px; padding:5px 1%;font-family:"InterstateMazda-Regular",Arial;border:1px solid #DADADA;}
+.formElement_row_monitoring{margin:0px 0 0 0;}
+.formElement_row_monitoring label{display:block; float:left; padding:5px 0; width:250px; }
+.formElement_row_monitoring input[type=text]{padding:5px; width:230px;}
+.managerInfo h3, .managerInfo h3{font-size:22px; color:#4A4A4A}
+.managerInfo h4, .managerInfo h4{font-size:22px;  color:#4A4A4A;}
+.managerSettings{padding:0px 20px 10px; margin:10px 0;}
+.managerInfo .formElement_row label{width:100px; float:left; padding:5px 0;}
+.managerInfo .formElement_row select{padding:5px; width:200px; float:left; margin:0 20px;}
+.managerInfo .formElement_row input{padding:5px; width:150px; float:left; margin:0 20px;}
+.docForConversion span{font-weight:bold;}
+.managerInfo{margin-top:10px;}
+.contentBox .left_col{width:60%; float:left;}
+.contentBox .right_col{width:30%; float:left;}
+.right_col .status_text{ width:100%; }
+.right_col .status_text img{ margin:0px 4px 0 50px; vertical-align: middle; }
+.right_col .status_text span{ margin-top:10px; }
+.right_col .status_text span.green_text{ color:#00b050; font-weight:bold;}
+.right_col .status_text span.red_text{ color:#ff0000; font-weight:bold;}
+.left_col button{float:right; margin-top:0px;}
+.right_col button.top_btn{margin:0px 5px;}
+.contentBox .right_col input[type=radio]{color:#060; font-weight:bold; margin-left:15px;}
+.blue_btn, .formElement_row button.blue_btn{background:url(../images/tableHeaderBg.jpg) left top repeat-x; border:1px solid #4E80BC; padding:4px 10px; font-family:"InterstateMazda-Regular",Arial;font-size:13px; font-weight:normal; margin:10px 5px; color:#fff; box-shadow:1px 2px 4px #999;}
+.gry_btn, .red_btn{background:url(../images/tableHeaderBg.jpg) left top repeat-x; border:1px solid #4E80BC; padding:4px 10px; font-family:"InterstateMazda-Regular",Arial;font-size:13px; font-weight:normal; margin:10px 5px; color:#fff; box-shadow:1px 2px 4px #999;}
+.red_btn{background:url(../images/radbutbg.jpg) left top repeat-x; border:1px solid #be4b48; padding:3px 10px;}
+.contentBox p span{margin-top:-25px; display:block;}
+.summary{padding-bottom:30px; display:block;}
+.monitoring{width:auto;}
+.monitoring span{ display:block; width:40%; text-align:right; margin:10px 10px 5px;}
+.monitoring span a{color:#4F81BD;}
+.progress_bar{ width:130px; margin:0 auto; font-weight:bold; font-size:14px; }
+.monitoring_formtabel{ width:80%;}
+.formElement_progress_bar{ width:100%; text-align:center; margin:0px 0; float:left;}
+.managerInfo .formElement_row .radiobutton_row { padding-left:50px; float:left;}
+.managerInfo .formElement_row .radiobutton_row label{width:150px; float:left; padding:5px 0; margin-left:0px;}
+.managerInfo .formElement_row .radiobutton_row input{padding:5px; width:15px; float:left; margin:5px 5px 0 0;}
+.leftpadding_none{ padding-left:0px !important; }
+.blue_button button{background:url(../images/formBtn.jpg); background-size:100% 100%; border:1px solid #7f7f7f; padding:4px 10px; font-family:"InterstateMazda-Regular",Arial;font-size:13px; font-weight:normal; margin:0 5px; box-shadow:1px 2px 4px #999;}
+.monitoring .left_col, .monitoring .right_col{ width:auto !important; float:right;}
+.gear_button{background:url(../images/formBtn.jpg); background-size:100% 100%; border:1px solid #7f7f7f; border-radius:2px; padding:6px 10px; font-size:12px; font-family: OpenSans;font-weight:normal; margin:0 5px;/*box-shadow:1px 2px 4px #999;*/}
+.bluebutton{background-color:#D0021B; border:1px solid #D0021B;  border-radius:2px; padding:6px 10px; font-size:12px; font-family:OpenSans;font-weight:normal; margin:0px 5px; color:#fff;/*box-shadow:1px 2px 4px #999;*/}
+p.margin_top{ margin-top:5px; line-height:18px;}
+.width_800{ width:800px;}
+.width_800 input{padding:5px; width:300px !important; float:left; color:#000; margin:0 20px; border:solid 1px #cbcbcb; background:#fff;}
+.width_80{ width:80% !important;}
+.margin_left20{ margin-left:30px;}
+.margin_left50{ margin-left:50px;}
+.margin_top10{ margin-top:10px;}
+.processing_font{ font-size: 14px; font-weight: bold; height: 50px; clear: both; margin: 10px 0;}
+.hide{display:none;}
+
+.dataTables_wrapper{border:1px solid #DADADA !important;}
+
+.dropbtn {
+    color: #5C5B65;
+    font-size: 9px;
+    border: none;
+    cursor: pointer;
+}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+	padding-top:25px !important;
+	padding-right:30px !important;
+	color:#5C5B65;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    min-width: 100px;
+	height:35px;
+	padding-right:22px;
+	margin-top:-3px;
+}
+
+.dropdown-content .downarrow{
+	text-align:right !important;
+	float:right;
+	font-size:9px;
+	margin-bottom:-3px;
+	padding-right:8px;
+}
+
+.dropdown-content table{
+	/*background-color:#f9f9f9;*/
+	background-color:#5C5B65;
+	vertical-align:middle;
+	border-radius:5px !important;
+	color:#fff;
+}
+
+.dropdown-content td{
+	text-align:center !important;
+	vertical-align:middle;
+	padding-left:5px;
+}
+
+.dropdown-content select{
+	width:90px;
+	height:28px;
+	font-family:"InterstateMazda-Regular",Arial;
+	border:1px solid #DADADA;
+	color:#676767;
+}
+
+.dropdown-content a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+}
+
+.show {
+	display:block;
+}
+
+.langIcon
+{
+	/*float:right;
+	margin-top:37px;*/
+}
+
+.langIcon:after
+{
+	height: auto;
+	float: left;
+	content:"\f1ab";
+	font-family:"FontAwesome";
+	color:#95A5A6;
+	font-size:20px;
+	font-style:normal;
+	/*margin-top:-18px !important;
+	margin-left:-21px !important;*/
+	padding-top:3px;
+}
+
+  .ui-tooltip, .arrow:after {
+    background: #71BD44;
+    border: 2px solid white;
+  }
+  .ui-tooltip {
+    padding: 10px 20px;
+    color: white;
+    border-radius: 20px;
+    font-size:12px; 
+	font-weight:bold;
+   /* text-transform: uppercase;*/
+    box-shadow: 0 0 7px #71BD44;
+    text-align: center;
+    width:200px;
+  }
+  .arrow {
+    width: 70px;
+    height: 16px;
+    overflow: hidden;
+    position: absolute;
+    left: 50%;
+    margin-left: -35px;
+    bottom: -16px;
+  }
+  .arrow.top {
+    top: -16px;
+    bottom: auto;
+  }
+  .arrow.left {
+    left: 20%;
+  }
+  .arrow:after {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: -20px;
+    width: 25px;
+    height: 25px;
+    box-shadow: 6px 5px 9px -9px black;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+  }
+  .arrow.top:after {
+    bottom: -20px;
+    top: auto;
+  }
+
+ #example_info, #example1_info 
+{
+	margin-top:-41px !important;
+	float:right !important;
+	color:#34495E !important;
+	font-family:OpenSans !important;
+	font-size:12.2px !important;
+	font-weight:normal !important;
+	margin-right:110px !important;
+} 
+
+#example_paginate, #example1_paginate
+{
+	text-align:center !important;
+	color: #333333 !important;
+	font-size:14px !important;
+	float:none !important;
+}  
+
+#example_previous, #example_first, #example_last,#example_next, #example1_previous, #example1_first, #example1_last,#example1_next
+{
+	border: 1.5px solid #DADADA !important;
+	margin-left: 0px;
+} 
+
+#example_next, #example1_next
+{
+	margin-left: 2px !important;
+}
+
+.firstNav:before
+{
+	content:"\f100" !important;
+	font-family:"FontAwesome" !important;
+	font-size:14px !important;
+	color:#333333 !important;
+	font-weight:normal;
+	font-style:normal;
+}
+
+.lastNav:before
+{
+	content:"\f101" !important;
+	font-family:"FontAwesome" !important;
+	font-size:14px !important;
+	color:#333333 !important;
+	font-weight:normal;
+	font-style:normal;
+}
+.prevNav:before
+{
+	content:"\f104" !important;
+	font-family:"FontAwesome" !important;
+	font-size:14px !important;
+	color:#333333 !important;
+	font-weight:normal;
+	font-style:normal;
+} 
+
+.nextNav:before
+{
+	content:"\f105" !important;
+	font-family:"FontAwesome" !important;
+	font-size:14px !important;
+	color:#333333 !important;
+	font-weight:normal;
+	font-style:normal;
+} 
+
+.paginate_input
+{
+	border: 1.5px solid #DADADA !important;
+	height: 30px !important;
+	color:#333333 !important;
+	text-align: center !important;
+	width: 30px !important;
+}
+
+.paginate_page
+{
+	margin-left: 38px !important;
+	margin-right: 2px !important;
+	color:#333333 !important;
+}
+.paginate_of
+{
+	margin-left: 2px !important;
+	margin-right: 42px !important;
+	color:#333333 !important;
+}
+
+.toolbar
+{
+	float: right;
+	margin-top: 17px;
+	/*margin-right:180px;*/
+	margin-right:210px;
+}
+
+.toolbar .separator
+{
+	height: 35px;
+	border-left: 1.5px solid #DADADA;
+	float: right !important;
+	/*margin-top: -2px;*/
+	margin-left:27px;
+	
+}
+
+/* Hidden Control from Top Navigation */
+#example_wrapper .top  .last 
+{
+	display:none !important;
+}
+#example_wrapper .top  .first 
+{
+	display:none !important;
+}
+#example_wrapper .top  .paginate_input 
+{
+	display:none !important;
+}
+#example_wrapper .top  .paginate_page 
+{
+	display:none !important;
+}
+#example_wrapper .top  .paginate_of 
+{
+	display:none !important;
+}
+
+#example_wrapper .top #example_paginate
+{
+	text-align: center !important;
+	color: #333333 !important;
+	font-size: 14px !important;
+	float: right !important;
+	margin-top: -17px !important;
+	margin-right: -10px !important;
+}  
+
+#example_wrapper .top  #example_previous
+{
+	float: left !important;
+	min-width: 0px !important;
+	margin-top: -27px !important;
+	margin-left: 0px!important;
+}
+
+#example_wrapper .top #example_next
+{
+	float: right !important;
+	min-width: 0px !important;
+	margin-top: -27px !important;
+	margin-left: 0px!important;
+	margin-right: 25px !important;
+}
+
+
+#example1_wrapper .top  .last 
+{
+	display:none !important;
+}
+#example1_wrapper .top  .first 
+{
+	display:none !important;
+}
+#example1_wrapper .top  .paginate_input 
+{
+	display:none !important;
+}
+#example1_wrapper .top  .paginate_page 
+{
+	display:none !important;
+}
+#example1_wrapper .top  .paginate_of 
+{
+	display:none !important;
+}
+
+#example1_wrapper .top #example1_paginate
+{
+	text-align: center !important;
+	color: #333333 !important;
+	font-size: 14px !important;
+	float: right !important;
+	margin-top: -17px !important;
+	margin-right: -10px !important;
+}  
+
+#example1_wrapper .top  #example1_previous
+{
+	float: left !important;
+	min-width: 0px !important;
+	margin-top: -27px !important;
+	margin-left: 0px!important;
+}
+
+#example1_wrapper .top #example1_next
+{
+	float: right !important;
+	min-width: 0px !important;
+	margin-top: -27px !important;
+	margin-left: 0px!important;
+	margin-right: 25px !important;
+}
+
+
+.fileUpload {
+    position: relative;
+    overflow: hidden;
+    /*margin: 10px;*/
+	float:left;
+	margin-left:-21px;
+	vertical-align:middle;
+	text-align:center;
+}
+.fileUpload input.upload {
+	position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0;
+    filter: alpha(opacity=0);
+}
+
+.btn 
+{
+	display: inline-block;
+    padding: 6px 12px 7px 12px;
+    margin-bottom: 0;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    background-image: none;
+    color:#fff;
+	background-color:#494A4A;
+	border:1px solid #494A4A;
+	border-radius:2px;
+	font-family:OpenSans;
+	
+}  
+
+.fileInput
+{
+	height:18px !important;
+	width:200px !important;
+	margin:0px !important;
+}
+
+.uploadIcon:before
+{
+	content:"\f0ee";
+	color:#fff;
+	font-size:15px;
+	font-family:"FontAwesome";
+	margin-right:10px;
+	font-weight:normal;
+	font-style:normal;
+}
+ 
+.downloadIcon:before
+{
+	content:"\f0ed";
+	color:#fff;
+	font-size:13px;
+	font-family:"FontAwesome";
+	margin-right:10px;
+	font-weight:normal;
+	font-style:normal;
+}
+   
+.ui-widget-header {
+    background: #555555 !important;
+}
+
+.ui-dialog-buttonpane button {
+    margin-top: 2px !important;
+    margin-left: 2px !important;
+    margin-bottom: -2px !important;
+}
+
+.ui-dialog p {
+    font-family: "InterstateMazda-Regular",Arial !important;
+    font-weight: normal !important;
+    font-size: 12.2px !important;
+    color: #34495E !important;
+}
+  
+.quicklinks
+{
+	margin:0 auto;
+}
+   
+.breadcumbs
+{
+	margin-left:40px;
+	margin-top:8px;
+	color: #34495E;
+	/*display:inline-block;*/
+} 
+ 
+.breadcumbs a
+{
+	font-size: 13px;
+	color: #34495E;
+	text-decoration: none;
+	margin-right:8px;
+	cursor:default;
+} 
+
+.rightPannel
+{
+	margin-right:72px;
+	margin-top:8px;
+	color: #34495E;
+	display:inline-block;
+	float:right;
+} 
+ 
+.rightPannel a
+{
+	font-size: 13px;
+	color: #34495E;
+	text-decoration: none;
+	margin-right:8px;
+} 
+@media screen\0 {
+    .managerInfo .formElement_row .radiobutton_row input { margin: 0px 5px 0 0; padding:5px 0px !important;}
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+
+}
+
+.loader {
+	position: fixed;
+	left: 0px;
+	top: 0px;
+	width: 100%;
+	height: 100%;
+	z-index: 9999;
+	background: url(../images/page-loader.gif) 50% 50% no-repeat rgb(249,249,249);
+}
+
+/*
+	Access Management List
+*/
+.modulesListDisplay
+{
+	width:100%;
+}
+
+.modulesListDisplay ul.menu
+{
+	list-style:none;
+}
+
+.modulesListDisplay ul.menu li
+{
+	height:30px;
+}
+
+.modulesListDisplay ul.menu li div.label
+{
+	float:left;
+	width:80%;
+	vertical-align:middle;
+	line-height:30px;
+	border-top:1px solid #dedede;
+}
+
+.modulesListDisplay ul.menu li div.label a
+{
+	text-decoration:none;
+	color:#5C5B65;
+	cursor:default;
+	margin-left:20px;
+}
+
+.modulesListDisplay ul.menu li div.label a:before
+{
+	content: "\f068";
+    font-size: 12.2px;
+    font-family: "FontAwesome";
+    font-weight: normal;
+    font-style: normal;
+    margin-right: 12px;
+    color: #D0021B;
+}
+
+.modulesListDisplay ul.menu li div.chkBox
+{
+	float:left;
+	width:20%;
+	text-align:right;
+	vertical-align:middle;
+	border-top:1px solid #dedede;
+	height:30px;
+}
+
+.modulesListDisplay ul.menu li div.chkBox input
+{
+	margin-right:5px;
+	margin-top:10px;
+}
+
+.modulesListDisplay ul.submenu
+{
+	list-style:none;
+	width:95%;
+	float:right;
+	padding-right:0px;
+}
+
+.modulesListDisplay ul.submenu li
+{
+	height:30px;
+}
+
+.modulesListDisplay ul.submenu li div.label
+{
+	float:left;
+	width:80%;
+	vertical-align:middle;
+	line-height:30px;
+	border-top:1px solid #dedede;
+}
+
+.modulesListDisplay ul.submenu li div.label a
+{
+	text-decoration:none;
+	color:#5C5B65;
+	cursor:default;
+	padding-left:0px;
+}
+
+.modulesListDisplay ul.submenu li div.label a:before
+{
+	content: "";
+}
+
+.modulesListDisplay ul.submenu li div.chkBox
+{
+	float:left;
+	width:20%;
+	text-align:right;
+	vertical-align:middle;
+	border-top:1px solid #dedede;
+	height:30px;
+}
+
+.modulesListDisplay ul.submenu li div.chkBox input
+{
+	margin-right:5px;
+	margin-top:10px;
+}
+
+
+.addIcon:before
+{
+	content:"\f196";
+	font-size:27px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	position:absolute;
+	margin-left:5px;
+}
+
+.proceedIcon:before
+{
+	content:"\f058";
+	font-size:27px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	position:absolute;
+	margin-left:5px;
+}
+
+.closeIcon:before
+{
+	content:"\f057";
+	font-size:27px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	position:absolute;
+	margin-left:32px;
+}
+
+.homeIcon:before
+{
+	content:"\f015";
+	font-size:15.5px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	margin-right:5px;
+	float:left;
+}
+
+.settingsIcon:before
+{
+	content:"\f013";
+	font-size:15.5px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	margin-right:5px;
+	float:left;
+}
+
+
+/*
+	Dashboard
+*/
+
+.dash-items-container
+{
+	/*width:1200px;*/
+	/* For Enabling Old Structure, remove width */
+	/*width:900px; since the no of tiles have increased so set to auto*/
+	width:auto;
+	margin:0 auto;
+	text-align:center;
+}
+
+.dash-items-container h4
+{
+	text-align:left;
+	color:#4A4A4A;
+	font-size:18px;
+}
+
+.dash-items-container .clear
+{
+	height:5px;
+	clear:both;
+}
+.dash-items-container .dash-items
+{
+	/* For Enabling Old Tiles 
+		width: 218px;
+		height:150px;
+	*/
+	border: 1px solid #dadada;
+	width: 140px;
+    margin: 10px; 
+	display: inline-block;
+	border-bottom:3px solid #D0021B;
+	height:100px;
+	overflow:hidden;
+	box-shadow: 10px 10px 6px -6px #777;
+	cursor: pointer;
+}
+
+.dash-items-container .dash-items p
+{
+	text-align:center;
+	word-wrap: break-word;
+	font-size:14px;
+	margin: 28px 10px;
+	color: #34495E;
+	text-transform: uppercase;
+}
+
+.dash-items-container .dash-items table tr td
+{
+	text-align:left;
+	height:30px;
+	vertical-align:middle;
+	max-height:50px;
+}
+
+.dash-items-container .dash-items table tr.displayLabelsRow
+{
+	background:#f0f0f0;
+} 
+
+.dash-items-container .dash-items table tr td.displayLabels 
+{
+	text-align:left;
+	padding-left:10px;
+	font-weight:normal;
+	font-size:14px;
+	text-transform:uppercase;
+	color:#34495e;
+	cursor:pointer;
+}
+
+.dash-items-container .dash-items .moveForward:before
+{
+	/*content:"\f11c";*/
+	content:"\f0a9";
+	font-size:26px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	margin-right:4px;
+	float:right;
+	cursor:pointer;
+}
+
+.dash-items-container .dash-items table tr td table tr td 
+{
+	padding-top:2px;
+	text-align:left;
+	height:30px;
+	vertical-align:middle;
+	max-height:50px;
+}
+
+.dash-items-container .dash-items table tr td table tr td select
+{
+	width:210px;
+	padding-left:3px;
+	height:25px;
+	margin-left:3px;
+	font-size:12px;
+}
+
+.dash-items-container .dash-items td.desc
+{
+	text-align:left;
+	padding-left:10px;
+	font-weight:normal;
+	height:50px;
+	vertical-align:top;
+}
+
+/*
+	Settings Display Button another Format
+*/
+i.style-switcher-btn
+{
+	right: 0;
+    top: 147px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 555555;
+    position: fixed;
+    padding: 7px 9px;
+    background: #555555;
+    border-radius: 6px 0 0 6px !important;
+}
+
+i.style-switcher-btn-1
+{
+	right: 0;
+    top: 190px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 555555;
+    position: fixed;
+    padding: 7px 9px;
+    background: #D0021B;
+    border-radius: 6px 0 0 6px !important;
+}
+
+i.style-switcher-btn:before, i.style-switcher-btn-1:before
+{
+	content:"\f013";
+	font-size:26px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	cursor:pointer;
+}
+
+i.style-switcher-btn-2
+{
+	right: 0;
+    top: 233px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 555555;
+    position: fixed;
+    padding: 7px 9px;
+    background: #555555;
+    border-radius: 6px 0 0 6px !important;
+}
+
+i.style-switcher-btn-3
+{
+	right: 0;
+    top: 280px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 555555;
+    position: fixed;
+    padding: 7px 9px;
+    background: #D0021B;
+    border-radius: 6px 0 0 6px !important;
+}
+
+i.style-switcher-btn-2:before, i.style-switcher-btn-3:before
+{
+	content:"\f085";
+	font-size:26px;
+	font-family:"FontAwesome";
+	font-weight:normal;
+	font-style:normal;
+	cursor:pointer;
+}
+
+
+/* FOR NUMBER SPINNERS */
+.sortSpinner
+{
+	border:0px !important;
+	margin-top:-2px !important;
+	width:20px !important;
+}
+
+.ui-spinner
+{
+	height:22px;
+	font-size:12px;
+	font-style:normal;
+	font-family:"InterstateMazda-Regular",Arial;
+	border:1px solid #DADADA !important;
+}
+
+
+.pagButtons
+{
+	border: 1.2px solid #DADADA !important;
+    text-decoration: none !important;
+	padding: 8px 12px !important;
+}
+
+.firstNav:before {
+    content: "\f100" !important;
+    font-family: "FontAwesome" !important;
+    font-size: 14px !important;
+    color: #333333 !important;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.prevNav:before {
+    content: "\f104" !important;
+    font-family: "FontAwesome" !important;
+    font-size: 14px !important;
+    color: #333333 !important;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.nextNav:before {
+    content: "\f105" !important;
+    font-family: "FontAwesome" !important;
+    font-size: 14px !important;
+    color: #333333 !important;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.lastNav:before {
+    content: "\f101" !important;
+    font-family: "FontAwesome" !important;
+    font-size: 14px !important;
+    color: #333333 !important;
+    font-weight: normal;
+    font-style: normal;
+}
+
+.infoIcon:before
+{
+	content: "\f05a" !important;
+    font-family: "FontAwesome" !important;
+    font-size: 12px !important;
+    color: #D0021B !important;
+    font-weight: normal;
+    font-style: normal;	
+}
+
+.downloadReports:before
+{
+	content: "\f019";
+	color:#34495E;
+	font-size: 20px;
+	font-family: "FontAwesome";
+	font-style: normal;
+}
+
+.logout
+{
+	float:right !important;
+	cursor:pointer;
+	padding-top: 7px;
+	margin-right: 20px;
+	font-size: 13.5px;
+}
+
+.logout span
+{
+	color:#fff;
+}
+
+.logoutIcon:before
+{
+	content:"\f08b";
+	color:#fff;
+	font-size:15.5px;
+	font-family:"FontAwesome";
+	margin-right:5px;
+	font-weight:normal;
+	font-style:normal;
+}

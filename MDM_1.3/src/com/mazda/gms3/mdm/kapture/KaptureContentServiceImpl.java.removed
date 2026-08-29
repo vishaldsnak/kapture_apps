@@ -1,0 +1,227 @@
+	/**
+	 * FILLS IN THE FIELDS update-article-tab REQUIRES BUT display-Article DOES NOT RETURN.
+	 *
+	 * The read and the write are NOT symmetric. display-Article hands back 35 fields; the update
+	 * contract expects ten more, and answers 400 "Validation failed. Missing or invalid mandatory
+	 * fields" when any is absent. The list below is taken from ContentImportJob (Job 9), whose
+	 * update payload is proven against this API, so the two clients send the same shape.
+	 *
+	 * ONLY ABSENT FIELDS ARE ADDED. Anything display-Article did return is left exactly as it came
+	 * back, which is the whole point of round-tripping the object: attributes, user groups, views
+	 * and workflow state survive untouched instead of being rebuilt from assumptions.
+	 *
+	 * The one value that cannot be defaulted is "id" - k_article's primary key. It is NOT the same
+	 * as articleId (the document number, e.g. SI1123) and display-Article never returns it, so it
+	 * is read from the table.
+	 */
+	private static void ensureUpdateFields(JsonObject article, String documentId, String locale,
+			Connection cmsConn) {
+		if (null == article) {
+			return;
+		}
+
+		if (!article.has(F_ID) || article.get(F_ID).isJsonNull()) {
+			String pkId = FetchKaptureDataDAO.getArticlePkId(documentId, locale, cmsConn);
+			article.addProperty(F_ID, pkId);
+		}
+
+		/*
+		 * dateAdded MIRRORS createdDate, as Job 9 sends it. Kapture treats them as the same
+		 * instant; sending "now" instead would silently re-date the document.
+		 */
+		if (!article.has("dateAdded")) {
+			article.addProperty("dateAdded", stringOf(article, "createdDate"));
+		}
+
+		/*
+		 * EMPTY STRINGS, NOT NULLS. The validator rejects a missing field; a blank one it accepts.
+		 * expireDate / reviewDate are blank across every row in k_article anyway - see the audit
+		 * note on article_expire_date - so there is nothing to carry over.
+		 */
+		addIfAbsent(article, "expireDate", "");
+		addIfAbsent(article, "reviewDate", "");
+		addIfAbsent(article, "articlePublishDate", "");
+
+		if (!article.has("fieldSecurities")) {
+			article.add("fieldSecurities", new JsonArray());
+		}
+		if (!article.has("articleTagList")) {
+			article.add("articleTagList", new JsonArray());
+		}
+		if (!article.has("facetsSchemaFields")) {
+			article.add("facetsSchemaFields", new JsonArray());
+		}
+
+		/*
+		 * pubFlag / isUpdateArticle ARE BOTH false IN JOB 9's UPDATE PAYLOAD and are left that way
+		 * deliberately. isUpdateArticle=true is NOT "this is an update" - Job 9 sends false on the
+		 * update call, so its meaning is something else and guessing at it would change behaviour
+		 * this screen has no reason to change.
+		 */
+		if (!article.has("pubFlag")) {
+			article.addProperty("pubFlag", Boolean.FALSE);
+		}
+		if (!article.has("isUpdateArticle")) {
+			article.addProperty("isUpdateArticle", Boolean.FALSE);
+		}
+	}
+
+	private static void addIfAbsent(JsonObject article, String field, String value) {
+		if (!article.has(field)) {
+			article.addProperty(field, value);
+		}
+	}
+
+	/**
+	 * Adds each reference key and every level above it to the article's category array.
+	 *
+	 * Kapture stores the whole chain, with only the mapped leaf flagged selected=true and its
+	 * ancestors selected=false - see any document's articlelistcategory. The chain is read from
+	 * k_categories rather than guessed, because MNAO hangs VIN ranges off VIN (4 levels) while
+	 * MC and MME hang them off CARLINE (6).
+	 *
+	 * @return how many entries were actually added
+	 */
+	private static int addCategories(JsonObject article, ArrayList<String> referenceKeys,
+			String locale, Connection cmsConn) {
+		JsonArray categories = arrayOf(article, F_CATEGORY_ARRAY);
+		LinkedHashSet<String> present = refKeysIn(categories);
+		int added = 0;
+
+		for (String referenceKey : referenceKeys) {
+			if (null == referenceKey || "".equals(referenceKey.trim())) {
+				continue;
+			}
+			String leafKey = referenceKey.trim();
+			ArrayList<IMCategoryDetails> chain = KaptureCategoryDAO.getHierarchy(leafKey, locale, cmsConn);
+			if (null == chain || chain.size() <= 0) {
+				logger.info("addCategories :: {" + leafKey + "} has no hierarchy in {" + locale
+						+ "} - skipped.");
+				continue;
+			}
+			String masterKey = chain.get(0).getCategoryRefKey();
+			for (int i = 0; i < chain.size(); i++) {
+				IMCategoryDetails level = chain.get(i);
+				String key = level.getCategoryRefKey();
+				if (present.contains(key)) {
+					// already on the document - an ancestor shared with another mapped range
+					continue;
+				}
+				JsonObject entry = new JsonObject();
+				entry.addProperty(F_CATEGORY_REF_KEY, key);
+				if (i > 0) {
+					entry.addProperty(F_PARENT_REF_KEY, chain.get(i - 1).getCategoryRefKey());
+				}
+				entry.addProperty(F_CATEGORY_NAME, level.getCategoryName());
+				entry.addProperty(F_MASTER_REF_KEY, masterKey);
+				// only the leaf is the actual mapping; the levels above it are context
+				entry.addProperty(F_SELECTED, Boolean.valueOf(i == chain.size() - 1));
+				categories.add(entry);
+				present.add(key);
+				added++;
+			}
+		}
+
+		if (added > 0) {
+			article.add(F_CATEGORY_ARRAY, categories);
+			rebuildCsv(article, categories);
+		}
+		return added;
+	}
+
+	/**
+	 * Removes the given reference keys from the article's category array.
+	 *
+	 * ONLY THE KEYS ASKED FOR ARE REMOVED - ancestors are left in place, exactly as the
+	 * InfoManager version behaved. An ancestor may still be shared with another mapped range, and
+	 * pruning it here would silently unmap that one too.
+	 *
+	 * @return how many entries were actually removed
+	 */
+	private static int removeCategories(JsonObject article, ArrayList<String> referenceKeys) {
+		JsonArray categories = arrayOf(article, F_CATEGORY_ARRAY);
+		LinkedHashSet<String> toRemove = new LinkedHashSet<String>();
+		for (String referenceKey : referenceKeys) {
+			if (null != referenceKey && !"".equals(referenceKey.trim())) {
+				toRemove.add(referenceKey.trim());
+			}
+		}
+		if (toRemove.isEmpty()) {
+			return 0;
+		}
+
+		JsonArray kept = new JsonArray();
+		int removed = 0;
+		for (int i = 0; i < categories.size(); i++) {
+			JsonElement element = categories.get(i);
+			String key = null;
+			if (null != element && element.isJsonObject()) {
+				key = stringOf(element.getAsJsonObject(), F_CATEGORY_REF_KEY);
+			}
+			if (null != key && toRemove.contains(key)) {
+				removed++;
+				continue;
+			}
+			kept.add(element);
+		}
+
+		if (removed > 0) {
+			article.add(F_CATEGORY_ARRAY, kept);
+			rebuildCsv(article, kept);
+		}
+		return removed;
+	}
+
+	/**
+	 * Keeps categoriesTreeRefKeys / categoriesTreeLabels in step with the array.
+	 *
+	 * Kapture carries the same information twice - as objects and as parallel CSVs - and they are
+	 * expected to agree, so both are rewritten from the array rather than patched.
+	 */
+	private static void rebuildCsv(JsonObject article, JsonArray categories) {
+		StringBuffer refKeys = new StringBuffer();
+		StringBuffer labels = new StringBuffer();
+		for (int i = 0; i < categories.size(); i++) {
+			JsonElement element = categories.get(i);
+			if (null == element || !element.isJsonObject()) {
+				continue;
+			}
+			JsonObject entry = element.getAsJsonObject();
+			String key = stringOf(entry, F_CATEGORY_REF_KEY);
+			if (null == key || "".equals(key)) {
+				continue;
+			}
+			String label = stringOf(entry, F_CATEGORY_NAME);
+			if (refKeys.length() > 0) {
+				refKeys.append(",");
+				labels.append(",");
+			}
+			refKeys.append(key);
+			labels.append(null == label ? "" : label);
+		}
+		article.addProperty(F_TREE_REF_KEYS, refKeys.toString());
+		article.addProperty(F_TREE_LABELS, labels.toString());
+	}
+
+	private static JsonArray arrayOf(JsonObject article, String field) {
+		JsonElement element = article.get(field);
+		if (null != element && element.isJsonArray()) {
+			return element.getAsJsonArray();
+		}
+		return new JsonArray();
+	}
+
+	private static LinkedHashSet<String> refKeysIn(JsonArray categories) {
+		LinkedHashSet<String> keys = new LinkedHashSet<String>();
+		for (int i = 0; i < categories.size(); i++) {
+			JsonElement element = categories.get(i);
+			if (null != element && element.isJsonObject()) {
+				String key = stringOf(element.getAsJsonObject(), F_CATEGORY_REF_KEY);
+				if (null != key && !"".equals(key)) {
+					keys.add(key);
+				}
+			}
+		}
+		return keys;
+	}
+
