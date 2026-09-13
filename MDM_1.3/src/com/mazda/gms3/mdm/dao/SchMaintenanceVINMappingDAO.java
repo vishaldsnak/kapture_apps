@@ -167,9 +167,9 @@ public class SchMaintenanceVINMappingDAO extends DBConnectionHelper{
 					{
 						details.setSourceFilePath(details.getSourceFilePath().trim());
 						// identify sourceFileName
-						if(details.getSourceFilePath().lastIndexOf("\\")!=-1)
+						if(Math.max(details.getSourceFilePath().lastIndexOf('/'), details.getSourceFilePath().lastIndexOf('\\'))!=-1)
 						{
-							details.setSourceFileName(details.getSourceFilePath().substring(details.getSourceFilePath().lastIndexOf("\\")+1, details.getSourceFilePath().length()));
+							details.setSourceFileName(details.getSourceFilePath().substring(Math.max(details.getSourceFilePath().lastIndexOf('/'), details.getSourceFilePath().lastIndexOf('\\'))+1, details.getSourceFilePath().length()));
 						}
 					}
 					

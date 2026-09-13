@@ -264,7 +264,9 @@ public class CDRomDAO extends DBConnectionHelper {
 				conn = getConnection();
 				ArrayList<LabelBean> uniqueManualTypeList = new ArrayList<LabelBean>();
 
-				String newModelKey = "\\"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
+				// SEPARATOR AGNOSTIC - the key is anchored on "/" and the path is normalised to "/"
+				// before the match below, so it works whether the stored path uses "\" or "/".
+				String newModelKey = "/"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
 				String tableName="gms3_dmt_mc_newm_vin,gms3_dmt_mc_vin";
 				String[] tabTokens=tableName.split(",");
 
@@ -300,9 +302,9 @@ public class CDRomDAO extends DBConnectionHelper {
 							{
 								path = path.trim();
 								// REMOVE VIN FILE NAME
-								if(path.lastIndexOf("\\")!=-1)
+								if(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))!=-1)
 								{
-									path = path.substring(0,path.lastIndexOf("\\"));
+									path = path.substring(0,Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')));
 								}
 
 								if(null!=path && !"".equals(path))
@@ -347,7 +349,7 @@ public class CDRomDAO extends DBConnectionHelper {
 					{
 						if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath))
 						{
-							if(faceLiftFolderPath.trim().toLowerCase().contains(newModelKey.trim().toLowerCase()))
+							if(faceLiftFolderPath.trim().toLowerCase().replace('\\', '/').contains(newModelKey.trim().toLowerCase()))
 							{
 								// NEW TABLES
 								cdRomTableName = "gms3_dmt_mc_newm_cd_data";
@@ -2773,7 +2775,9 @@ public class CDRomDAO extends DBConnectionHelper {
 			if(null!=locale && !"".equals(locale) && null!=carlineCode && !"".equals(carlineCode) && 
 					null!=vdsCode && !"".equals(vdsCode) && null!=visStartRange && !"".equals(visStartRange))
 			{
-				String newModelKey = "\\"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
+				// SEPARATOR AGNOSTIC - the key is anchored on "/" and the path is normalised to "/"
+				// before the match below, so it works whether the stored path uses "\" or "/".
+				String newModelKey = "/"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
 
 				locale = locale.replace("_", "-");
 				conn = getConnection();
@@ -2808,9 +2812,9 @@ public class CDRomDAO extends DBConnectionHelper {
 								{
 									path = path.trim();
 									// REMOVE VIN FILE NAME
-									if(path.lastIndexOf("\\")!=-1)
+									if(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))!=-1)
 									{
-										path = path.substring(0,path.lastIndexOf("\\"));
+										path = path.substring(0,Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')));
 									}
 
 									if(null!=path && !"".equals(path))
@@ -2855,7 +2859,7 @@ public class CDRomDAO extends DBConnectionHelper {
 					{
 						if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath))
 						{
-							if(faceLiftFolderPath.trim().toLowerCase().contains(newModelKey.trim().toLowerCase()))
+							if(faceLiftFolderPath.trim().toLowerCase().replace('\\', '/').contains(newModelKey.trim().toLowerCase()))
 							{
 								vinTableName = "gms3_dmt_mc_newm_vin";
 							}
@@ -3099,9 +3103,11 @@ public class CDRomDAO extends DBConnectionHelper {
 				/*
 				 * IDENTIFY TABLE NAME
 				 */
-				String newModelKey = "\\"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
+				// SEPARATOR AGNOSTIC - the key is anchored on "/" and the path is normalised to "/"
+				// before the match below, so it works whether the stored path uses "\" or "/".
+				String newModelKey = "/"+ApplicationProperties.getProperty("cdrom.model.type.folder.key.newm");
 				String tableName="";
-				if(faceLiftFolderPath.trim().toLowerCase().contains(newModelKey.trim().toLowerCase()))
+				if(faceLiftFolderPath.trim().toLowerCase().replace('\\', '/').contains(newModelKey.trim().toLowerCase()))
 				{
 					tableName = "gms3_dmt_mc_newm_cd_data";
 				}
@@ -3307,9 +3313,17 @@ public class CDRomDAO extends DBConnectionHelper {
 
 							if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath))
 							{
-								String[] pathTok = faceLiftFolderPath.split("\\\\");
+								// SPLIT ON EITHER SEPARATOR - the stored path may use "\" or "/". Splitting
+								// on "\" alone returns the whole string as ONE token when the path uses
+								// "/", and the rejoin below then reads pathTok[1..3] and throws.
+								String[] pathTok = faceLiftFolderPath.split("[/\\\\]");
 								if(null!=pathTok && pathTok.length>0)
 								{
+									// REJOIN WITH "\" ON PURPOSE - this value is NOT a filesystem path. It is
+									// fed into SQL LIKE against dc_source_network_loc / dc_cd_txt_file_path,
+									// whose stored values use BACKSLASHES (verified against the MC Dev dump:
+									// e.g. JP\Nissan_familia_van_bv\SH\FL0000\vin.txt). Rejoining with "/"
+									// here makes every one of those LIKE queries miss. Do not "portablise".
 									faceLiftFolderPath = pathTok[0]+"\\"+pathTok[1]+"\\"+pathTok[2]+"\\"+pathTok[3]+"\\";
 								}
 								pathTok = null;
@@ -3637,9 +3651,17 @@ public class CDRomDAO extends DBConnectionHelper {
 
 							if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath))
 							{
-								String[] pathTok = faceLiftFolderPath.split("\\\\");
+								// SPLIT ON EITHER SEPARATOR - the stored path may use "\" or "/". Splitting
+								// on "\" alone returns the whole string as ONE token when the path uses
+								// "/", and the rejoin below then reads pathTok[1..3] and throws.
+								String[] pathTok = faceLiftFolderPath.split("[/\\\\]");
 								if(null!=pathTok && pathTok.length>0)
 								{
+									// REJOIN WITH "\" ON PURPOSE - this value is NOT a filesystem path. It is
+									// fed into SQL LIKE against dc_source_network_loc / dc_cd_txt_file_path,
+									// whose stored values use BACKSLASHES (verified against the MC Dev dump:
+									// e.g. JP\Nissan_familia_van_bv\SH\FL0000\vin.txt). Rejoining with "/"
+									// here makes every one of those LIKE queries miss. Do not "portablise".
 									faceLiftFolderPath = pathTok[0]+"\\"+pathTok[1]+"\\"+pathTok[2]+"\\"+pathTok[3]+"\\";
 								}
 								pathTok = null;
@@ -4044,17 +4066,17 @@ public class CDRomDAO extends DBConnectionHelper {
 						if(null!=sourceLoc && !"".equals(sourceLoc))
 						{
 							// remove file name (e.g. anc.ent etc)
-							if(sourceLoc.lastIndexOf("\\")!=-1)
+							if(Math.max(sourceLoc.lastIndexOf('/'), sourceLoc.lastIndexOf('\\'))!=-1)
 							{
-								sourceLoc = sourceLoc.substring(0, sourceLoc.lastIndexOf("\\"));
+								sourceLoc = sourceLoc.substring(0, Math.max(sourceLoc.lastIndexOf('/'), sourceLoc.lastIndexOf('\\')));
 							}
 
 							if(null!=sourceLoc && !"".equals(sourceLoc))
 							{
 								// remove processing folderName (html / html5/ ent / etc.)
-								if(sourceLoc.lastIndexOf("\\")!=-1)
+								if(Math.max(sourceLoc.lastIndexOf('/'), sourceLoc.lastIndexOf('\\'))!=-1)
 								{
-									sourceLoc = sourceLoc.substring(0, sourceLoc.lastIndexOf("\\"));
+									sourceLoc = sourceLoc.substring(0, Math.max(sourceLoc.lastIndexOf('/'), sourceLoc.lastIndexOf('\\')));
 									if(null!=sourceLoc && !"".equals(sourceLoc))
 									{
 										boolean add = true;

@@ -7,10 +7,14 @@ D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsea
 \MDM_1.3\src
 D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\2614818341.index
 \MDM_1.3\src
-D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\1797599806.index
-\MDM_1.3\src
 D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\2908308060.index
 \MDM_1.3\src
+D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\1797599806.index
+\MDM_1.3\src
+D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\1422261136.index
+\GMS3AssetsTool\src
+D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\2818553890.index
+\GMS3AssetsTool\src
 D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\1312426176.index
 \MDM_1.3\src
 D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.jst.jsp.core\jspsearch\4156760184.index

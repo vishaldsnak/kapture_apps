@@ -6,3 +6,6 @@
 {"logTime": "0826/041810", "session": "END"}
 {"logTime": "0829/031954", "session": "START"}
 {"logTime": "0829/044239", "session": "END"}
+{"logTime": "0907/064821", "session": "START"}
+{"logTime": "0907/064821", "level": "INFO", "location": "chrome\\browser\\sessions\\session_service_log.cc:326 EdgeLogSessionServiceMessage", "message": "SessionServiceEvent: kStart - {\r\n   \"crashed\": false,\r\n   \"type\": 0\r\n}\r\n"}
+{"logTime": "0908/054358", "session": "END"}

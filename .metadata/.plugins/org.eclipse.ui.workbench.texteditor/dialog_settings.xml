@@ -3,6 +3,8 @@
 	<section name="java.lang.Class">
 		<item key="replaceBarOpen" value="false"/>
 		<list key="findhistory">
+			<item value="wsl.default.user"/>
+			<item value="default"/>
 			<item value="MDM_SI"/>
 			<item value="SI_VIN"/>
 			<item value="cdrom."/>

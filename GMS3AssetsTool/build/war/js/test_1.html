@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>jQuery UI Dialog - Default functionality</title>
+<link href="jquery-ui.css" type="text/css" rel="stylesheet" />
+  <script type="text/javascript" src="external/jquery/jquery.js"></script>
+<script type="text/javascript" src="jquery-ui.js"></script>
+<style>
+.hide
+{
+	display:none;
+}
+</style>
+
+  <script>
+ $(document).ready(function() {
+	$( "#dialog" ).addClass("hide");
+} );
+ 
+ 
+ function showDialog()
+ {
+	// open dialog
+	$( "#dialog" ).removeClass('hide').dialog({
+		  closeOnEscape: false,
+		  open: function(event, ui) { $(".ui-dialog-titlebar-close", ui.dialog | ui).hide(); },
+	      resizable: false,
+	      height:140,
+	      modal: true,
+	      buttons: {
+	    	"Tes": function() {
+	    		$("#ALT_RULE_ActionClicked").val("DELETE_LANGUAGE_MAPPING");
+	    		$("#ALT_RULE_Language_Delete").val(srNo);
+		          $( this ).dialog( "close" );
+				  $("#ALT_RULE_Form").submit();
+				}  
+		  	,
+	        "No": function() {
+	          $( this ).dialog( "close" );
+	        }
+	      }
+	    });
+ }
+ 
+  </script>
+</head>
+<body>
+ <div onclick="showDialog()">Open Dialog</div>
+<div id="dialog" title="Basic dialog" class="hide">
+  <p>This is the default dialog which is useful for displaying information. The dialog window can be moved, resized and closed with the 'x' icon.</p>
+</div>
+ 
+ 
+</body>
+</html>

@@ -1,0 +1,18 @@
+Performing migration from source [D:\WD\Kapture_WD\SourceCode_Migrated\GMS3AssetsTool\build\tomcat9\assetstool.war] to destination [D:\WD\Kapture_WD\SourceCode_Migrated\GMS3AssetsTool\assetstool.war] with Jakarta EE specification profile [TOMCAT]
+Migration starting for archive [D:\WD\Kapture_WD\SourceCode_Migrated\GMS3AssetsTool\build\tomcat9\assetstool.war] using streaming
+Migration starting for archive [WEB-INF/lib/commons-fileupload-1.3.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-fileupload-1.3.1.jar]
+Migration starting for archive [WEB-INF/lib/commons-io-2.5.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-io-2.5.jar]
+Migration starting for archive [WEB-INF/lib/commons-logging-1.1.1.jar] using streaming
+Migration finished for archive [WEB-INF/lib/commons-logging-1.1.1.jar]
+Migration starting for archive [WEB-INF/lib/jstl-1.2.jar] using streaming
+Migration finished for archive [WEB-INF/lib/jstl-1.2.jar]
+Migration starting for archive [WEB-INF/lib/log4j-1.2.17.jar] using streaming
+Migration finished for archive [WEB-INF/lib/log4j-1.2.17.jar]
+Migration starting for archive [WEB-INF/lib/quick-json-1.0.2.3.jar] using streaming
+Migration finished for archive [WEB-INF/lib/quick-json-1.0.2.3.jar]
+Migration starting for archive [css/font-awesome-4.6.3.zip] using streaming
+Migration finished for archive [css/font-awesome-4.6.3.zip]
+Migration finished for archive [D:\WD\Kapture_WD\SourceCode_Migrated\GMS3AssetsTool\build\tomcat9\assetstool.war]
+Migration completed successfully in [1,119] milliseconds

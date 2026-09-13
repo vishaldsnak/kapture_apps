@@ -56,19 +56,16 @@ public class DashboardCategories {
 	public static final String TILE_RUM_VIN = "RUM_VIN";
 
 	/*
-	 * ACCESS MANAGEMENT IS NOT IN THE TILE LIST - AccessManagementFilter DELIBERATELY EXCLUDES IT,
-	 * AND IT USED TO BE REACHED BY A "SETTINGS" LINK SITTING OUTSIDE THE TILES ALTOGETHER. IT IS
-	 * NOW A SYNTHETIC TILE IN THE ADMINISTRATION CATEGORY, ADDED ONLY FOR A SUPER ADMIN - EXACTLY
-	 * THE CONDITION THE OLD LINK WAS WRAPPED IN.
-	 *
-	 * THE TILE IS LABELLED ACCESS MANAGEMENT, NOT SETTINGS, BECAUSE THAT IS THE SCREEN IT OPENS -
-	 * ROLE BASED ACCESS TO THE MDM SCREENS. ONLY THE navType STAYS "SETTINGS", SINCE THAT IS THE
-	 * VALUE THE Dashboard SERVLET ALREADY BRANCHES ON.
+	 * ACCESS MANAGEMENT IS NOT IN THE TILE LIST - AccessManagementFilter DELIBERATELY EXCLUDES IT.
+	 * IT IS NOT A DASHBOARD TILE AT ALL: it is reached from a gear icon in the top bar
+	 * (appTopBar.jsp), shown for super admins only, linking straight to /accessmanagement. It used
+	 * to be a synthetic SETTINGS tile in the (now retired) Administration category; that tile has
+	 * been removed.
 	 */
 
 	// ---------------------------------------------------------------- TAB ORDER
 	private static final String[] CATEGORY_ORDER = new String[] { CAT_MASTER_DATA, CAT_SI_VIN_RANGE,
-			CAT_SST, CAT_RUM_VIN_TRANSLATION, CAT_TOOLS, CAT_ADMIN, CAT_OTHER };
+			CAT_SST, CAT_TOOLS, CAT_OTHER };
 
 	// ---------------------------------------------------------------- TILE KEY -> CATEGORY
 	private static final Map<String, String> TILE_CATEGORY_MAP = buildTileCategoryMap();
@@ -89,6 +86,8 @@ public class DashboardCategories {
 		map.put(TILE_ENGINE, CAT_MASTER_DATA);
 		map.put(TILE_TRANSMISSION, CAT_MASTER_DATA);
 		map.put(TILE_VEHICLE_TYPE, CAT_MASTER_DATA);
+		// Master Data Locale Mapping - moved here from the retired Administration tab
+		map.put(AccessManagementInterface.REF_KEY_MASTERDATA_LOCALE_MAPPING, CAT_MASTER_DATA);
 
 		// SI VIN RANGES
 		map.put(AccessManagementInterface.REF_KEY_MNAO_SIVIN_RANGE, CAT_SI_VIN_RANGE);
@@ -102,21 +101,24 @@ public class DashboardCategories {
 		map.put(TILE_SST_MAINTENANCE, CAT_SST);
 		map.put(TILE_SST_VEHICLE_DATA, CAT_SST);
 
-		// RUM VIN AND TRANSLATIONS
-		map.put(TILE_RUM_VIN, CAT_RUM_VIN_TRANSLATION);
-		map.put(AccessManagementInterface.REF_KEY_ESI_LABELS_UPDATE_SCHEDULE, CAT_RUM_VIN_TRANSLATION);
-		map.put(AccessManagementInterface.REF_KEY_SI_TRANSLATION_UPDATE, CAT_RUM_VIN_TRANSLATION);
-
 		// TOOLS, IMPORT AND EXPORT
 		map.put(TILE_CD_CREATION, CAT_TOOLS);
 		map.put(AccessManagementInterface.REF_KEY_RMI_TOOL, CAT_TOOLS);
 		map.put(AccessManagementInterface.REF_KEY_SI_CHANNEL_DATA_LOAD, CAT_TOOLS);
 		map.put(AccessManagementInterface.REF_KEY_MNAO_DATA_EXPORT_TOOL, CAT_TOOLS);
 		map.put(AccessManagementInterface.REF_KEY_NEW_MNAO_DATA_EXPORT_TOOL, CAT_TOOLS);
+		// Moved into Tools from the retired RUM VIN & Translations tab
+		map.put(TILE_RUM_VIN, CAT_TOOLS);
+		map.put(AccessManagementInterface.REF_KEY_ESI_LABELS_UPDATE_SCHEDULE, CAT_TOOLS);
+		map.put(AccessManagementInterface.REF_KEY_SI_TRANSLATION_UPDATE, CAT_TOOLS);
 
-		// ADMINISTRATION
-		map.put(AccessManagementInterface.REF_KEY_MASTERDATA_LOCALE_MAPPING, CAT_ADMIN);
-		map.put(AccessManagementInterface.REF_KEY_ACCESS_MANAGEMENT, CAT_ADMIN);
+		/*
+		 * The former ADMINISTRATION tab is retired. Master Data Locale Mapping moved to Master
+		 * Data (above); Access Management left the tiles entirely for a gear icon in the top bar
+		 * (appTopBar.jsp, super admin only). CAT_ADMIN and CAT_RUM_VIN_TRANSLATION stay defined
+		 * (DashboardIcons still maps them) but are no longer populated or ordered, so neither tab
+		 * renders.
+		 */
 
 		return map;
 	}
@@ -148,19 +150,10 @@ public class DashboardCategories {
 			}
 
 			/*
-			 * ACCESS MANAGEMENT GOES LAST SO IT SITS AT THE END OF THE ADMINISTRATION TAB. IT IS
-			 * ADDED EVEN WHEN THE USER HAS NO OTHER ADMINISTRATION TILE - THE TAB IS CREATED FOR IT.
+			 * ACCESS MANAGEMENT IS NO LONGER A DASHBOARD TILE - it moved to a gear icon in the top
+			 * bar (appTopBar.jsp), shown for super admins only, linking straight to /accessmanagement.
+			 * The superAdminUser parameter is kept for signature stability but is no longer used here.
 			 */
-			if (superAdminUser) {
-				String accessKey = AccessManagementInterface.REF_KEY_ACCESS_MANAGEMENT;
-				DashboardTileDetails accessTile = new DashboardTileDetails();
-				accessTile.setNavType("SETTINGS");
-				accessTile.setTileKey(accessKey);
-				accessTile.setTitle(resolve(msgProps, "label.dash." + accessKey, accessKey));
-				accessTile.setDescription(resolve(msgProps, "label.dashtile." + accessKey + ".desc", ""));
-				accessTile.setIcon(DashboardIcons.forTile(accessKey));
-				addTile(byKey, accessTile, msgProps);
-			}
 
 			// EMIT IN THE FIXED TAB ORDER, SKIPPING CATEGORIES THIS USER HAS NO TILES FOR
 			for (int i = 0; i < CATEGORY_ORDER.length; i++) {

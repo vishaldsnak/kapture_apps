@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/javaee" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd" id="WebApp_ID" version="2.5">
+  <display-name>assetstool</display-name>
+  <!--
+    Injects the WebSEAL iv-user header from wsl.default.user (application.properties)
+    when a request carries none. Blank property = filter does nothing = the real header
+    is required, which is the VDI / MC Dev setting.
+  -->
+  <filter>
+    <filter-name>DefaultUserFilter</filter-name>
+    <filter-class>com.webapp.mazda.assetstool.filter.DefaultUserFilter</filter-class>
+  </filter>
+  <filter-mapping>
+    <filter-name>DefaultUserFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+    <dispatcher>REQUEST</dispatcher>
+    <dispatcher>FORWARD</dispatcher>
+    <dispatcher>INCLUDE</dispatcher>
+    <dispatcher>ERROR</dispatcher>
+  </filter-mapping>
+  <servlet>
+		<description>
+		</description>
+		<display-name>Progress</display-name>
+		<servlet-name>Progress</servlet-name>
+		<servlet-class>com.webapp.mazda.assetstool.servlet.Progress</servlet-class>
+	</servlet>
+	<servlet>
+		<description>
+		</description>
+		<display-name>ManageAssets</display-name>
+		<servlet-name>ManageAssets</servlet-name>
+		<servlet-class>com.webapp.mazda.assetstool.servlet.ManageAssets</servlet-class>
+	</servlet>
+	<servlet>
+		<description>
+		</description>
+		<display-name>Error</display-name>
+		<servlet-name>Error</servlet-name>
+		<servlet-class>com.webapp.mazda.assetstool.servlet.Error</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>Progress</servlet-name>
+		<url-pattern>/Progress</url-pattern>
+	</servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>ManageAssets</servlet-name>
+		<url-pattern>/manageassets</url-pattern>
+	</servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>Error</servlet-name>
+		<url-pattern>/error</url-pattern>
+	</servlet-mapping>
+	<welcome-file-list>
+		<welcome-file>index.html</welcome-file>
+		<welcome-file>index.htm</welcome-file>
+		<welcome-file>index.jsp</welcome-file>
+		<welcome-file>default.html</welcome-file>
+		<welcome-file>default.htm</welcome-file>
+		<welcome-file>default.jsp</welcome-file>
+	</welcome-file-list>
+</web-app>

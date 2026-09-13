@@ -25,12 +25,14 @@
 		<item key="WizardZipFileResourceExportPage1.STORE_CREATE_STRUCTURE_ID" value="true"/>
 		<item key="WizardZipFileResourceExportPage1.STORE_COMPRESS_CONTENTS_ID" value="true"/>
 		<list key="WizardZipFileResourceExportPage1.STORE_DESTINATION_NAMES_ID">
+			<item value="D:\AssetsTool.zip"/>
+			<item value="D:.zip"/>
 			<item value="D:\MDM.zip"/>
 		</list>
 		<section name="ZipFileExportWizard.dialogBounds">
 			<item key="DIALOG_X_ORIGIN" value="356"/>
 			<item key="DIALOG_Y_ORIGIN" value="7"/>
-			<item key="DIALOG_WIDTH" value="683"/>
+			<item key="DIALOG_WIDTH" value="682"/>
 			<item key="DIALOG_HEIGHT" value="636"/>
 			<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-18|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
 		</section>

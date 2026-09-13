@@ -2190,9 +2190,9 @@ public class OEMMapping extends HttpServlet {
 			String path = ApplicationProperties.getProperty("EXPORT_DATA_PHYSICAL_PATH");
 			if(null!=path && !"".equals(path))
 			{
-				if(!path.endsWith("\\"))
+				if(!path.endsWith("/") && !path.endsWith("\\"))
 				{
-					path = path+"\\";
+					path = path+"/";
 				}
 				// add VIN DATA NAME
 				String name = "";

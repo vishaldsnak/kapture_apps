@@ -103,13 +103,27 @@
 			</c:if>
 		</div>
 		<div class="tbRight">
-			<%--
-				THE OLD SETTINGS LINK IS NOT IN THIS BAR - IT IS NOW AN ACCESS MANAGEMENT TILE IN THE
-				ADMINISTRATION CATEGORY ON MY PAGE, ADDED BY
-				com.mazda.gms3.mdm.utils.DashboardCategories FOR SUPER ADMINS ONLY.
-			--%>
 			<a class="tbAction" href="javascript:void(0);" onclick="mdm_logout();"><fmt:message
 					key="label.logout" /></a>
+			<%--
+				ACCESS MANAGEMENT - super admins only. It is no longer a My Page tile; it sits here as
+				a gear icon between Logout and the profile. It opens the SAME screen the old SETTINGS
+				tile did, THROUGH THE SAME NAVIGATION: mdm_navigateSomeWhere('SETTINGS', ...) submits
+				MDM_DashboardForm, and the Dashboard servlet's SETTINGS branch builds the top menu and
+				redirects to /accessmanagement. A bare link to /accessmanagement CANNOT be used -
+				AccessManagement.doGet bounces to /mypage when the top menu holds only My Page, which
+				is the dashboard's state. So this depends on mdm_navigateSomeWhere + MDM_DashboardForm
+				being present, exactly as the tile it replaces did (both live on My Page/dashboard.jsp).
+				The fa-cog glyph needs font-awesome, already linked by the including page; the title is
+				the text fallback for accessibility.
+			--%>
+			<c:if test="${userAccessBean.superAdminUser eq true}">
+				<a class="tbAction tbActionIcon" href="javascript:void(0);"
+						onclick="mdm_navigateSomeWhere('SETTINGS','','');"
+						title="<fmt:message key="label.dash.ACCESS_MANAGEMENT" />"
+						aria-label="<fmt:message key="label.dash.ACCESS_MANAGEMENT" />"><i
+						class="fa fa-cog"></i></a>
+			</c:if>
 			<span class="tbUser">
 				<span class="tbAvatar"><%=initials%></span>
 				<span class="tbUserMeta">
