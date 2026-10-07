@@ -141,6 +141,11 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 													<c:out value="${axleTypeBean.successMessage }" />
 												</div>
 											</c:if>
+											<c:if test="${!empty axleTypeBean.infoMessage }">
+												<div class="errorWarningMessage" id="MS3_ERROR_MESSAGE">
+													<c:out value="${axleTypeBean.infoMessage }" />
+												</div>
+											</c:if>
 											<div class="cb"></div>
 										</td>
 									</tr>
@@ -232,6 +237,34 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 									</tr>
 									</c:if>
 								</table>
+								<c:if test="${axleTypeBean.showWriteControls eq true }">
+								<p style="height:45px;">&nbsp;</p>
+								<h4>
+									<fmt:message key="label.import"/> <fmt:message key="label.axletype"/> <fmt:message key="label.details"/>
+								</h4>
+								<br />
+								<table width="100%" border="0" cellspacing="0" cellpadding="0" class="inputTable">
+									<tr>
+										<td>
+											<div class="formElement_row leftpadding_none" style="margin: 0px !important;">
+												<label style="width: 150px;"><fmt:message key="label.upload" /> <fmt:message key="label.axletype"/> <fmt:message key="label.excel"/> <span class="mandatory">*</span></label>
+												<input id="AXL_uploadFile" class="fileInput" placeholder="<fmt:message key="label.choose.file"/>" disabled="disabled" />
+												<div class="fileUpload btn">
+													<span><fmt:message key="label.browse"/></span>
+													<input id="AXL_File" name="AXL_File" type="file" class="upload" />
+												</div>
+												<button style="margin-left:25px;padding:6px 10px;float: left;" type="button" onclick="axl_file_upload();" id="AXL_Upload" name="AXL_Upload"
+												class="bluebutton cursorPointer"><i class="uploadIcon"></i><fmt:message key="label.import"/></button>
+												<!-- DOWNLOAD THE BLANK IMPORT TEMPLATE FOR THIS SCREEN -->
+												<a style="margin-left:25px;float: left;line-height:30px;" href="javascript:void(0);"
+													id="AXL_DownloadTemplate" onclick="axl_download_template();"
+													title="<fmt:message key="label.download.template"/>"><fmt:message key="label.download.template"/></a>
+												<div class="cb"></div>
+											</div>
+										</td>
+									</tr>
+								</table>
+								</c:if>
 								<p style="height:45px;">&nbsp;</p>
 								<h4>
 									<fmt:message key="label.master"/> <fmt:message key="label.details"/>
@@ -956,5 +989,51 @@ function mdm_localeData()
 }
 </script>
 
+
+<script type="text/javascript">
+/*
+ * EXCEL IMPORT
+ */
+if(null!=document.getElementById("AXL_File")) {
+	document.getElementById("AXL_File").onchange = function () {
+		document.getElementById("AXL_uploadFile").value = this.value;
+	};
+}
+
+/*
+ * The import is the ONLY multipart submit of this screen: the form is switched to multipart for
+ * this one submit. The servlet sends a multipart request to the import, every other action keeps
+ * posting exactly as before.
+ */
+function axl_file_upload()
+{
+	$("#loader").show();
+	var importForm = document.getElementById("AXL_Form");
+	importForm.enctype = "multipart/form-data";
+	importForm.encoding = "multipart/form-data";
+	importForm.submit();
+}
+
+/*
+ * A page restored from the browser's back / forward cache keeps the form as it was - put it back
+ * to a normal post so the next action is not taken for an import.
+ */
+window.addEventListener("pageshow", function () {
+	var mainForm = document.getElementById("AXL_Form");
+	if(null!=mainForm) {
+		mainForm.enctype = "application/x-www-form-urlencoded";
+		mainForm.encoding = "application/x-www-form-urlencoded";
+	}
+});
+
+/*
+ * Download the blank import template for this screen. Plain GET - the page is NOT submitted,
+ * so nothing already keyed in is lost.
+ */
+function axl_download_template()
+{
+	window.location.href = "<c:out value="${pageContext.request.contextPath}"/>/importtemplate?screen=DRIVE_AXLE_TYPE";
+}
+</script>
 
 </html>

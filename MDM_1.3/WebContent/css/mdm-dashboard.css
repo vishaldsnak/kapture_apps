@@ -138,6 +138,17 @@
 	color: #fff;
 }
 
+/* icon-only action (Access Management gear) - square-ish pill instead of the wide text one */
+.mdmTopBar .tbActionIcon {
+	padding: 7px 10px;
+	line-height: 1;
+}
+
+.mdmTopBar .tbActionIcon .fa {
+	font-size: 14px;
+	vertical-align: middle;
+}
+
 .mdmTopBar .tbUser {
 	display: inline-block;
 	vertical-align: middle;

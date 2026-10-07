@@ -14,6 +14,7 @@ import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
 import com.mazda.gms3.mdm.utils.DBConnectionHelper;
+import com.mazda.gms3.mdm.utils.ImportActionUtils;
 import com.mazda.gms3.mdm.utils.Utilities;
 import com.mazda.gms3.mdm.vo.AccessManagementInterface;
 import com.mazda.gms3.mdm.vo.AxleTypeDetails;
@@ -423,4 +424,148 @@ public class AxleTypeDAO extends DBConnectionHelper{
 		return true;
 	}
 
+
+	/**
+	 * EXCEL IMPORT LOOKUP - the id of the ACTIVE row an import line refers to, or 0 when there is
+	 * none. Unique criteria: Country Locale + Manual Language + Code, case- and space-insensitive -
+	 * the same rule the screen's own Entry / Update enforces. Deleted rows are never matched, so an
+	 * add / update of a code that was deleted earlier inserts a new row.
+	 */
+	public static long findExistingIdForImport(AxleTypeDetails details, Connection conn) throws Exception
+	{
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = conn.prepareStatement("SELECT mdm_at_id FROM gms3_mdm_axle_type WHERE mdm_cl_id = ? AND mdm_ml_id = ?"
+					+ " AND TRIM(LOWER(mdm_at_axle_type)) = ? AND mdm_at_flag NOT IN (?)");
+			pstmt.setLong(1, details.getCountryLocaleId());
+			pstmt.setLong(2, details.getManualLanguageId());
+			pstmt.setString(3, ImportActionUtils.safeLower(details.getAxleCode()));
+			pstmt.setString(4, ApplicationProperties.getProperty("flag.value.delete"));
+			rs = pstmt.executeQuery();
+			if(rs.next())
+			{
+				return rs.getLong(1);
+			}
+			return 0;
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+		}
+	}
+
+	/**
+	 * EXCEL IMPORT - CREATE OR UPDATE ONE ROW (Action A / U / blank).
+	 *
+	 * The row is looked up with the same criteria as findExistingIdForImport.
+	 *  - FOUND: the code and both descriptions are updated. The STATUS IS KEPT - an import never
+	 *    activates or drafts a row. The sync status follows the screen's rule for an unchanged
+	 *    status: an ACTIVE row whose code / descriptions changed is set to N so it is synchronised
+	 *    again; otherwise it is left as it is.
+	 *  - NOT FOUND: inserted exactly as the screen's Entry inserts it (status from details = Draft).
+	 *
+	 * Uses the caller's connection; opens (and closes) its own only when none is passed.
+	 */
+	public static boolean importAxleTypeDetails(AxleTypeDetails details, Connection conn)
+	{
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		boolean ownConnection = false;
+		try
+		{
+			details.setAxleCode(ImportActionUtils.safeTrim(details.getAxleCode()));
+			details.setAxleCodeDescription(ImportActionUtils.safeTrim(details.getAxleCodeDescription()));
+			details.setAxleCodeDescriptionRegional(ImportActionUtils.safeTrim(details.getAxleCodeDescriptionRegional()));
+			if(null==conn || conn.isClosed())
+			{
+				conn = getConnection();
+				ownConnection = true;
+			}
+
+			long existingId = 0;
+			String oldValues = "";
+			String oldFlag = "";
+			String syncStatus = null;
+			pstmt = conn.prepareStatement("SELECT mdm_at_id, mdm_at_axle_type, mdm_at_axle_type_desc_eng, mdm_at_axle_type_desc_reg,"
+					+ " mdm_at_flag, mdm_sync_status FROM gms3_mdm_axle_type WHERE mdm_cl_id = ? AND mdm_ml_id = ?"
+					+ " AND TRIM(LOWER(mdm_at_axle_type)) = ? AND mdm_at_flag NOT IN (?)");
+			pstmt.setLong(1, details.getCountryLocaleId());
+			pstmt.setLong(2, details.getManualLanguageId());
+			pstmt.setString(3, details.getAxleCode().toLowerCase());
+			pstmt.setString(4, ApplicationProperties.getProperty("flag.value.delete"));
+			rs = pstmt.executeQuery();
+			if(rs.next())
+			{
+				existingId = rs.getLong(1);
+				oldValues = ImportActionUtils.safeTrim(rs.getString(2)) + "|" + ImportActionUtils.safeTrim(rs.getString(3))
+						+ "|" + ImportActionUtils.safeTrim(rs.getString(4));
+				oldFlag = ImportActionUtils.safeTrim(rs.getString(5));
+				syncStatus = rs.getString(6);
+			}
+			rs.close();
+			rs = null;
+			pstmt.close();
+			pstmt = null;
+
+			if(existingId>0)
+			{
+				String newValues = details.getAxleCode() + "|" + details.getAxleCodeDescription() + "|" + details.getAxleCodeDescriptionRegional();
+				if(oldFlag.equals(ApplicationProperties.getProperty("flag.value.active"))
+						&& !oldValues.toLowerCase().equals(newValues.toLowerCase()))
+				{
+					syncStatus = AccessManagementInterface.SYNC_STATUS_NO;
+				}
+				pstmt = conn.prepareStatement("UPDATE gms3_mdm_axle_type SET mdm_at_axle_type = ?, mdm_at_axle_type_desc_eng = ?,"
+						+ " mdm_at_axle_type_desc_reg = ?, mdm_at_updated_tmstp = ?, mdm_sync_status = ? WHERE mdm_at_id = ?");
+				pstmt.setString(1, details.getAxleCode());
+				pstmt.setString(2, details.getAxleCodeDescription());
+				pstmt.setString(3, details.getAxleCodeDescriptionRegional());
+				pstmt.setTimestamp(4, new java.sql.Timestamp(new Date().getTime()));
+				pstmt.setString(5, syncStatus);
+				pstmt.setLong(6, existingId);
+				pstmt.executeUpdate();
+			}
+			else
+			{
+				pstmt = conn.prepareStatement("INSERT INTO gms3_mdm_axle_type(mdm_at_axle_type,mdm_at_axle_type_desc_eng,"
+						+ "mdm_at_flag,mdm_at_created_tmstp,mdm_cl_id,mdm_ml_id,mdm_at_axle_type_desc_reg) VALUES(?,?,?,?,?,?,?)");
+				pstmt.setString(1, details.getAxleCode());
+				pstmt.setString(2, details.getAxleCodeDescription());
+				pstmt.setString(3, details.getFlag().trim());
+				pstmt.setTimestamp(4, new java.sql.Timestamp(new Date().getTime()));
+				pstmt.setLong(5, details.getCountryLocaleId());
+				pstmt.setLong(6, details.getManualLanguageId());
+				pstmt.setString(7, details.getAxleCodeDescriptionRegional());
+				pstmt.executeUpdate();
+			}
+			return true;
+		}
+		catch(Exception e)
+		{
+			logger.info("importAxleTypeDetails :: ################ Exception ################");
+			Utilities.printStackTraceToLogs(AxleTypeDAO.class.getName(), "importAxleTypeDetails()", e);
+			return false;
+		}
+		finally
+		{
+			try
+			{
+				if(null!=rs)
+					rs.close();
+				if(null!=pstmt)
+					pstmt.close();
+				if(ownConnection && null!=conn)
+					conn.close();
+			}
+			catch(Exception e)
+			{
+				Utilities.printStackTraceToLogs(AxleTypeDAO.class.getName(), "importAxleTypeDetails()", e);
+			}
+		}
+	}
 }

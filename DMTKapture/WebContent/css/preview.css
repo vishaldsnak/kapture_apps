@@ -1,0 +1,87 @@
+/* Content Preview page (jsps/preview.jsp) - DMT palette of css/style.css */
+html, body.pvBody { height: 100%; margin: 0; background: #F9F9F9; }
+body.pvBody { display: flex; flex-direction: column; overflow: hidden; }
+
+.pvHeader { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #DADADA; }
+.pvHeader .pvHeaderTitle { float: none; display: block; height: auto; padding: 0 25px 0 0; font-size: 20px; }
+
+.pvContext { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; background: #555555; color: #fff; padding: 8px 20px; }
+.pvContextLeft { display: block; }
+.pvSep { margin: 0 10px; color: #CECECE; }
+.pvBadge { display: inline-block; background: #FFF4E5; color: #B26A00; border: 1px solid #F0C27B; border-radius: 10px; padding: 1px 10px; font-size: 11px; }
+.pvPublish[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+.pvFilters { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; background: #fff; border-bottom: 1px solid #DADADA; padding: 10px 20px; }
+.pvFilter { display: inline-flex; align-items: center; }
+.pvFilterLabel { color: #34495E; font-weight: bold; }
+/* multi select dropdown: a button + a panel of check boxes (nothing ticked = all) */
+.pvMulti { position: relative; display: inline-block; margin-left: 8px; }
+.pvMultiButton { position: relative; min-width: 170px; max-width: 280px; padding: 4px 24px 4px 6px; border: 1px solid #CBCBCB; background: #fff; color: #000; font-family: inherit; font-size: 12px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.pvMultiButton:after { content: ""; position: absolute; right: 8px; top: 50%; margin-top: -2px; border: 4px solid transparent; border-top-color: #34495E; }
+.pvMultiButton[disabled] { background: #F1F1F1; color: #999; cursor: default; }
+.pvMultiPanel { display: none; position: absolute; z-index: 50; left: 0; top: 100%; min-width: 100%; max-height: 280px; overflow-y: auto; background: #fff; border: 1px solid #CBCBCB; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18); padding: 2px 0; }
+.pvMultiOpen .pvMultiPanel { display: block; }
+.pvMultiActions { display: flex; justify-content: space-between; gap: 16px; padding: 4px 8px; border-bottom: 1px solid #EEEEEE; }
+.pvMultiActions a { color: #4F81BD; cursor: pointer; text-decoration: none; }
+.pvMultiActions a:hover { text-decoration: underline; }
+.pvMultiOption { display: flex; align-items: center; gap: 6px; padding: 3px 8px; color: #000; font-weight: normal; white-space: nowrap; cursor: pointer; }
+.pvMultiOption:hover { background: #F1F1F1; }
+.pvMultiOption input { margin: 0; }
+
+.pvMain { flex: 1 1 auto; display: flex; min-height: 0; }
+.pvTree { flex: 0 0 360px; overflow: auto; background: #fff; border-right: 1px solid #DADADA; padding: 10px 6px; }
+.pvContent { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+.pvDocHeader { flex: 0 0 auto; background: #fff; border-bottom: 1px solid #DADADA; padding: 10px 16px; }
+.pvDocHeader .pvDocId { color: #D0021B; font-size: 15px; font-weight: bold; margin-right: 10px; }
+.pvDocHeader .pvDocTitle { color: #34495E; font-size: 14px; }
+.pvDocHeader .pvDocMeta { margin-top: 6px; color: #5C5B65; }
+.pvDocHeader .pvDocMeta span { margin-right: 14px; }
+.pvDocHeader a { color: #4F81BD; text-decoration: none; }
+.pvDocHeader a:hover { text-decoration: underline; }
+.pvFrame { flex: 1 1 auto; width: 100%; border: 0; background: #fff; }
+.pvInfo { color: #5C5B65; padding: 10px; }
+.pvNone { margin: 30px auto; font-size: 14px; }
+
+/* tree */
+.pvTree ul { list-style: none; margin: 0; padding-left: 16px; }
+.pvTree > ul { padding-left: 0; }
+.pvTree li { margin: 0; }
+.pvNode { display: flex; align-items: flex-start; padding: 3px 4px; border-radius: 2px; color: #34495E; cursor: pointer; line-height: 16px; }
+.pvNode:hover { background: #F1F1F1; }
+.pvCaret { flex: 0 0 14px; height: 16px; position: relative; }
+.pvCaret:before { content: ""; position: absolute; left: 3px; top: 4px; border: 5px solid transparent; border-left-color: #34495E; }
+.pvOpen > .pvNode .pvCaret:before { left: 1px; top: 6px; border-left-color: transparent; border-top-color: #34495E; }
+.pvLeafCaret { flex: 0 0 14px; }
+.pvFolder > ul { display: none; }
+.pvOpen > ul { display: block; }
+.pvRoot > .pvNode { font-weight: bold; text-transform: uppercase; color: #D0021B; }
+.pvDoc .pvNode { color: #5C5B65; }
+.pvDoc .pvNode .pvId { color: #4F81BD; margin-right: 6px; white-space: nowrap; }
+.pvDoc.pvSelected > .pvNode { background: #CECECE; }
+/* published by a Publish Content job: greyed out */
+.pvPublishedDoc .pvNode, .pvPublishedDoc .pvNode .pvId { color: #A0A0A8; }
+.pvPublishedLabel { display: inline-block; margin-left: 6px; background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; border-radius: 8px; padding: 0 6px; font-size: 10px; }
+.pvBadge.pvBadgePublished { background: #E8F5E9; color: #2E7D32; border-color: #A5D6A7; }
+.pvHidden { display: none; }
+/* "Cannot publish yet": the items other jobs are processing */
+.pvModal.pvModalWide { width: 680px; max-width: 92vw; }
+.pvModalLead { margin-bottom: 12px; }
+.pvBusyTable { width: 100%; border-collapse: collapse; font-size: 12px; white-space: normal; }
+.pvBusyTable th { background: #F2F2F2; color: #34495E; text-align: left; padding: 6px 8px; border: 1px solid #DADADA; }
+.pvBusyTable td { padding: 6px 8px; border: 1px solid #DADADA; color: #5C5B65; vertical-align: top; }
+.pvBusyTable td.pvBusyJob { color: #D0021B; font-weight: bold; white-space: nowrap; }
+
+/* modal */
+.pvModalBack { display: none; position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.35); z-index: 100; }
+.pvModalBack.pvShow { display: flex; align-items: center; justify-content: center; }
+.pvModal { width: 420px; max-width: calc(100% - 32px); background: #fff; border-radius: 3px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
+.pvModalTitle { background: #555555; color: #fff; padding: 10px 14px; font-weight: bold; }
+.pvModalText { padding: 18px 14px; color: #34495E; font-size: 13px; white-space: pre-line; }
+.pvModalButtons { padding: 0 14px 14px; text-align: right; }
+/* shown while the publish job is being scheduled - blocks the page, so the button cannot be clicked again */
+.pvBusyBack { z-index: 110; cursor: wait; }
+.pvBusyBox { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 3px; padding: 16px 20px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); color: #34495E; font-size: 13px; font-weight: bold; }
+.pvSpinner { width: 20px; height: 20px; border: 3px solid #d5dbe1; border-top-color: #D0021B; border-radius: 50%;
+	animation: pvSpin 0.8s linear infinite; }
+@keyframes pvSpin { to { transform: rotate(360deg); } }

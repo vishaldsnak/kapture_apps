@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Application-SCOPED JNDI resources for DMT (Kapture).
+
+  This file ships inside the application (WebContent/META-INF/context.xml -> the WAR's
+  META-INF/context.xml), so the DataSource below is visible ONLY to this application.
+  Tomcat's server.xml is NOT touched and no other application deployed on the same
+  Tomcat is affected.
+
+  DBConnectionHelper.getConnection() looks these names up through
+  java:comp/env/<jdbc.datasource> - the same code path used on the VDI / production
+  servers, so local and server behaviour match exactly.
+
+  Per environment only the url/username/password below change.
+-->
+<Context>
+
+	<!-- Conversion schema (kapture_dc) - DMT and MDM tables -->
+	<!--
+	  sessionVariables adds NO_BACKSLASH_ESCAPES to the session sql_mode. DO NOT REMOVE.
+	  The DMT tables key every document on its source path, stored with BACKSLASHES
+	  (ja-JP\NewM_cx-3_dk\WM\...), and the SQL builds its WHERE clauses by joining text.
+	  Oracle treats a backslash as an ordinary character; MySQL by default treats it as an
+	  escape, so every lookup by path silently finds NO ROW (and LIKE finds none either).
+	  With this mode a backslash is an ordinary character again, exactly as on Oracle.
+	-->
+	<Resource name="jdbc/conv_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://localhost:3306/kapture_dc?useSSL=false&amp;rewriteBatchedStatements=true&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC&amp;sessionVariables=sql_mode=(SELECT CONCAT(@@sql_mode,',NO_BACKSLASH_ESCAPES'))"
+		username="root"
+		password="welcome1234"
+		initialSize="2"
+		maxTotal="20"
+		maxIdle="5"
+		minIdle="2"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="false"
+		testWhileIdle="true"
+		timeBetweenEvictionRunsMillis="60000"
+		minEvictableIdleTimeMillis="300000"
+		removeAbandonedOnBorrow="true"
+		removeAbandonedTimeout="3600"
+		logAbandoned="true"
+		defaultAutoCommit="true" />
+
+	<!--
+	  KAPTURE CMS schema (kapture_cms_db) - the replacement for the Oracle OK_IM schema,
+	  referenced by jdbc.cms.datasource and read through DBConnectionHelper.getCMSConnection().
+
+	  This is a SEPARATE resource rather than a cross-database reference on
+	  jdbc/conv_datasource because the two schemas are NOT always co-located: on the VDI
+	  server both live on the same MySQL instance, but on a developer workstation
+	  kapture_dc is local while kapture_cms_db is the shared AWS-hosted server. Where they
+	  ARE co-located, simply point this resource at the same url as conv_datasource above.
+
+	  All CMS tables are referenced fully qualified (kapture_cms_db.<table>), so the
+	  database named in the url below is only the connection default.
+	-->
+	<Resource name="jdbc/cms_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://server.mgssdev.kapturekm.com:3306/kapture_cms_db?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC"
+		username="gauravb"
+		password="Gaurav@123"
+		initialSize="1"
+		maxTotal="10"
+		maxIdle="3"
+		minIdle="1"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="false"
+		testWhileIdle="true"
+		timeBetweenEvictionRunsMillis="60000"
+		minEvictableIdleTimeMillis="300000"
+		removeAbandonedOnBorrow="true"
+		removeAbandonedTimeout="3600"
+		logAbandoned="true"
+		defaultAutoCommit="true" />
+
+	<!--
+	  THERE IS NO THIRD DATASOURCE. A commented-out jdbc/im_datasource pointing at the
+	  InfoManager schema (kapture_im) used to sit here, kept "in case an InfoManager-backed
+	  screen needs it". InfoManager is not used as a database by this application, so nothing can need it -
+	  the schema does not exist on the migrated servers and no code reads the property.
+	  Do not reinstate it.
+	-->
+
+</Context>

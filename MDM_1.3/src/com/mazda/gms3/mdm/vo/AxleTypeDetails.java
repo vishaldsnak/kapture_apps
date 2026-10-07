@@ -136,4 +136,13 @@ public class AxleTypeDetails {
 	public void setEditableFlag(boolean editableFlag) {
 		this.editableFlag = editableFlag;
 	}
+
+	/** Excel import Action / Indicator column: A / U / D, or blank (= add or update). */
+	private String importAction=null;
+	public String getImportAction() {
+		return importAction;
+	}
+	public void setImportAction(String importAction) {
+		this.importAction = importAction;
+	}
 }

@@ -1,15 +1,21 @@
 package com.mazda.gms3.mdm.servlet;
 
 import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.sql.Connection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -17,10 +23,15 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import com.mazda.gms3.mdm.bean.BodyTypeBean;
 import com.mazda.gms3.mdm.bean.UserAccessBean;
@@ -31,6 +42,8 @@ import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
 import com.mazda.gms3.mdm.utils.CountryLocaleComparator;
+import com.mazda.gms3.mdm.utils.DBConnectionHelper;
+import com.mazda.gms3.mdm.utils.ImportActionUtils;
 import com.mazda.gms3.mdm.utils.ManualLanguageComparator;
 import com.mazda.gms3.mdm.utils.MessageProperties;
 import com.mazda.gms3.mdm.utils.Utilities;
@@ -41,6 +54,7 @@ import com.mazda.gms3.mdm.vo.CountryLocaleDetails;
 import com.mazda.gms3.mdm.vo.ManualLanguageDetails;
 import com.mazda.gms3.mdm.vo.ModuleDetails;
 import com.mazda.gms3.mdm.vo.SelectItemDetails;
+import com.mazda.gms3.sst.utils.SSTUtils;
 
 /**
  * Servlet implementation class BodyType
@@ -106,6 +120,7 @@ public class BodyType extends HttpServlet {
 			sessionBean.setFieldDetails(null);
 			sessionBean.setErrorMessage(null);
 			sessionBean.setSuccessMessage(null);
+			sessionBean.setInfoMessage(null);
 			sessionBean.setSelectedRows(null);
 			sessionBean.setShowUpdate(false);
 			sessionBean.setDisplayPageLength(null);
@@ -205,6 +220,20 @@ public class BodyType extends HttpServlet {
 			/*
 			 * call function to read parameters from request
 			 */
+			if(ServletFileUpload.isMultipartContent(request))
+			{
+				/*
+				 * EXCEL IMPORT - the ONLY multipart submit of this screen: the Import button switches
+				 * the form to multipart for that one submit. Every other action is a normal form post
+				 * and is handled by the else branch below, unchanged. readParamsFromRequest must NOT
+				 * run here - getParameter() is null on a multipart request and it would wipe the
+				 * selected Country Locale and Language.
+				 */
+				importFromExcel(request, sessionBean);
+			}
+			else
+			{
+			sessionBean.setInfoMessage(null);
 			readParamsFromRequest(sessionBean, request);
 			
 			if(null!=request.getParameter("BDT_CountrySelection") && !"".equals(request.getParameter("BDT_CountrySelection")))
@@ -296,6 +325,7 @@ public class BodyType extends HttpServlet {
 				 */
 				getBodyTypeList(sessionBean);	
 			}
+			} // end of the normal (non-import) form post
 		}
 		catch(Exception e)
 		{
@@ -1729,4 +1759,475 @@ public class BodyType extends HttpServlet {
 		}
 	}
 
+
+	/*
+	 * =====================================================================================
+	 * EXCEL IMPORT (Action A / U / D) - same behaviour as the other MDM import screens.
+	 *
+	 * Columns, row 1 = header. Identical to this screen's Excel export, so an exported file can
+	 * be edited and imported back:   CODE | NAME REGIONAL LANG | NAME ENG LANG | ACTION
+	 * Unique criteria: Code within the selected Country Locale + Language, case- and
+	 * space-insensitive - the same rule the screen's own Entry / Update enforces.
+	 *   A / U / blank : create-or-update (found -> update, not found -> insert)
+	 *   D             : soft delete through the screen's EXISTING delete
+	 * =====================================================================================
+	 */
+	private void importFromExcel(HttpServletRequest request, BodyTypeBean sessionBean)
+	{
+		sessionBean.setInfoMessage(null);
+		sessionBean.setBodyListToImport(null);
+		sessionBean.setFieldDetails(new BodyTypeDetails());
+		sessionBean.setCountryLocaleId(null);
+		sessionBean.setManualLanguageId(null);
+		String fileName = null;
+		byte[] data = null;
+		try
+		{
+			ServletFileUpload servletFileUpload = new ServletFileUpload(new DiskFileItemFactory());
+			List<FileItem> fileItems = servletFileUpload.parseRequest(request);
+			for(FileItem fileItem : fileItems)
+			{
+				if(fileItem.isFormField())
+				{
+					String value = fileItem.getString("UTF-8");
+					if(null!=value && !"".equals(value.trim()))
+					{
+						if("BDT_CountryLocale_Code".equals(fileItem.getFieldName()))
+						{
+							sessionBean.setCountryLocaleId(value.trim());
+						}
+						else if("BDT_Lang_Code".equals(fileItem.getFieldName()))
+						{
+							sessionBean.setManualLanguageId(value.trim());
+						}
+					}
+				}
+				else if("BDT_File".equals(fileItem.getFieldName()))
+				{
+					fileName = fileItem.getName();
+					data = fileItem.get();
+				}
+			}
+
+			if(validateFileUpload(sessionBean))
+			{
+				String extension = "";
+				if(null!=fileName && fileName.lastIndexOf(".")!=-1)
+				{
+					extension = fileName.substring(fileName.lastIndexOf(".")+1).trim().toLowerCase();
+				}
+				if(null!=data && data.length>0 && (extension.equals("xlsx") || extension.equals("xls")))
+				{
+					executeExcelOperation(sessionBean, data, extension);
+				}
+				else
+				{
+					logger.info("importFromExcel :: no file, or not an Excel file {"+fileName+"}.");
+					sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(BodyType.class.getName(), "importFromExcel()", e);
+			sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
+		}
+		// show the grid of the selected locale / language again, as every other action does
+		sessionBean.setSelectedRows(null);
+		sessionBean.setShowUpdate(false);
+		getBodyTypeList(sessionBean);
+	}
+
+	private boolean validateFileUpload(BodyTypeBean sessionBean)
+	{
+		StringBuilder errorMessage = new StringBuilder();
+		if(null==sessionBean.getCountryLocaleId() || "".equals(sessionBean.getCountryLocaleId()))
+		{
+			errorMessage.append(msgProps.addMessage("error.mandatory.fields.specific", msgProps.getProperty("label.countrylocale")));
+		}
+		if(null==sessionBean.getManualLanguageId() || "".equals(sessionBean.getManualLanguageId()))
+		{
+			if(errorMessage.length()>0)
+			{
+				errorMessage.append("<MSG_TOKEN>");
+			}
+			errorMessage.append(msgProps.addMessage("error.mandatory.fields.specific", msgProps.getProperty("label.language")));
+		}
+		if(errorMessage.length()>0)
+		{
+			sessionBean.setErrorMessage(errorMessage.toString());
+			return false;
+		}
+		return true;
+	}
+
+	/** Reads the uploaded workbook (first sheet, row 1 = header) into the import list. */
+	private void readExcelData(byte[] data, BodyTypeBean sessionBean, String extension)
+	{
+		sessionBean.setBodyListToImport(new ArrayList<BodyTypeDetails>());
+		InputStream is = null;
+		org.apache.poi.ss.usermodel.Workbook workbook = null;
+		try
+		{
+			is = new ByteArrayInputStream(data);
+			if("xlsx".equals(extension))
+			{
+				workbook = new XSSFWorkbook(is);
+			}
+			else
+			{
+				workbook = new HSSFWorkbook(is);
+			}
+			Iterator<Row> rowIterator = workbook.getSheetAt(0).iterator();
+			long rowCount = 0;
+			while(rowIterator.hasNext())
+			{
+				Row row = rowIterator.next();
+				if(rowCount>0)
+				{
+					BodyTypeDetails details = new BodyTypeDetails();
+					details.setBodyCode(excelCell(row, 0));
+					details.setBodyCodeDescriptionRegional(excelCell(row, 1));
+					details.setBodyCodeDescription(excelCell(row, 2));
+					details.setImportAction(excelCell(row, 3));
+					// a row left completely empty (e.g. formatted but unused) is not data
+					if(null!=details.getBodyCode() || null!=details.getBodyCodeDescriptionRegional() || null!=details.getBodyCodeDescription()
+							|| null!=details.getImportAction())
+					{
+						sessionBean.getBodyListToImport().add(details);
+					}
+				}
+				rowCount++;
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(BodyType.class.getName(), "readExcelData()", e);
+		}
+		finally
+		{
+			try
+			{
+				if(null!=workbook)
+					workbook.close();
+				if(null!=is)
+					is.close();
+			}
+			catch(Exception e)
+			{
+				Utilities.printStackTraceToLogs(BodyType.class.getName(), "readExcelData()", e);
+			}
+		}
+	}
+
+	/** Trimmed text of one cell, or null when the cell is empty. */
+	private static String excelCell(Row row, int index)
+	{
+		Object value = SSTUtils.readCellValue(row.getCell(index));
+		if(null==value || "".equals(String.valueOf(value).trim()))
+		{
+			return null;
+		}
+		return String.valueOf(value).trim();
+	}
+
+	/**
+	 * Checks EVERY row before any database work; one problem rejects the whole file.
+	 * Code is always required; the two descriptions only for a create / update row.
+	 */
+	private boolean validateExcelRowData(BodyTypeBean sessionBean)
+	{
+		StringBuilder errorMessage = new StringBuilder();
+		int errorCount = 0;
+		if(null!=sessionBean.getBodyListToImport() && sessionBean.getBodyListToImport().size()>0)
+		{
+			for(int i=0;i<sessionBean.getBodyListToImport().size();i++)
+			{
+				BodyTypeDetails fieldDetails = sessionBean.getBodyListToImport().get(i);
+				// EXTRA 1 BECAUSE THE HEADER ROW IS SKIPPED
+				int rowNo = i+1+1;
+
+				if(!ImportActionUtils.isValidAction(fieldDetails.getImportAction()))
+				{
+					appendError(errorMessage, msgProps.addMessage("error.excel.unknown.action", String.valueOf(rowNo)));
+					errorCount++;
+				}
+
+				boolean deleteRow = ImportActionUtils.isDeleteAction(fieldDetails.getImportAction());
+				if(null==fieldDetails.getBodyCode()
+						|| (!deleteRow && (null==fieldDetails.getBodyCodeDescription() || null==fieldDetails.getBodyCodeDescriptionRegional())))
+				{
+					String[] id = (msgProps.getProperty("label.bodytype")+","+String.valueOf(rowNo)).split(",");
+					appendError(errorMessage, msgProps.getMessage(id, "error.excel.improper.lines"));
+					errorCount++;
+				}
+				if(null!=fieldDetails.getBodyCode() && fieldDetails.getBodyCode().length()>10)
+				{
+					String[] id = (msgProps.getProperty("label.bodytypecode")+",10,"+String.valueOf(rowNo)).split(",");
+					appendError(errorMessage, msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+					errorCount++;
+				}
+				if(null!=fieldDetails.getBodyCodeDescription() && fieldDetails.getBodyCodeDescription().length()>200)
+				{
+					String[] id = (msgProps.getProperty("label.bodytypedesc")+",200,"+String.valueOf(rowNo)).split(",");
+					appendError(errorMessage, msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+					errorCount++;
+				}
+				if(null!=fieldDetails.getBodyCodeDescriptionRegional() && fieldDetails.getBodyCodeDescriptionRegional().length()>200)
+				{
+					String[] id = (msgProps.getProperty("label.bodytypedesc.reg")+",200,"+String.valueOf(rowNo)).split(",");
+					appendError(errorMessage, msgProps.getMessage(id, "error.length.greater.characters.for.row"));
+					errorCount++;
+				}
+			}
+		}
+		else
+		{
+			appendError(errorMessage, msgProps.addMessage("error.no.data.found.excel.import", msgProps.getProperty("label.bodytype")));
+			errorCount++;
+		}
+
+		if(errorCount>0)
+		{
+			decideErrorDisplay(sessionBean, errorMessage, errorCount);
+			return false;
+		}
+		return true;
+	}
+
+	private static void appendError(StringBuilder errorMessage, String message)
+	{
+		if(errorMessage.length()>0)
+		{
+			errorMessage.append("<MSG_TOKEN>");
+		}
+		errorMessage.append(message);
+	}
+
+	/**
+	 * Up to 10 errors are shown on the screen; more than that are written to a text file and the
+	 * screen shows a link to it - the same as the other import screens.
+	 */
+	private void decideErrorDisplay(BodyTypeBean sessionBean, StringBuilder errorMessage, int errorCount)
+	{
+		if(errorCount>10)
+		{
+			String eFPath = ApplicationProperties.getProperty("EXPORT_ERROR_PHYSICAL_PATH");
+			if(!eFPath.endsWith("/") && !eFPath.endsWith("\\"))
+			{
+				eFPath = eFPath+"/";
+			}
+			String eFName = ApplicationProperties.getProperty("EXPORT_DATA_BODY_TYPE_NAME")+"_"+String.valueOf(System.currentTimeMillis())
+					+ApplicationProperties.getProperty("EXPORT_ERROR_EXTENSION");
+			FileOutputStream fos = null;
+			try
+			{
+				fos = new FileOutputStream(new File(eFPath+eFName));
+				fos.write(errorMessage.toString().replace("<MSG_TOKEN>", "\n").getBytes("UTF-8"));
+				fos.flush();
+			}
+			catch(Exception e)
+			{
+				Utilities.printStackTraceToLogs(BodyType.class.getName(), "decideErrorDisplay()", e);
+			}
+			finally
+			{
+				try
+				{
+					if(null!=fos)
+						fos.close();
+				}
+				catch(Exception e)
+				{
+					Utilities.printStackTraceToLogs(BodyType.class.getName(), "decideErrorDisplay()", e);
+				}
+			}
+			String webPath = ApplicationProperties.getProperty("EXPORT_ERROR_WB_PATH")+eFName;
+			String message = msgProps.addMessage("error.import.invalid.custom.message", String.valueOf(errorCount));
+			message = message + " " + msgProps.getProperty("label.error.screen.help.text.start");
+			message = message + " <a href=\""+webPath+"\" target=\"_blank\">" + msgProps.getProperty("label.here") + "</a>";
+			message = message + " " + msgProps.getProperty("label.view.the.details");
+			sessionBean.setErrorMessage(message);
+		}
+		else if(errorMessage.length()>0)
+		{
+			sessionBean.setErrorMessage(errorMessage.toString());
+		}
+	}
+
+	private void executeExcelOperation(BodyTypeBean sessionBean, byte[] data, String extension)
+	{
+		try
+		{
+			readExcelData(data, sessionBean, extension);
+			if(!validateExcelRowData(sessionBean))
+			{
+				return;
+			}
+			StringBuilder errorMessage = new StringBuilder();
+			int errorCount = 0;
+			int duplicateRowsCount = 0;
+			int failureCount = 0;
+			ArrayList<BodyTypeDetails> listToSave = new ArrayList<BodyTypeDetails>();
+			ArrayList<BodyTypeDetails> listToDelete = new ArrayList<BodyTypeDetails>();
+			Set<String> seenCodes = new HashSet<String>();
+			Long countryLocaleId = Long.valueOf(sessionBean.getCountryLocaleId());
+			Long manualLanguageId = Long.valueOf(sessionBean.getManualLanguageId());
+
+			for(int i=0;i<sessionBean.getBodyListToImport().size();i++)
+			{
+				BodyTypeDetails fieldDetails = sessionBean.getBodyListToImport().get(i);
+				fieldDetails.setSrNo(i+1+1);
+				fieldDetails.setCountryLocaleId(countryLocaleId);
+				fieldDetails.setManualLanguageId(manualLanguageId);
+				/*
+				 * The same code twice in one file is a duplicate (whatever its Action): the later row
+				 * is skipped and reported, so a file can never add and delete the same code at once.
+				 */
+				if(!seenCodes.add(ImportActionUtils.safeLower(fieldDetails.getBodyCode())))
+				{
+					duplicateRowsCount++;
+					errorCount++;
+					appendError(errorMessage, msgProps.addMessage("error.excel.duplicate.lines",
+							msgProps.getProperty("label.bodytype"), String.valueOf(fieldDetails.getSrNo())));
+					continue;
+				}
+				if(ImportActionUtils.isDeleteAction(fieldDetails.getImportAction()))
+				{
+					listToDelete.add(fieldDetails);
+				}
+				else
+				{
+					fieldDetails.setFlag(ApplicationProperties.getProperty("flag.value.draft"));
+					listToSave.add(fieldDetails);
+				}
+			}
+
+			Connection conn = null;
+			int successCount = 0;
+			int deleteSuccessCount = 0;
+			try
+			{
+				conn = DBConnectionHelper.getConnection();
+
+				// ---------------- A / U / blank : create or update
+				for(BodyTypeDetails fieldDetails : listToSave)
+				{
+					if(BodyTypeDAO.importBodyTypeDetails(fieldDetails, conn))
+					{
+						successCount++;
+					}
+					else
+					{
+						logger.info("executeExcelOperation :: failed to import Row No {"+fieldDetails.getSrNo()+"}.");
+						failureCount++;
+						errorCount++;
+						appendError(errorMessage, msgProps.addMessage("error.import",
+								msgProps.getProperty("label.bodytype"), String.valueOf(fieldDetails.getSrNo())));
+					}
+				}
+
+				// ---------------- D : soft delete through the screen's EXISTING delete
+				java.util.List<Long> deleteIdList = new ArrayList<Long>();
+				ArrayList<BodyTypeDetails> deleteRows = new ArrayList<BodyTypeDetails>();
+				for(BodyTypeDetails deleteDetails : listToDelete)
+				{
+					long existingId = 0;
+					try
+					{
+						existingId = BodyTypeDAO.findExistingIdForImport(deleteDetails, conn);
+					}
+					catch(Exception e)
+					{
+						Utilities.printStackTraceToLogs(BodyType.class.getName(), "executeExcelOperation()", e);
+					}
+					if(existingId>0)
+					{
+						deleteIdList.add(Long.valueOf(existingId));
+						deleteRows.add(deleteDetails);
+					}
+					else
+					{
+						// no ACTIVE row matches - report it, never a silent no-op
+						failureCount++;
+						errorCount++;
+						appendError(errorMessage, msgProps.addMessage("error.import.delete",
+								msgProps.getProperty("label.bodytype"), String.valueOf(deleteDetails.getSrNo())));
+					}
+				}
+				String deleteIds = ImportActionUtils.buildDeleteIds(deleteIdList);
+				if(null!=deleteIds && !"".equals(deleteIds))
+				{
+					if(BodyTypeDAO.deleteBodyDetails(deleteIds))
+					{
+						deleteSuccessCount = deleteIdList.size();
+					}
+					else
+					{
+						// the delete itself failed - every row it covered is a failure
+						for(BodyTypeDetails deleteDetails : deleteRows)
+						{
+							failureCount++;
+							errorCount++;
+							appendError(errorMessage, msgProps.addMessage("error.import.delete",
+									msgProps.getProperty("label.bodytype"), String.valueOf(deleteDetails.getSrNo())));
+						}
+					}
+				}
+			}
+			finally
+			{
+				if(null!=conn)
+				{
+					conn.close();
+				}
+			}
+
+			if(listToSave.size()<=0 && listToDelete.size()<=0 && duplicateRowsCount<=0)
+			{
+				errorCount++;
+				appendError(errorMessage, msgProps.addMessage("error.no.data.found.excel.import", msgProps.getProperty("label.bodytype")));
+			}
+
+			// successMessage is a single escaped c:out on the JSP - join with a SPACE
+			String success = "";
+			if(successCount>0)
+			{
+				success = msgProps.addMessage("import.success.count.message", String.valueOf(successCount));
+			}
+			if(deleteSuccessCount>0)
+			{
+				String deleteMsg = msgProps.addMessage("import.delete.success.count.message", String.valueOf(deleteSuccessCount));
+				success = "".equals(success) ? deleteMsg : success+" "+deleteMsg;
+			}
+			if(!"".equals(success))
+			{
+				sessionBean.setSuccessMessage(success);
+			}
+
+			if(errorCount>0)
+			{
+				decideErrorDisplay(sessionBean, errorMessage, errorCount);
+			}
+
+			String info = "";
+			if(duplicateRowsCount>0)
+			{
+				info = msgProps.addMessage("error.excel.duplicate.rows.count", String.valueOf(duplicateRowsCount));
+			}
+			if(failureCount>0)
+			{
+				String failMsg = msgProps.addMessage("error.excel.failure.rows.count", String.valueOf(failureCount));
+				info = "".equals(info) ? failMsg : info+" "+failMsg;
+			}
+			if(!"".equals(info))
+			{
+				sessionBean.setInfoMessage(info);
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(BodyType.class.getName(), "executeExcelOperation()", e);
+		}
+	}
 }

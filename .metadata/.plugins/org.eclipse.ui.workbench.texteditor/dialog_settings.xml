@@ -3,6 +3,11 @@
 	<section name="java.lang.Class">
 		<item key="replaceBarOpen" value="false"/>
 		<list key="findhistory">
+			<item value="failureStatus==true"/>
+			<item value=".css"/>
+			<item value="."/>
+			<item value="mfIncrementDataPreparationSuccessCount"/>
+			<item value="dataPreparationCount"/>
 			<item value="wsl.default.user"/>
 			<item value="default"/>
 			<item value="MDM_SI"/>
@@ -10,5 +15,9 @@
 			<item value="cdrom."/>
 			<item value="logger"/>
 		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="378"/>
+		<item key="DIALOG_Y_ORIGIN" value="202"/>
 	</section>
 </section>

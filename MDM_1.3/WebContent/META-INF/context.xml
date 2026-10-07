@@ -66,22 +66,11 @@
 		defaultAutoCommit="true" />
 
 	<!--
-	  Second datasource referenced by jdbc.im.datasource. It is not used by any current
-	  screen; enable it (and point it at the right schema) if an InfoManager-backed
-	  screen needs it.
-
-	<Resource name="jdbc/im_datasource"
-		auth="Container"
-		type="javax.sql.DataSource"
-		driverClassName="com.mysql.cj.jdbc.Driver"
-		url="jdbc:mysql://localhost:3306/kapture_im?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC"
-		username="root"
-		password="welcome1234"
-		initialSize="1"
-		maxTotal="10"
-		maxIdle="2"
-		validationQuery="SELECT 1"
-		testOnBorrow="true" />
+	  THERE IS NO THIRD DATASOURCE. A commented-out jdbc/im_datasource pointing at the
+	  InfoManager schema (kapture_im) used to sit here, kept "in case an InfoManager-backed
+	  screen needs it". InfoManager was removed from MDM entirely, so nothing can need it -
+	  the schema does not exist on the migrated servers and no code reads the property.
+	  Do not reinstate it.
 	-->
 
 </Context>

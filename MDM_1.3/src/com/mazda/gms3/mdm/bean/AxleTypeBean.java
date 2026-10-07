@@ -125,4 +125,21 @@ public class AxleTypeBean {
 	public void setDisplayPageLength(String displayPageLength) {
 		this.displayPageLength = displayPageLength;
 	}
+
+	/** Warning message shown after an import (duplicate / failed row counts). */
+	private String infoMessage=null;
+	/** Rows read from the uploaded import Excel. */
+	private ArrayList<AxleTypeDetails> axleListToImport=null;
+	public String getInfoMessage() {
+		return infoMessage;
+	}
+	public void setInfoMessage(String infoMessage) {
+		this.infoMessage = infoMessage;
+	}
+	public ArrayList<AxleTypeDetails> getAxleListToImport() {
+		return axleListToImport;
+	}
+	public void setAxleListToImport(ArrayList<AxleTypeDetails> axleListToImport) {
+		this.axleListToImport = axleListToImport;
+	}
 }

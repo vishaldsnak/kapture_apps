@@ -127,4 +127,21 @@ public class BodyTypeBean {
 	}
 	
 	
+
+	/** Warning message shown after an import (duplicate / failed row counts). */
+	private String infoMessage=null;
+	/** Rows read from the uploaded import Excel. */
+	private ArrayList<BodyTypeDetails> bodyListToImport=null;
+	public String getInfoMessage() {
+		return infoMessage;
+	}
+	public void setInfoMessage(String infoMessage) {
+		this.infoMessage = infoMessage;
+	}
+	public ArrayList<BodyTypeDetails> getBodyListToImport() {
+		return bodyListToImport;
+	}
+	public void setBodyListToImport(ArrayList<BodyTypeDetails> bodyListToImport) {
+		this.bodyListToImport = bodyListToImport;
+	}
 }

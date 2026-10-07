@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MDM CONTEXT DESCRIPTOR FOR A MANAGED TOMCAT (MC Dev / VDI).
+
+  WHERE THIS GOES
+  ---------------------------------------------------------------------------
+      <CATALINA_BASE>/conf/Catalina/localhost/mdmgt.xml
+
+  The file name IS the context path, so it must stay mdmgt.xml to serve /mdmgt.
+
+  WHY IT IS NEEDED AT ALL
+  ---------------------------------------------------------------------------
+  The WAR already carries the same resources in META-INF/context.xml, and that
+  is what works on a developer workstation. A managed Tomcat commonly ignores it:
+
+    1. <Host ... deployXML="false"> - the standard hardening. Tomcat then refuses
+       to read ANY application's own META-INF/context.xml. Descriptors placed
+       here, by the server administrator, are still honoured - which is the whole
+       point of the setting.
+    2. A descriptor already exists at the path above from an earlier deploy. It
+       takes precedence, and dropping a new WAR in does NOT refresh it. If that
+       older file has no <Resource> entries, the lookups fail exactly as seen:
+
+         Name [jdbc/cms_datasource] is not bound in this Context
+         Name [jdbc/conv_datasource] is not bound in this Context
+
+  Either way the fix is the same: put the resources here, with THIS
+  environment's hosts and credentials.
+
+  ONLY TWO DATASOURCES ARE REQUIRED. jdbc/im_datasource was dropped - it pointed
+  at the old InfoManager schema (kapture_im) and no code has referenced it since
+  InfoManager was removed. Do not recreate it.
+
+  THE MYSQL DRIVER ships inside the WAR (WEB-INF/lib/mysql-connector-java-8.0.13.jar),
+  so nothing needs to be added to Tomcat's own lib for these to resolve.
+-->
+<Context>
+
+	<!--
+	  MDM's own schema - every screen, all the gms3_* tables.
+	  Looked up as java:comp/env/jdbc/conv_datasource via the
+	  jdbc.datasource property in application.properties.
+	-->
+	<Resource name="jdbc/conv_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://REPLACE_MDM_DB_HOST:3306/kapture_dc?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC"
+		username="REPLACE_MDM_DB_USER"
+		password="REPLACE_MDM_DB_PASSWORD"
+		initialSize="2"
+		maxTotal="20"
+		maxIdle="5"
+		minIdle="2"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="true" />
+
+	<!--
+	  THE KAPTURE CMS SCHEMA - k_user, k_user_content_locale, k_add_user_cmsrole,
+	  k_article, k_categories.
+
+	  THIS ONE IS NEEDED TO LOG IN AT ALL. AccessManagementFilter reads the
+	  user's profile and roles from it on every request, so if this resource is
+	  missing every user is bounced to no-access before any screen is reached -
+	  which is what the "cannot resolve a profile for {...}" line means.
+
+	  A SEPARATE RESOURCE, NOT A CROSS-DATABASE REFERENCE: where kapture_dc and
+	  kapture_cms_db sit on the same server both may point at it, but they are
+	  not always co-located.
+	-->
+	<Resource name="jdbc/cms_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://REPLACE_CMS_DB_HOST:3306/kapture_cms_db?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC"
+		username="REPLACE_CMS_DB_USER"
+		password="REPLACE_CMS_DB_PASSWORD"
+		initialSize="2"
+		maxTotal="20"
+		maxIdle="5"
+		minIdle="2"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="true" />
+
+</Context>

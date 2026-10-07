@@ -72,6 +72,8 @@ public class ImportTemplateUtils {
 	public static final String SCREEN_SST_SECTION_MODEL_MAPPING = "SST_SECTION_MODEL_MAPPING";
 	public static final String SCREEN_VIN_CROSS_REFERENCE = "VIN_CROSS_REFERENCE";
 	public static final String SCREEN_MASTERDATA_LOCALE_MAPPING = "MASTERDATA_LOCALE_MAPPING";
+	public static final String SCREEN_DRIVE_AXLE_TYPE = "DRIVE_AXLE_TYPE";
+	public static final String SCREEN_BODY_TYPE = "BODY_TYPE";
 
 	/**
 	 * Variants for the screens whose columns depend on the selected country / language.
@@ -155,6 +157,16 @@ public class ImportTemplateUtils {
 		put(map, new ImportTemplateDetails(SCREEN_TRANSMISSION_TYPE, "TRANSMISSIONTYPE",
 				"TRANSMISSION TYPE", new String[] { "TRANSMISSION BOOK CODE",
 						"TRANSMISSION TYPE CODE", "TRANSMISSION TYPE NAME" }));
+
+		// DRIVE AXLE TYPE - /axletype (same column order as the screen's Excel export)
+		put(map, new ImportTemplateDetails(SCREEN_DRIVE_AXLE_TYPE, "DRIVEAXLE", "DRIVE AXLE",
+				new String[] { "DRIVE AXLE CODE", "DRIVE AXLE NAME REGIONAL LANG",
+						"DRIVE AXLE NAME ENG LANG" }));
+
+		// BODY TYPE - /bodytype (same column order as the screen's Excel export)
+		put(map, new ImportTemplateDetails(SCREEN_BODY_TYPE, "BODYTYPE", "BODY TYPE",
+				new String[] { "BODY TYPE CODE", "BODY TYPE NAME REGIONAL LANG",
+						"BODY TYPE NAME ENG LANG" }));
 
 		// ABBREVIATION - /abbreviationmaster
 		put(map, new ImportTemplateDetails(SCREEN_ABBREVIATION_MASTER, "ABBREVIATION",
