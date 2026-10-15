@@ -14,6 +14,7 @@ import com.mazda.gms3.dmt.autosync.vo.AutoSyncCategoryDetails;
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncConstants;
 import com.mazda.gms3.dmt.kapture.KaptureApiClient;
 import com.mazda.gms3.dmt.kapture.KaptureApiResult;
+import com.mazda.gms3.dmt.kapture.KaptureCategoryStore;
 import com.mazda.gms3.dmt.kapture.KaptureLookupDAO;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
@@ -38,6 +39,9 @@ import com.mazda.gms3.dmt.vo.MarketLocaleMasterDataTypeMapping;
  *
  * Engine books and transmission books are not categories.
  *
+ * kapture.category.write.mode decides how a category is written: API = the Kapture category API, DB = straight
+ * into the categories table (KaptureCategoryStore - same columns as the API, the parent is never changed).
+ *
  * A category is created parent first. The top category of a tree (CARLINE, ESI, ENGINE_TYPE,
  * TRANSMISSION_TYPE, MODEL_YEAR, VIN, AXLE_TYPE, BODY_TYPE) is created when Kapture does not have it
  * yet for the locale; any other missing parent is a failure of that row. A row of MDM gets sync
@@ -57,6 +61,7 @@ public class KaptureCategorySync {
 	public final List<MasterDataRecord> records = new ArrayList<MasterDataRecord>();
 
 	private KaptureApiClient api = null;
+	private boolean dbMode;
 	private String kaptureLocale;
 	private String locale;
 	private String type;
@@ -64,6 +69,14 @@ public class KaptureCategorySync {
 	private Map<String, String> known;
 	/** Upper-cased reference key -> outcome, for every category already handled in this run. */
 	private Map<String, Boolean> done;
+	/** DB mode: categories of the type that were already in Kapture for the locale, in processing order (parents first). */
+	private List<KaptureCategoryStore.Row> fill;
+	/**
+	 * Upper-cased reference key -> the label it gets: the name of the LAST row that has one ("" = no row has a name).
+	 * Same rule as the Master Data Syncing tab (legacy updated the category row by row, so the last row won) - several
+	 * MDM rows can carry one reference key with different names, and both screens must give it the same label.
+	 */
+	private Map<String, String> labels;
 
 	/**
 	 * @param market        MC / MME / MNAO
@@ -73,6 +86,8 @@ public class KaptureCategorySync {
 	public void sync(String market, String locale, String kaptureLocale) {
 		this.locale = locale;
 		this.kaptureLocale = kaptureLocale;
+		this.dbMode = KaptureCategoryStore.dbMode();
+		logger.info("sync :: " + market + " :: " + locale + " :: category write mode :: " + (dbMode ? KaptureCategoryStore.MODE_DB : KaptureCategoryStore.MODE_API));
 		MasterDataSyncDAO dao = new MasterDataSyncDAO();
 		for (int t = 0; t < TYPES.length; t++) {
 			type = TYPES[t];
@@ -87,7 +102,7 @@ public class KaptureCategorySync {
 				if (null == items || items.isEmpty()) {
 					continue;
 				}
-				if (null == api) {
+				if (null == api && !dbMode) {
 					api = new KaptureApiClient();
 				}
 				syncType(items);
@@ -120,6 +135,21 @@ public class KaptureCategorySync {
 			known.put(e.getKey(), null == e.getValue()[1] ? "" : e.getValue()[1].trim());
 		}
 		done = new HashMap<String, Boolean>();
+		fill = new ArrayList<KaptureCategoryStore.Row>();
+		labels = new HashMap<String, String>();
+		for (AutoSyncCategoryDetails item : items) {
+			for (int level = 1; level <= 5; level++) {
+				AutoSyncCategoryDetails d = level(item, level);
+				if (null == d || null == d.getCategoryRefKey() || "".equals(d.getCategoryRefKey().trim())) {
+					continue;
+				}
+				String ref = key(d.getCategoryRefKey());
+				String name = null == d.getCategoryName() ? "" : d.getCategoryName().trim();
+				if (!"".equals(name) || !labels.containsKey(ref)) {
+					labels.put(ref, name);
+				}
+			}
+		}
 
 		ArrayList<String> level1Ids = new ArrayList<String>();
 		ArrayList<String> otherIds = new ArrayList<String>();
@@ -150,6 +180,28 @@ public class KaptureCategorySync {
 			}
 		}
 
+		// DB MODE: WHAT WAS ALREADY IN KAPTURE FOR THIS LOCALE GOES INTO THE DEFAULT LOCALES THAT DO NOT HAVE IT YET (new
+		// categories were by insertNew); a failed fill keeps every row of the type at N, so the next run does it again
+		if (dbMode && !fill.isEmpty()) {
+			try {
+				int written = KaptureCategoryStore.fillMissingLocales(fill, null);
+				logger.info("syncType :: " + type + " :: " + locale + " :: categories already in Kapture " + fill.size() + " :: rows added for missing locales " + written);
+			} catch (RuntimeException e) {
+				MasterDataRecord rec = new MasterDataRecord();
+				rec.type = type;
+				rec.locale = locale;
+				rec.result = MasterDataRecord.RESULT_FAILED;
+				rec.message = "Adding the categories to the missing locales failed: " + e.getMessage();
+				records.add(rec);
+				logger.info("syncType :: " + type + " :: " + locale + " :: " + rec.message);
+				for (AutoSyncCategoryDetails item : items) {
+					if (null != item.getMdmItemId()) {
+						failedIds.add(item.getMdmItemId());
+					}
+				}
+			}
+		}
+
 		level1Ids.removeAll(failedIds);
 		otherIds.removeAll(failedIds);
 
@@ -174,7 +226,10 @@ public class KaptureCategorySync {
 		if (done.containsKey(ref)) {
 			return done.get(ref).booleanValue();
 		}
-		name = null == name || "".equals(name.trim()) ? ref : name.trim();
+		// THE LABEL OF THE REFERENCE KEY (last row with a name, as the Master Data Syncing tab); a blank label leaves
+		// the existing one, a new category without a label is named after its reference key
+		String label = labels.containsKey(ref) ? labels.get(ref) : (null == name ? "" : name.trim());
+		name = "".equals(label) ? (known.containsKey(ref) ? known.get(ref) : ref) : label;
 		MasterDataRecord rec = new MasterDataRecord();
 		rec.type = type;
 		rec.locale = locale;
@@ -183,6 +238,11 @@ public class KaptureCategorySync {
 		rec.categoryName = name;
 		rec.parentRefKey = parent;
 		try {
+			if (dbMode && level == 1 && !"".equals(parent) && known.containsKey(parent) && !done.containsKey(parent)) {
+				// the top of the tree is there for this locale - also into the locales that miss it, before its children
+				done.put(parent, Boolean.TRUE);
+				fill.add(new KaptureCategoryStore.Row(parent, "".equals(known.get(parent)) ? parent : known.get(parent), ""));
+			}
 			if (!"".equals(parent) && !known.containsKey(parent)) {
 				if (level == 1) {
 					// THE TOP OF THE TREE - CREATED WHEN KAPTURE DOES NOT HAVE IT YET
@@ -197,12 +257,19 @@ public class KaptureCategorySync {
 				if (known.get(ref).equals(name)) {
 					rec.result = MasterDataRecord.RESULT_NO_CHANGE;
 				} else {
-					KaptureApiResult r = api.updateCategory(ref, name, kaptureLocale);
-					if (!r.isOk()) {
-						throw new IllegalStateException("Update failed :: " + r.describe());
+					if (dbMode) {
+						KaptureCategoryStore.updateNames(Collections.singletonList(new KaptureCategoryStore.Row(ref, name, parent)), kaptureLocale);
+					} else {
+						KaptureApiResult r = api.updateCategory(ref, name, kaptureLocale);
+						if (!r.isOk()) {
+							throw new IllegalStateException("Update failed :: " + r.describe());
+						}
 					}
 					known.put(ref, name);
 					rec.result = MasterDataRecord.RESULT_UPDATED;
+				}
+				if (dbMode) {
+					fill.add(new KaptureCategoryStore.Row(ref, name, parent));
 				}
 			} else {
 				create(ref, name, parent);
@@ -249,16 +316,29 @@ public class KaptureCategorySync {
 	 * alone is not proof, the row appears in k_categories a few seconds later.
 	 */
 	private void create(String ref, String name, String parent) {
-		KaptureApiResult r = api.createCategory(ref, name, parent, kaptureLocale);
-		if (!r.isOk() && !KaptureApiClient.isAlreadyExists(r)) {
-			throw new IllegalStateException("Create failed :: " + r.describe());
+		String answer;
+		int attempts;
+		if (dbMode) {
+			KaptureCategoryStore.insertNew(Collections.singletonList(new KaptureCategoryStore.Row(ref, name, parent)), kaptureLocale);
+			answer = "written to the categories table";
+			// a DB write is visible at once - one look
+			attempts = 1;
+		} else {
+			KaptureApiResult r = api.createCategory(ref, name, parent, kaptureLocale);
+			if (!r.isOk() && !KaptureApiClient.isAlreadyExists(r)) {
+				throw new IllegalStateException("Create failed :: " + r.describe());
+			}
+			answer = "Kapture answered the create (" + r.describe() + ")";
+			attempts = KaptureApiClient.requireInt("kapture.category.readback.attempts");
 		}
-		int attempts = KaptureApiClient.requireInt("kapture.category.readback.attempts");
 		long delay = KaptureApiClient.requireInt("kapture.category.readback.delay.ms");
 		for (int a = 0; a < attempts; a++) {
 			if (KaptureLookupDAO.getCategories(Collections.singletonList(ref), kaptureLocale).containsKey(ref)) {
 				known.put(ref, name);
 				return;
+			}
+			if (a + 1 == attempts) {
+				break;
 			}
 			try {
 				Thread.sleep(delay);
@@ -267,7 +347,7 @@ public class KaptureCategorySync {
 				break;
 			}
 		}
-		throw new IllegalStateException("Kapture answered the create (" + r.describe() + ") but the category is not there.");
+		throw new IllegalStateException(answer + " but the category is not there.");
 	}
 
 	private static AutoSyncCategoryDetails level(AutoSyncCategoryDetails item, int level) {

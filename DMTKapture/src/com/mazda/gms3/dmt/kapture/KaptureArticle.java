@@ -55,4 +55,17 @@ public class KaptureArticle {
 	 * Attachment for a file attribute, or to a nested Map for a group element (ATTACHMENTS).
 	 */
 	public Map<String, Object> fields = new LinkedHashMap<String, Object>();
+
+	/*
+	 * AN UPDATE THAT KEEPS THE DOCUMENT AS KAPTURE HOLDS IT (IPM Facelift VIN Update) - all null / empty for the
+	 * conversion, which sends the job's user groups and views and writes as the token user.
+	 */
+	/** The document's own user groups / views as Kapture returned them, sent as they are; null = those of the job. */
+	public com.google.gson.JsonArray userGroupsJson = null;
+	public com.google.gson.JsonArray viewsJson = null;
+	/**
+	 * Article-level values carried over from the read - articleOwner, articleCreator, articleCreatorUserID, createdBy;
+	 * a value missing here is the token user, as for the conversion.
+	 */
+	public Map<String, String> carriedOver = new LinkedHashMap<String, String>();
 }

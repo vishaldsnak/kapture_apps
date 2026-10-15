@@ -382,12 +382,7 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 														</c:if>
 													</td>
 													<td>
-														<c:if test="${scheduleList.showAbort eq true}">
-															<a href="javascript:void(0);" onclick="mdval_abortConversion('<c:out value="${scheduleList.scheduleId }"/>','<c:out value="${scheduleList.threadId }"/>');"><c:out value="${scheduleList.status }"/></a>		
-														</c:if>
-														<c:if test="${scheduleList.showAbort eq false}">
 															<c:out value="${scheduleList.status }"/>
-														</c:if>
 													</td>
 													<td>
 														<c:if test="${scheduleList.status != 'Success'}">
@@ -1028,7 +1023,7 @@ function mdval_helpDisplay(thisObj)
 		{
 			if(null!=locale && locale!="" && mnaoLocales.indexOf(locale)>-1)
 			{
-				$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vin.ent.help.message" />");
+				$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vin.text.mnao.help.message" />");
 			}
 			else
 			{
@@ -1042,14 +1037,6 @@ function mdval_helpDisplay(thisObj)
 		else if(value=='CDPROCESSING')
 		{
 			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="cdprocessing.help.message" />");
-		}
-		else if(value=='LEFTMENU')
-		{
-			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="leftmenu.help.message" />");
-		}
-		else if(value=='VINATTRIBUTE')
-		{
-			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vinattribute.help.message" />");
 		}
 	}
 }
@@ -1071,7 +1058,7 @@ function mdval_helpDisplayOnLoad()
 		{
 			if(null!=locale && locale!="" && mnaoLocales.indexOf(locale)>-1)
 			{
-				$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vin.ent.help.message" />");
+				$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vin.text.mnao.help.message" />");
 			}
 			else
 			{
@@ -1085,14 +1072,6 @@ function mdval_helpDisplayOnLoad()
 		else if(value=='CDPROCESSING')
 		{
 			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="cdprocessing.help.message" />");
-		}
-		else if(value=='LEFTMENU')
-		{
-			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="leftmenu.help.message" />");
-		}
-		else if(value=='VINATTRIBUTE')
-		{
-			$("#MDVAL_HelpDisplay").html("<i class=\"infoIcon\"></i>&nbsp;<fmt:message key="vinattribute.help.message" />");
 		}
 	}
 }

@@ -57,6 +57,7 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 <link href="js/jquery-ui.theme.css" type="text/css" rel="stylesheet" />
 <link href="js/jquery-ui.theme.min.css" type="text/css" rel="stylesheet" />
 <link rel="stylesheet" href="css/dataTables.jqueryui.min.css" />
+<link href="css/settings_guide.css" type="text/css" rel="stylesheet" />
 <style type="text/css">
 .cursorPointer {
 	cursor: pointer;
@@ -169,8 +170,10 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 												
 											</table>
 										</td>
-									</tr>	
+									</tr>
 								</table>
+								<!-- CONTENT PROVISION GUIDE -->
+								<jsp:include page="settingsGuide.jsp" flush="true" />
 							</div>
                         </div>
                     </div>

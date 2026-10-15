@@ -25,7 +25,6 @@ public class MetaDataFileDetails {
 	private String threadId=null;
 	private String schdeuleRemarks=null;
 	
-	private boolean showAbort=false;
 	
 	private boolean rowSelected = false;
 	
@@ -109,12 +108,6 @@ public class MetaDataFileDetails {
 	}
 	public void setThreadId(String threadId) {
 		this.threadId = threadId;
-	}
-	public boolean isShowAbort() {
-		return showAbort;
-	}
-	public void setShowAbort(boolean showAbort) {
-		this.showAbort = showAbort;
 	}
 	public String getLocale() {
 		return locale;

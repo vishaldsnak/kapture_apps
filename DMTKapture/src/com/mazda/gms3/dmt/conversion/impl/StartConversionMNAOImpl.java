@@ -39,6 +39,8 @@ import com.mazda.gms3.dmt.mc.utils.PrintReportsUtil;
 import com.mazda.gms3.dmt.mc.utils.XcopyUtil;
 import com.mazda.gms3.dmt.mc.vo.CDProcessingDetails;
 import com.mazda.gms3.dmt.mc.vo.DisplayOrderDetails;
+import com.mazda.gms3.dmt.dao.UnlistedDisplayDataDAO;
+import com.mazda.gms3.dmt.conversion.utils.UnlistedDisplayData;
 import com.mazda.gms3.dmt.mc.vo.ESICategoryDetails;
 import com.mazda.gms3.dmt.mc.vo.MCViewContentDetails;
 import com.mazda.gms3.dmt.mc.vo.VinDetails;
@@ -192,6 +194,7 @@ public class StartConversionMNAOImpl {
 				if(updateProcessingStatus==true)
 				{
 					// MNAO preview: the MNAO style link rule (GMS3_CUSTOM_CONTENT_CSS) and voltage map link property (LINK_URL)
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.discard(scheduleId);
 					preview = new com.mazda.gms3.dmt.preview.PreviewBuilder(scheduleId, ApplicationProperties.getProperty("market.mnao"));
 					masterDataFailed = false;
 					/*
@@ -388,7 +391,7 @@ public class StartConversionMNAOImpl {
 														tempList= null;
 													}
 													else if(chF.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-															&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+															&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 															chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 													{
 														// DISPLAY ORDER TEXT FILE FOUND.
@@ -754,7 +757,7 @@ public class StartConversionMNAOImpl {
 													tempList= null;
 												}
 												else if(chF.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-														&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+														&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 														chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 												{
 													// DISPLAY ORDER TEXT FILE FOUND.
@@ -880,6 +883,7 @@ public class StartConversionMNAOImpl {
 						 * OFFLINE PREVIEW: tree, filters and the job's rows - from what the job holds in memory
 						 */
 						preview.finish(mnaoDocumentManagementDAO.getViewContentDataList());
+						com.mazda.gms3.dmt.dao.ClearedDisplayData.discard(scheduleId);
 						
 						/**
 						 * PROCEED FOR PRINTING REPORTS.
@@ -5968,6 +5972,25 @@ public class StartConversionMNAOImpl {
 		return saved;
 	}
 
+	/**
+	 * View content (model year + VIN) of the documents of the vin.txt material folders the display order files
+	 * do not list - see UnlistedDisplayData. MNAO has no CD data.
+	 */
+	private void removeUnlistedViewContent(ScheduleItemDetails itemDetails, List<VinDetails> vinList, List<ContentDetails> listed)
+	{
+		String documentTable = "gms3_dmt_"+itemDetails.getLocale().replace("-", "_").trim().toLowerCase()+"_imdoc";
+		List<UnlistedDisplayDataDAO.ViewContentTable> viewContent = new ArrayList<UnlistedDisplayDataDAO.ViewContentTable>();
+		viewContent.add(new UnlistedDisplayDataDAO.ViewContentTable("gms3_vc_model_year_details", "VC_MY_LOCALE", "VC_MY_DOCUMENT_ID"));
+		viewContent.add(new UnlistedDisplayDataDAO.ViewContentTable("gms3_vc_vin_details", "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID"));
+		List<DisplayOrderDetails> rows = UnlistedDisplayData.removeViewContent(itemDetails, documentTable, "DC_IM_DOC_FLAG", viewContent,
+				UnlistedDisplayData.vinMaterialFolders(itemDetails, vinList), listed);
+		if(null==finalDisplayOrderList)
+		{
+			finalDisplayOrderList = new ArrayList<DisplayOrderDetails>();
+		}
+		finalDisplayOrderList.addAll(rows);
+	}
+
 	private void startProcessingDisplayOrder(File materialDirFolder, ScheduleItemDetails itemDetails, String wslId, ArrayList<DisplayOrderDetails> displayOrderList, ArrayList<VinDetails> applicableVINListForMaterialFolder,String channelFolderName)
 	{
 		try
@@ -5980,6 +6003,8 @@ public class StartConversionMNAOImpl {
 			 * 
 			 */
 			ScheduleDAO.updateCurrentJobStatus(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), "DISPLAY ORDER PROCESSING");
+			// the documents the display order files list - the view content of the others of the material folder is removed
+			ArrayList<ContentDetails> listedDocuments = new ArrayList<ContentDetails>();
 
 			ArrayList<DisplayOrderDetails> processingDisplayOrderList = ScheduleDAO.getApplicableDisplayOrderForMaterialOrFaceLiftFolder(itemDetails.getModelFolderName(), itemDetails.getManualType(), itemDetails.getFaceLiftFolderName(), itemDetails.getMaterialFolderName());
 			DisplayOrderDetails details = null;
@@ -6208,6 +6233,7 @@ public class StartConversionMNAOImpl {
 				 * PREPARE DATA FOR VIEW CONTENT AND INSERT IN DATA BASE TABLE
 				 */
 				List<DisplayOrderDetails> tList = mnaoDocumentManagementDAO.saveDisplayOrderDetails(documentsList, channelFolderName, itemDetails.getLocale(), model, itemDetails.getManualType(), currentMasterVINList);
+				listedDocuments.addAll(documentsList);
 				if(null!=tList && tList.size()>0)
 				{
 					details = null;
@@ -6300,6 +6326,8 @@ public class StartConversionMNAOImpl {
 			{
 				logger.info("startProcessingDisplayOrder :: No Display Order Information Found for Processing Display Order for Material Folder :: > " + itemDetails.getMaterialFolderName());
 			}
+			// also when no display order row was given: nothing listed = the view content of the whole material folder goes
+			removeUnlistedViewContent(itemDetails, applicableVINListForMaterialFolder, listedDocuments);
 			processingDisplayOrderList = null;
 			channelFolderName = null;
 		}
@@ -6328,6 +6356,8 @@ public class StartConversionMNAOImpl {
 			ScheduleDAO.updateCurrentJobStatus(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), "DISPLAY ORDER PROCESSING");
 
 			ArrayList<DisplayOrderDetails> processingDisplayOrderList = new ArrayList<DisplayOrderDetails>();
+			// the documents the display order files list - the view content of the others of the material folders is removed
+			ArrayList<ContentDetails> listedDocuments = new ArrayList<ContentDetails>();
 			
 			if(null!=displayOrderList && displayOrderList.size()>0)
 			{
@@ -6637,6 +6667,10 @@ public class StartConversionMNAOImpl {
 							}
 							
 							List<DisplayOrderDetails> tList = mnaoDocumentManagementDAO.saveDisplayOrderDetails(documentsList, channelFolderName, itemDetails.getLocale(), model, itemDetails.getManualType(), currentMasterVINList);
+							if(null!=documentsList)
+							{
+								listedDocuments.addAll(documentsList);
+							}
 							if(null!=tList && tList.size()>0)
 							{
 								displayOrderDetails = null;
@@ -6754,6 +6788,8 @@ public class StartConversionMNAOImpl {
 			{
 				logger.info("startProcessingDisplayOrderForFaceLift :: No Display Order Information Found for Processing in FaceLift Folder at Path :: > " + PathUtil.winPath(faceLiftDirFolder));
 			}
+			// also when no display order row was given: nothing listed = the view content of the whole material folder goes
+			removeUnlistedViewContent(itemDetails, allVINList, listedDocuments);
 			channelFolderName = null;
 		}
 		catch(Exception e)

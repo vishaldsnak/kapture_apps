@@ -56,6 +56,7 @@ import com.mazda.gms3.dmt.utils.ApplicationProperties;
 import com.mazda.gms3.dmt.utils.DateFormatter;
 import com.mazda.gms3.dmt.utils.MessageProperties;
 import com.mazda.gms3.dmt.utils.SendMailUsingAuthentication;
+import com.mazda.gms3.dmt.utils.SourceContentPaths;
 import com.mazda.gms3.dmt.utils.Utilities;
 import com.mazda.gms3.dmt.vo.DeleteFileDetails;
 import com.mazda.gms3.dmt.vo.LeftMenuFileDetails;
@@ -72,10 +73,19 @@ public class Schedule extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private Logger logger = LogManager.getLogger(Schedule.class);
 
-	private MessageProperties msgProps= null;
-	private String serverPath="";
+	/*
+	 * PER REQUEST, NOT PER SERVLET (2026-10-11). These were fields of the one servlet instance every user shares, so a
+	 * request could read another user's id, messages or content path. They are set at the start of doGet / doPost; a job
+	 * thread gets the user id captured before it starts.
+	 */
+	private static final ThreadLocal<MessageProperties> MSGPROPS = new ThreadLocal<MessageProperties>();
+	private static final ThreadLocal<String> SERVERPATH = new ThreadLocal<String>();
+	private static final ThreadLocal<String> WSLID = new ThreadLocal<String>();
 
-	private String wslId=""; 
+	private static MessageProperties msgProps() { return MSGPROPS.get(); }
+	private static String serverPath() { return SERVERPATH.get(); }
+	private static String wslId() { return WSLID.get(); }
+
 
 	/**
 	 * @see HttpServlet#HttpServlet()
@@ -90,13 +100,14 @@ public class Schedule extends HttpServlet {
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); SERVERPATH.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -104,7 +115,7 @@ public class Schedule extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 
 
 			/*
@@ -127,17 +138,17 @@ public class Schedule extends HttpServlet {
 			/*
 			 * call function to set serverPath from the settings dao
 			 */
-			SettingDetails sDetails = SettingsDAO.getSettingsData(wslId);
+			SettingDetails sDetails = SettingsDAO.getSettingsData(wslId());
 			if(null!=sDetails && null!=sDetails.getNetworkPath() && !"".equals(sDetails.getNetworkPath()))
 			{
-				serverPath = com.mazda.gms3.dmt.utils.SourceContentPaths.contentRoot(sDetails.getNetworkPath());
+				SERVERPATH.set(com.mazda.gms3.dmt.utils.SourceContentPaths.contentRoot(sDetails.getNetworkPath()));
 				sessionBean.setShowJSPData(true);
 			}
 			sDetails = null;
 			//serverPath=ApplicationProperties.getProperty("GMS3_SOURCE_CONTENT_PATH");
-			if(null!=serverPath && !"".equals(serverPath))
+			if(null!=serverPath() && !"".equals(serverPath()))
 			{
-				serverPath = serverPath.replace("/", "\\");
+				SERVERPATH.set(serverPath().replace("/", "\\"));
 			}
 
 
@@ -221,13 +232,14 @@ public class Schedule extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); SERVERPATH.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -235,7 +247,7 @@ public class Schedule extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
@@ -259,10 +271,10 @@ public class Schedule extends HttpServlet {
 			/*
 			 * call function to set serverPath from the settings dao
 			 */
-			SettingDetails sDetails = SettingsDAO.getSettingsData(wslId);
+			SettingDetails sDetails = SettingsDAO.getSettingsData(wslId());
 			if(null!=sDetails && null!=sDetails.getNetworkPath() && !"".equals(sDetails.getNetworkPath()))
 			{
-				serverPath = com.mazda.gms3.dmt.utils.SourceContentPaths.contentRoot(sDetails.getNetworkPath());
+				SERVERPATH.set(com.mazda.gms3.dmt.utils.SourceContentPaths.contentRoot(sDetails.getNetworkPath()));
 				sessionBean.setShowJSPData(true);
 			}
 			sDetails = null;
@@ -292,6 +304,8 @@ public class Schedule extends HttpServlet {
 				checkBoxATOperation(request, sessionBean);
 			}
 
+			sessionBean.setFaceliftConfirmPending(false);
+			sessionBean.setScrollToSelectItems(false);
 			if(null!=sessionBean.getActionClicked() && !"".equals(sessionBean.getActionClicked()))
 			{
 				if(sessionBean.getActionClicked().equals("MARKET_SELECTION"))
@@ -311,7 +325,18 @@ public class Schedule extends HttpServlet {
 
 				else if(sessionBean.getActionClicked().equals("FILTER_RECORDS"))
 				{
-					filterOperation(sessionBean);
+					// facelift Excel files present: the IPM Facelift VIN Update must have run before the conversion
+					if(!sessionBean.isFaceliftRunConfirmed() && faceliftFilesPresent())
+					{
+						sessionBean.setScheduleItemsList(new ArrayList<ScheduleItemDetails>());
+						sessionBean.setShowNoRecordTable(false);
+						sessionBean.setSelectAll(false);
+						sessionBean.setFaceliftConfirmPending(true);
+					}
+					else
+					{
+						filterOperation(sessionBean);
+					}
 				}
 
 				else if(sessionBean.getActionClicked().equals("SCHEDULE_CONVERSION"))
@@ -334,6 +359,9 @@ public class Schedule extends HttpServlet {
 				else if(sessionBean.getActionClicked().equals("VIEW_IDENTIFIED_DOCS_DETAILS"))
 				{
 					viewImpactedDocumentsDetails(sessionBean);
+					// the page opens at the listed items - every other action (Schedule, errors) stays at the top
+					sessionBean.setScrollToSelectItems(sessionBean.isShowAutomationGridBlock() && null!=sessionBean.getAutomationItemsList()
+							&& !sessionBean.getAutomationItemsList().isEmpty() && (null==sessionBean.getErrorMessage() || "".equals(sessionBean.getErrorMessage())));
 				}
 				else if(sessionBean.getActionClicked().equals("OPERATION_CHANGE"))
 				{
@@ -377,13 +405,23 @@ public class Schedule extends HttpServlet {
 				}
 				else if(sessionBean.getActionClicked().equals("IDENTIFY_IMPACTED_DOCUMENTS"))
 				{
-//					identifyImpactedDocumentsData(sessionBean);
 					identifyImpactedDocumentsDataForSchedule(sessionBean);
 				}
+				else if(sessionBean.getActionClicked().equals("VALIDATE_FACELIFT"))
+				{
+					validateFaceliftFolder(sessionBean);
+				}
+			}
+
+			// IPM FACELIFT VIN UPDATE: the Excel files of the facelift folder (or the "no Excel found" message)
+			if(null!=sessionBean.getOperationId() && sessionBean.getOperationId().equals(ApplicationProperties.getProperty("operation.type.automation")))
+			{
+				refreshFaceliftFiles(sessionBean);
 			}
 
 			// reset actionClicked
 			sessionBean.setActionClicked(null);
+			sessionBean.setFaceliftRunConfirmed(false);
 		}
 		catch(Exception e)
 		{
@@ -542,6 +580,16 @@ public class Schedule extends HttpServlet {
 						value=null;
 					}
 
+					if (fieldName.equals("DMT_SCHAT_LoadType"))
+					{
+						String value = fileItem.getString("UTF-8");
+						if (ScheduleDAO.LOAD_TYPE_MASTER_DATA_WITH_CONTENT.equals(value) || ScheduleDAO.LOAD_TYPE_ONLY_CONTENT.equals(value))
+						{
+							sessionBean.setAtLoadTypeId(value);
+						}
+						value=null;
+					}
+
 					if (fieldName.equals("DMT_SCH_DocumentStatus")) 
 					{
 						String value = fileItem.getString("UTF-8");
@@ -622,6 +670,11 @@ public class Schedule extends HttpServlet {
 						value=null;
 					}
 
+					if (fieldName.equals("DMT_SCH_FaceliftConfirmed"))
+					{
+						sessionBean.setFaceliftRunConfirmed("Y".equals(fileItem.getString("UTF-8")));
+					}
+
 					if (fieldName.equals("DMT_SCH_ActionClicked")) 
 					{
 						String value = fileItem.getString("UTF-8");
@@ -682,87 +735,6 @@ public class Schedule extends HttpServlet {
 						value=null;
 					}
 				}
-				else if (!fileItem.isFormField())
-				{
-					if(null!=sessionBean.getActionClicked() && !"".equals(sessionBean.getActionClicked())
-							&& sessionBean.getActionClicked().equals("FILE_UPLOAD"))
-					{
-						String fileName = fileItem.getName();
-						byte[] data = fileItem.get();
-						if(null!=fileName && !"".equals(fileName) && null!=data)
-						{
-							/*
-							 * check for CSV
-							 */
-							String extension="";
-							if(fileName.lastIndexOf(".")!=-1)
-							{
-								extension = fileName.substring(fileName.lastIndexOf(".")+1, fileName.length());
-								if(null!=extension && !"".equals(extension))
-								{
-									if(extension.trim().toLowerCase().equals("xlsx") || 
-											extension.trim().toLowerCase().equals("xls") || 
-											extension.trim().toLowerCase().equals("xlsm"))
-									{
-										// re-initialize automationItemsList
-										sessionBean.setAutomationItemsList(new ArrayList<ItemDetails>());
-										// re-initialize inputDataList
-										sessionBean.setInputDataList(new ArrayList<ExcelRowDetails>());
-										// hide showIdentifyButton block
-										sessionBean.setShowIdenitfyButton(false);
-										// hide automationList Block
-										sessionBean.setShowAutomationGridBlock(false);
-										/*
-										 * read excel data and start identifying impacted documents channel wise and manual type wise 
-										 */
-										ArrayList<ExcelRowDetails> inputDataList =  AutomationUtils.readAutomationExcelData(data, extension);
-										if(null!=inputDataList && inputDataList.size()>0)
-										{
-											logger.info("readParamsFromRequest() :: Total Rows read from Excel are :: >"+ inputDataList.size()+". Proceed to Validate them.");
-											/*
-											 * ITERTAE EXCEL FILE AND VALIDATE IF ALL THE NEW VINS EXIST IN INFOMANAGER OR NOT.
-											 */
-											if(validateExcel(inputDataList, sessionBean))
-											{
-												sessionBean.setInputDataList(inputDataList);
-												sessionBean.setShowIdenitfyButton(true);
-											}
-											inputDataList = null;
-										}
-										else
-										{
-											logger.info("readParamsFromRequest() :: No Data Read from Uploaded Excel. Throws Message - No Data read from Excel, either the file is corrupt or no data exists in the uploaded Excel.");
-											sessionBean.setErrorMessage(msgProps.getProperty("error.no.data.excel"));
-										}
-									}
-									else
-									{
-										logger.info("readParamsFromRequest() :: Extension is not EXCEL. Throw Message - Uploaded file not supported."); 
-										sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
-									}
-								}
-								else
-								{
-									logger.info("readParamsFromRequest() :: File Name does not contain valid extension. Throw message - Please upload a valid Excel File.");
-									sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
-								}
-							}
-							else
-							{
-								logger.info("readParamsFromRequest() :: File Name does not contain any extension. Throw message - Please upload a valid Excel File.");
-								sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
-							}
-							extension = null;
-						}	
-						else
-						{
-							logger.info("readParamsFromRequest() :: File Name / Size is null. Throw message - Please upload a valid Excel File.");
-							sessionBean.setErrorMessage(msgProps.getProperty("error.valid.excel"));
-						}
-						fileName=  null;
-						data = null;
-					}
-				}
 			}
 		}
 		catch(Exception e)
@@ -781,9 +753,9 @@ public class Schedule extends HttpServlet {
 		{
 			sessionBean.setMarketId(null);
 			sessionBean.setMarketList(new ArrayList<SelectItemDetails>());
-			if(null!=serverPath && !"".equals(serverPath))
+			if(null!=serverPath() && !"".equals(serverPath()))
 			{
-				File sourceContentFolder = PathUtil.file(serverPath);
+				File sourceContentFolder = PathUtil.file(serverPath());
 				if(sourceContentFolder.exists() && sourceContentFolder.isDirectory())
 				{
 					File[] marketFolders = sourceContentFolder.listFiles();
@@ -807,7 +779,7 @@ public class Schedule extends HttpServlet {
 				}
 				else
 				{
-					logger.info("getMarketList :: Either Source Content Directory at ServerPath does not Exists or No Market Folder Found at Path :: > " + serverPath);
+					logger.info("getMarketList :: Either Source Content Directory at ServerPath does not Exists or No Market Folder Found at Path :: > " + serverPath());
 				}
 				sourceContentFolder = null;
 			}
@@ -833,9 +805,9 @@ public class Schedule extends HttpServlet {
 			sessionBean.setSelectedLocales(null);
 			sessionBean.setSelectedLocalesString(null);
 			sessionBean.setLocalesList(new ArrayList<SelectItemDetails>());
-			if(null!=serverPath && !"".equals(serverPath) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
+			if(null!=serverPath() && !"".equals(serverPath()) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
 			{
-				String marketDirPath = serverPath;
+				String marketDirPath = serverPath();
 				if(!marketDirPath.endsWith("\\"))
 				{
 					marketDirPath = marketDirPath+"\\";
@@ -864,7 +836,7 @@ public class Schedule extends HttpServlet {
 							 * add All option to the List
 							 */
 							SelectItemDetails si = new SelectItemDetails();
-							si.setLabel(msgProps.getProperty("label.all"));
+							si.setLabel(msgProps().getProperty("label.all"));
 							si.setValue(ApplicationProperties.getProperty("check.all.label"));
 							sessionBean.getLocalesList().add(si);
 							si = null;
@@ -901,9 +873,9 @@ public class Schedule extends HttpServlet {
 			sessionBean.setSelectedModels(null);
 			sessionBean.setSelectedModelsString(null);
 			sessionBean.setModelsList(new ArrayList<SelectItemDetails>());
-			if(null!=serverPath && !"".equals(serverPath) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
+			if(null!=serverPath() && !"".equals(serverPath()) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
 			{
-				String marketDirPath = serverPath;
+				String marketDirPath = serverPath();
 				if(!marketDirPath.endsWith("\\"))
 				{
 					marketDirPath = marketDirPath+"\\";
@@ -996,7 +968,7 @@ public class Schedule extends HttpServlet {
 						 * add All option to the List
 						 */
 						SelectItemDetails si = new SelectItemDetails();
-						si.setLabel(msgProps.getProperty("label.all"));
+						si.setLabel(msgProps().getProperty("label.all"));
 						si.setValue(ApplicationProperties.getProperty("check.all.label"));
 						sessionBean.getModelsList().add(si);
 						si = null;
@@ -1028,13 +1000,13 @@ public class Schedule extends HttpServlet {
 	{
 		sessionBean.setDocumentStatusList(new ArrayList<SelectItemDetails>());
 		SelectItemDetails si = new SelectItemDetails();
-		si.setLabel(msgProps.getProperty("flag.label.publish"));
+		si.setLabel(msgProps().getProperty("flag.label.publish"));
 		si.setValue(ApplicationProperties.getProperty("flag.value.publish"));
 		sessionBean.getDocumentStatusList().add(si);
 		si = null;
 
 		si = new SelectItemDetails();
-		si.setLabel(msgProps.getProperty("flag.label.draft"));
+		si.setLabel(msgProps().getProperty("flag.label.draft"));
 		si.setValue(ApplicationProperties.getProperty("flag.value.draft"));
 		sessionBean.getDocumentStatusList().add(si);
 		si = null;
@@ -1044,13 +1016,13 @@ public class Schedule extends HttpServlet {
 	{
 		sessionBean.setOperationList(new ArrayList<SelectItemDetails>());
 		SelectItemDetails si = new SelectItemDetails();
-		si.setLabel(msgProps.getProperty("operation.type.dataload"));
+		si.setLabel(msgProps().getProperty("operation.type.dataload"));
 		si.setValue(ApplicationProperties.getProperty("operation.type.dataload"));
 		sessionBean.getOperationList().add(si);
 		si = null;
 
 		si = new SelectItemDetails();
-		si.setLabel(msgProps.getProperty("operation.type.automation"));
+		si.setLabel(msgProps().getProperty("operation.type.automation"));
 		si.setValue(ApplicationProperties.getProperty("operation.type.automation"));
 		sessionBean.getOperationList().add(si);
 		si = null;
@@ -1250,9 +1222,9 @@ public class Schedule extends HttpServlet {
 			sessionBean.setSelectedManualTypes(null);
 			sessionBean.setSelectedManualTypesString(null);
 			sessionBean.setManualTypesList(new ArrayList<SelectItemDetails>());
-			if(null!=serverPath && !"".equals(serverPath) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
+			if(null!=serverPath() && !"".equals(serverPath()) && null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()))
 			{
-				String marketDirPath = serverPath;
+				String marketDirPath = serverPath();
 				if(!marketDirPath.endsWith("\\"))
 				{
 					marketDirPath = marketDirPath+"\\";
@@ -1378,7 +1350,7 @@ public class Schedule extends HttpServlet {
 						 * add All option to the List
 						 */
 						SelectItemDetails si = new SelectItemDetails();
-						si.setLabel(msgProps.getProperty("label.all"));
+						si.setLabel(msgProps().getProperty("label.all"));
 						si.setValue(ApplicationProperties.getProperty("check.all.label"));
 						sessionBean.getManualTypesList().add(si);
 						si = null;
@@ -1555,6 +1527,7 @@ public class Schedule extends HttpServlet {
 		sessionBean.setInputDataList(null);
 		sessionBean.setShowIdenitfyButton(false);
 		sessionBean.setJobIdForATOperation(null);
+		sessionBean.setAtLoadTypeId(ScheduleDAO.LOAD_TYPE_ONLY_CONTENT);
 		
 		// set today's date as ToDate
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -1614,26 +1587,27 @@ public class Schedule extends HttpServlet {
 						{
 							if(details.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.pending.value")))
 							{
-								details.setScheduleStatusLabel(msgProps.getProperty("schedule.status.pending.label"));
+								details.setScheduleStatusLabel(msgProps().getProperty("schedule.status.pending.label"));
 							}
 							else if(details.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.processing.value")))
 							{
-								details.setScheduleStatusLabel(msgProps.getProperty("schedule.status.processing.label"));
+								details.setScheduleStatusLabel(msgProps().getProperty("schedule.status.processing.label"));
 								// set showAbortLink to true
 								details.setShowAbort(true);
 							}
 							else if(details.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.completed.value")))
 							{
-								details.setScheduleStatusLabel(msgProps.getProperty("schedule.status.completed.label"));
-								// set showViewButton to true - only if Documents Count > 0
-								if(details.getTotalDocsForProcessing()>0)
+								details.setScheduleStatusLabel(msgProps().getProperty("schedule.status.completed.label"));
+								// set showViewButton to true - only if Documents Count > 0 and an item is left to schedule
+								// (the count stays after an update job took the items; the remark says by which job)
+								if(details.getTotalDocsForProcessing()>0 && 0!=details.getRemainingItemsCount())
 								{
 									details.setShowViewButton(true);
 								}
 							}
 							else if(details.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.aborted.value")))
 							{
-								details.setScheduleStatusLabel(msgProps.getProperty("schedule.status.aborted.label"));
+								details.setScheduleStatusLabel(msgProps().getProperty("schedule.status.aborted.label"));
 							}
 						}
 						
@@ -1642,11 +1616,11 @@ public class Schedule extends HttpServlet {
 						{
 							if(details.getJobStatus().equals(ApplicationProperties.getProperty("schedule.status.success.value")))
 							{
-								details.setJobStatusLabel(msgProps.getProperty("schedule.status.success.label"));
+								details.setJobStatusLabel(msgProps().getProperty("schedule.status.success.label"));
 							}
 							else if(details.getJobStatus().equals(ApplicationProperties.getProperty("schedule.status.failure.value")))
 							{
-								details.setJobStatusLabel(msgProps.getProperty("schedule.status.failure.label"));
+								details.setJobStatusLabel(msgProps().getProperty("schedule.status.failure.label"));
 							}
 						}
 						
@@ -1725,7 +1699,7 @@ public class Schedule extends HttpServlet {
 									{
 										Utilities.printStackTraceToLogs(Schedule.class.getName(), "abortConversion()", e);
 										// no need of showing any error
-										logger.info(msgProps.getProperty("error.message.impacted.docs.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
+										logger.info(msgProps().getProperty("error.message.impacted.docs.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
 									}
 									break;
 								}
@@ -1734,12 +1708,12 @@ public class Schedule extends HttpServlet {
 						
 						if (threadFound == false) 
 						{
-							logger.info(msgProps.getProperty("error.message.impacted.docs.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+							logger.info(msgProps().getProperty("error.message.impacted.docs.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
 						}
 					} 
 					else
 					{
-						logger.info(msgProps.getProperty("error.message.impacted.docs.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+						logger.info(msgProps().getProperty("error.message.impacted.docs.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
 					}
 					threadArray = null;
 					threadSet = null;
@@ -1789,7 +1763,7 @@ public class Schedule extends HttpServlet {
 						userId = null;
 						
 						// show success Message - independent of whether thread was active or not
-						sessionBean.setSuccessMessage(msgProps.getProperty("job.abort.success.message"));
+						sessionBean.setSuccessMessage(msgProps().getProperty("job.abort.success.message"));
 						/*
 						 * re-call Schedule List
 						 */
@@ -1799,13 +1773,13 @@ public class Schedule extends HttpServlet {
 					{
 						Utilities.printStackTraceToLogs(Schedule.class.getName(), "abortConversionOperation()", e);
 						logger.info("abortConversionOperation :: Error while updating status for Schedule Id {"+scheduleId+"} in DATABASE.");
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 					}
 				}
 				else
 				{
 					logger.info("abortConversionOperation :: Thread Id from request as param are null. Throw Message");
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 				}
 				threadId = null;
 				scheduleId = null;
@@ -1813,13 +1787,13 @@ public class Schedule extends HttpServlet {
 			else
 			{
 				logger.info("abortConversionOperation :: Schedule Id from request as param are null. Throw Message");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "abortConversionOperation()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 	
@@ -1833,7 +1807,7 @@ public class Schedule extends HttpServlet {
 	{
 		if(null==sessionBean.getMarketId() || "".equals(sessionBean.getMarketId()))
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.fields"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.fields"));
 			return false;
 		}
 		return true;
@@ -1899,7 +1873,7 @@ public class Schedule extends HttpServlet {
 			sessionBean.setScheduleItemsList(null);
 			ArrayList<ScheduleItemDetails> tempItemsList = new ArrayList<ScheduleItemDetails>();
 			if(null!=sessionBean.getMarketId() && !"".equals(sessionBean.getMarketId()) 
-					&& null!=serverPath && !"".equals(serverPath))
+					&& null!=serverPath() && !"".equals(serverPath()))
 			{
 				String[] localesToProcess=null;
 				String[] modelsToProcess=null;
@@ -1979,14 +1953,14 @@ public class Schedule extends HttpServlet {
 				 * Now Create path for the MarKET DIRECTORY 
 				 */
 				String marketDirPath="";
-				serverPath = serverPath.replace("/", "\\");
-				if(serverPath.endsWith("\\"))
+				SERVERPATH.set(serverPath().replace("/", "\\"));
+				if(serverPath().endsWith("\\"))
 				{
-					marketDirPath = serverPath+sessionBean.getMarketId();
+					marketDirPath = serverPath()+sessionBean.getMarketId();
 				}
 				else
 				{
-					marketDirPath = serverPath+"\\"+sessionBean.getMarketId();
+					marketDirPath = serverPath()+"\\"+sessionBean.getMarketId();
 				}
 				logger.info("identifyFileItemsOperationForMC :: Iterating Market Directory at Path :: > " + marketDirPath);
 				File marketFolder = PathUtil.file(marketDirPath);
@@ -2198,7 +2172,7 @@ public class Schedule extends HttpServlet {
 																					if(dummyFile.isFile())
 																					{
 																						if(dummyFile.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-																								&& !dummyFile.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+																								&& !dummyFile.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 																								dummyFile.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 																						{
 																							displayOrderFileFound = true;
@@ -2327,7 +2301,7 @@ public class Schedule extends HttpServlet {
 																						}
 
 																						if(dummyFile.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-																								&& !dummyFile.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+																								&& !dummyFile.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 																								dummyFile.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 																						{
 																							// DISPLAY ORDER TEXT FILE FOUND.
@@ -4678,7 +4652,7 @@ public class Schedule extends HttpServlet {
 	{
 		if(null==sessionBean.getScheduleItemsList() || sessionBean.getScheduleItemsList().size()<=0)
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item.conversion"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item.conversion"));
 			return false;
 		}
 
@@ -4696,7 +4670,7 @@ public class Schedule extends HttpServlet {
 
 			if(anyRowSelected==false)
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item.conversion"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item.conversion"));
 				return false;
 			}
 
@@ -4822,7 +4796,7 @@ public class Schedule extends HttpServlet {
 						rowNos = rowNos.substring(0, rowNos.length()-1);
 					}
 					// add ERROR MESSAGE
-					sessionBean.setErrorMessage("Row No. "+rowNos.trim()+" cannot be selected for Content Load, as they contain only VIN Tet File and No Display Order Text File.");
+					sessionBean.setErrorMessage("Row No. "+rowNos.trim()+" cannot be selected for Content Load, as they contain only VIN Text File and No Display Order Text File.");
 					return false;
 				}
 
@@ -4910,12 +4884,12 @@ public class Schedule extends HttpServlet {
 			{
 				if(sessionBean.getMarketId().trim().toLowerCase().equals("mc") || sessionBean.getMarketId().trim().toLowerCase().equals("mme"))
 				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.no.docs.found.mc.conversion"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.no.docs.found.mc.conversion"));
 					return false;
 				}
 				else if(sessionBean.getMarketId().trim().toLowerCase().equals("mnao"))
 				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.no.docs.found.conversion"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.no.docs.found.conversion"));
 					return false;
 				}
 			}
@@ -4937,7 +4911,7 @@ public class Schedule extends HttpServlet {
 		}
 		if(count>0)
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.fail.schedule.conversion"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.fail.schedule.conversion"));
 			return false;
 		}
 		return true;
@@ -4958,7 +4932,23 @@ public class Schedule extends HttpServlet {
 				MasterDataSyncDAO masterDataDAO = new MasterDataSyncDAO();
 				AutoSyncScheduleItemDetails details = null;
 				String[] selCats = AutoSyncConstants.ITEMS_KEYS.split(",");
-				ArrayList<AutoSyncScheduleItemDetails> itemsList = masterDataDAO.getItemsCountForProcessing(selCats, sessionBean.getMarketId().trim());
+				// ONLY THE LOCALES OF THIS CONVERSION: "Master Data with Content" syncs the rows of its own locale, so
+				// rows still waiting in another locale of the market are no reason to refuse a content load here
+				ArrayList<String> conversionLocales = new ArrayList<String>();
+				if(null!=sessionBean.getSelectedLocales())
+				{
+					for(String l : sessionBean.getSelectedLocales())
+					{
+						if(null!=l && !"".equals(l.trim()) && !l.trim().equalsIgnoreCase(ApplicationProperties.getProperty("check.all.label").trim()))
+						{
+							conversionLocales.add(l.trim());
+						}
+					}
+				}
+				// ... and their companion locales (en-US -> en-CA): "Master Data with Content" syncs those too
+				conversionLocales = new ArrayList<String>(com.mazda.gms3.dmt.masterdata.MasterDataLoad.withCompanions(conversionLocales));
+				ArrayList<AutoSyncScheduleItemDetails> itemsList = masterDataDAO.getItemsCountForProcessing(selCats, sessionBean.getMarketId().trim(),
+						conversionLocales.isEmpty() ? null : conversionLocales.toArray(new String[0]));
 				int totalCount = 0;
 				if(null!=itemsList && itemsList.size()>0)
 				{
@@ -4987,8 +4977,8 @@ public class Schedule extends HttpServlet {
 								|| sessionBean.getMarketId().trim().toLowerCase().equals(ApplicationProperties.getProperty("market.mnao").trim().toLowerCase()));
 				if(totalCount>0 && masterDataWithContent==false)
 				{
-					String[] id = (String.valueOf(totalCount)+","+sessionBean.getMarketId()).split(",");
-					sessionBean.setErrorMessage(msgProps.getMessage(id, "error.message.masterdata.remains.for.syncing"));
+					String[] id = new String[] { String.valueOf(totalCount), sessionBean.getMarketId(), conversionLocales.isEmpty() ? ApplicationProperties.getProperty("check.all.label").trim() : String.join(", ", conversionLocales) };
+					sessionBean.setErrorMessage(msgProps().getMessage(id, "error.message.masterdata.remains.for.syncing"));
 					id = null;
 				}
 				else
@@ -5023,7 +5013,7 @@ public class Schedule extends HttpServlet {
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "scheduleConversion()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 
@@ -5097,7 +5087,7 @@ public class Schedule extends HttpServlet {
 										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 										String[] data = ids.split(",");
-										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 										errorMessage.append("\n");
 										ids = null;
 										data = null;
@@ -5124,7 +5114,7 @@ public class Schedule extends HttpServlet {
 								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 								//										errorMessage.append("\n");
 								//										ids = null;
 								//										data = null;
@@ -5161,7 +5151,7 @@ public class Schedule extends HttpServlet {
 								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
 						if(null!=publishJob)
 						{
-							errorMessage.append(msgProps.getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
 									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
 							errorMessage.append("\n");
 							proceedFurther=false;
@@ -5174,7 +5164,7 @@ public class Schedule extends HttpServlet {
 				{
 					StringBuilder msgBuilder = new StringBuilder();
 					// cannot proceed further
-					String message = msgProps.getProperty("label.cannot.proceed.further");
+					String message = msgProps().getProperty("label.cannot.proceed.further");
 					msgBuilder.append(message);
 					msgBuilder.append("\n");
 					if(null!=errorMessage)
@@ -5193,7 +5183,7 @@ public class Schedule extends HttpServlet {
 					ScheduleDetails schDetails = new ScheduleDetails();
 					schDetails.setScheduleName(ApplicationProperties.getProperty("schedule.name.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
 					schDetails.setThreadId(ApplicationProperties.getProperty("schedule.name.key"));
-					schDetails.setUserId(wslId);
+					schDetails.setUserId(wslId());
 					schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
 					// a Kapture load is always Draft - the Publish Content job publishes (as MC)
 					schDetails.setImDocsProcessingStatus(ApplicationProperties.getProperty("flag.value.draft"));
@@ -5245,7 +5235,7 @@ public class Schedule extends HttpServlet {
 					{
 						ScheduleDAO.saveScheduleLoadType(scheduleId, sessionBean.getLoadTypeId());
 						sessionBean.setScheduleName(schDetails.getScheduleName());
-						String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
+						String message = msgProps().addMessage("conversion.schedule.success", schDetails.getScheduleName());
 						sessionBean.setSuccessMessage(message);
 						message= null;
 						/*
@@ -5254,6 +5244,7 @@ public class Schedule extends HttpServlet {
 						String threadId = schDetails.getThreadId();
 						final String code = String
 								.valueOf(scheduleId);
+						final String jobUser = wslId();
 						final StartConversionMNAOImpl startConvImpl = new StartConversionMNAOImpl();
 						Runnable runn = new Runnable() 
 						{
@@ -5262,7 +5253,7 @@ public class Schedule extends HttpServlet {
 
 								synchronized (startConvImpl) {
 									try {
-										startConvImpl.startConversion(String.valueOf(code), wslId);
+										startConvImpl.startConversion(String.valueOf(code), jobUser);
 									} catch (Exception e) {
 										Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
 									}
@@ -5278,7 +5269,7 @@ public class Schedule extends HttpServlet {
 					}
 					else
 					{
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.schedule.conversion"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.schedule.conversion"));
 					}
 					scheduleId = null;
 					schDetails = null;
@@ -5288,7 +5279,7 @@ public class Schedule extends HttpServlet {
 			//			else
 			//			{
 			//				// Maximum 5 conversion jobs can be scheduled in parallel. Please wait till the Processing jobs gets finished.
-			//				sessionBean.setErrorMessage(msgProps.getProperty("error.message.max.jobs.scheduled"));
+			//				sessionBean.setErrorMessage(msgProps().getProperty("error.message.max.jobs.scheduled"));
 			//			}
 
 		}
@@ -5368,7 +5359,7 @@ public class Schedule extends HttpServlet {
 										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 										String[] data = ids.split(",");
-										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 										errorMessage.append("\n");
 										ids = null;
 										data = null;
@@ -5395,7 +5386,7 @@ public class Schedule extends HttpServlet {
 								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 								//										errorMessage.append("\n");
 								//										ids = null;
 								//										data = null;
@@ -5430,7 +5421,7 @@ public class Schedule extends HttpServlet {
 								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
 						if(null!=publishJob)
 						{
-							errorMessage.append(msgProps.getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
 									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
 							errorMessage.append("\n");
 							proceedFurther=false;
@@ -5443,7 +5434,7 @@ public class Schedule extends HttpServlet {
 				{
 					StringBuilder msgBuilder = new StringBuilder();
 					// cannot proceed further
-					String message = msgProps.getProperty("label.cannot.proceed.further");
+					String message = msgProps().getProperty("label.cannot.proceed.further");
 					msgBuilder.append(message);
 					msgBuilder.append("\n");
 					if(null!=errorMessage)
@@ -5462,7 +5453,7 @@ public class Schedule extends HttpServlet {
 					ScheduleDetails schDetails = new ScheduleDetails();
 					schDetails.setScheduleName(ApplicationProperties.getProperty("schedule.name.mc.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
 					schDetails.setThreadId(ApplicationProperties.getProperty("schedule.name.mc.key"));
-					schDetails.setUserId(wslId);
+					schDetails.setUserId(wslId());
 					schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
 					// a Kapture load is always Draft - the Publish Content job publishes
 					schDetails.setImDocsProcessingStatus(ApplicationProperties.getProperty("flag.value.draft"));
@@ -5511,7 +5502,7 @@ public class Schedule extends HttpServlet {
 					{
 						ScheduleDAO.saveScheduleLoadType(scheduleId, sessionBean.getLoadTypeId());
 						sessionBean.setScheduleName(schDetails.getScheduleName());
-						String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
+						String message = msgProps().addMessage("conversion.schedule.success", schDetails.getScheduleName());
 						sessionBean.setSuccessMessage(message);
 						message= null;
 						/*
@@ -5520,6 +5511,7 @@ public class Schedule extends HttpServlet {
 						String threadId = schDetails.getThreadId();
 						final String code = String
 								.valueOf(scheduleId);
+						final String jobUser = wslId();
 						final StartMCConversionImpl startConvImpl = new StartMCConversionImpl();
 						Runnable runn = new Runnable() 
 						{
@@ -5528,7 +5520,7 @@ public class Schedule extends HttpServlet {
 
 								synchronized (startConvImpl) {
 									try {
-										startConvImpl.startConversion(String.valueOf(code), wslId);
+										startConvImpl.startConversion(String.valueOf(code), jobUser);
 									} catch (Exception e) {
 										Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
 									}
@@ -5544,7 +5536,7 @@ public class Schedule extends HttpServlet {
 					}
 					else
 					{
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.schedule.conversion"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.schedule.conversion"));
 					}
 					scheduleId = null;
 					schDetails = null;
@@ -5554,7 +5546,7 @@ public class Schedule extends HttpServlet {
 			//			else
 			//			{
 			//				// Maximum 5 conversion jobs can be scheduled in parallel. Please wait till the Processing jobs gets finished.
-			//				sessionBean.setErrorMessage(msgProps.getProperty("error.message.max.jobs.scheduled"));
+			//				sessionBean.setErrorMessage(msgProps().getProperty("error.message.max.jobs.scheduled"));
 			//			}
 		}
 		catch(Exception e)
@@ -5633,7 +5625,7 @@ public class Schedule extends HttpServlet {
 										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 										String[] data = ids.split(",");
-										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 										errorMessage.append("\n");
 										ids = null;
 										data = null;
@@ -5660,7 +5652,7 @@ public class Schedule extends HttpServlet {
 								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
 								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
 								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps.getMessage(data, "error.message.item.already.processing"));
+								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
 								//										errorMessage.append("\n");
 								//										ids = null;
 								//										data = null;
@@ -5695,7 +5687,7 @@ public class Schedule extends HttpServlet {
 								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
 						if(null!=publishJob)
 						{
-							errorMessage.append(msgProps.getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
 									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
 							errorMessage.append("\n");
 							proceedFurther=false;
@@ -5708,7 +5700,7 @@ public class Schedule extends HttpServlet {
 				{
 					StringBuilder msgBuilder = new StringBuilder();
 					// cannot proceed further
-					String message = msgProps.getProperty("label.cannot.proceed.further");
+					String message = msgProps().getProperty("label.cannot.proceed.further");
 					msgBuilder.append(message);
 					msgBuilder.append("\n");
 					if(null!=errorMessage)
@@ -5727,7 +5719,7 @@ public class Schedule extends HttpServlet {
 					ScheduleDetails schDetails = new ScheduleDetails();
 					schDetails.setScheduleName(ApplicationProperties.getProperty("schedule.name.mme.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
 					schDetails.setThreadId(ApplicationProperties.getProperty("schedule.name.mme.key"));
-					schDetails.setUserId(wslId);
+					schDetails.setUserId(wslId());
 					schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
 					// a Kapture load is always Draft - the Publish Content job publishes (as MC)
 					schDetails.setImDocsProcessingStatus(ApplicationProperties.getProperty("flag.value.draft"));
@@ -5779,7 +5771,7 @@ public class Schedule extends HttpServlet {
 					{
 						ScheduleDAO.saveScheduleLoadType(scheduleId, sessionBean.getLoadTypeId());
 						sessionBean.setScheduleName(schDetails.getScheduleName());
-						String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
+						String message = msgProps().addMessage("conversion.schedule.success", schDetails.getScheduleName());
 						sessionBean.setSuccessMessage(message);
 						message= null;
 						/*
@@ -5788,6 +5780,7 @@ public class Schedule extends HttpServlet {
 						String threadId = schDetails.getThreadId();
 						final String code = String
 								.valueOf(scheduleId);
+						final String jobUser = wslId();
 						final StartMMEConversionImpl startConvImpl = new StartMMEConversionImpl();
 						Runnable runn = new Runnable() 
 						{
@@ -5796,7 +5789,7 @@ public class Schedule extends HttpServlet {
 
 								synchronized (startConvImpl) {
 									try {
-										startConvImpl.startConversion(String.valueOf(code), wslId);
+										startConvImpl.startConversion(String.valueOf(code), jobUser);
 									} catch (Exception e) {
 										Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
 									}
@@ -5812,7 +5805,7 @@ public class Schedule extends HttpServlet {
 					}
 					else
 					{
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.schedule.conversion"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.schedule.conversion"));
 					}
 					scheduleId = null;
 					schDetails = null;
@@ -5822,7 +5815,7 @@ public class Schedule extends HttpServlet {
 			//			else
 			//			{
 			//				// Maximum 5 conversion jobs can be scheduled in parallel. Please wait till the Processing jobs gets finished.
-			//				sessionBean.setErrorMessage(msgProps.getProperty("error.message.max.jobs.scheduled"));
+			//				sessionBean.setErrorMessage(msgProps().getProperty("error.message.max.jobs.scheduled"));
 			//			}
 
 		}
@@ -5831,16 +5824,153 @@ public class Schedule extends HttpServlet {
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "scheduleMMEOperation()", e);
 		}
 	}
+	/*
+	 * =====================================================================================================
+	 * IPM FACELIFT VIN UPDATE - THE FACELIFT FOLDER (2026-10-11)
+	 * No upload any more: every Excel of the folder source.facelift.folder.name (beside MDM, under the source content
+	 * location of the Settings page) is read - same 11 columns, any mix of locales. "Validate Data" reads and checks them;
+	 * the Identify button appears when every row is valid.
+	 * =====================================================================================================
+	 */
+
+	/** The Excel files of the facelift folder, for the page (names only; empty = the "no Excel found" message). */
+	private void refreshFaceliftFiles(ScheduleBean sessionBean)
+	{
+		List<String> names = new ArrayList<String>();
+		try
+		{
+			for(File f : AutomationUtils.listFaceliftFiles(SourceContentPaths.faceliftFolder(serverPath())))
+			{
+				names.add(f.getName());
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(Schedule.class.getName(), "refreshFaceliftFiles()", e);
+		}
+		sessionBean.setFaceliftFileNames(names);
+		if(null==sessionBean.getAtLoadTypeId())
+		{
+			sessionBean.setAtLoadTypeId(ScheduleDAO.LOAD_TYPE_ONLY_CONTENT);
+		}
+	}
 
 	/**
-	 * Validate the following 
-	 * Row Valid - All Mandatory
-	 * Locale Exists in MDM / IM or Not
-	 * Old Vin Exists in MDM / IM or Not
-	 * New Vin Exists in MDM / IM or Not
-	 * @param inputDataList
-	 * @param sessionBean
-	 * @return
+	 * Conversion "Go": true when the facelift folder holds Excel files. Order with all three folders = MDM (Master Data
+	 * Syncing), then Facelift_Content (IPM Facelift VIN Update), then GMS3_Content (conversion) - so the user confirms the
+	 * facelift job ran before the conversion records are listed. A folder that cannot be read counts as present (ask).
+	 */
+	private boolean faceliftFilesPresent()
+	{
+		try
+		{
+			return !AutomationUtils.listFaceliftFiles(SourceContentPaths.faceliftFolder(serverPath())).isEmpty();
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(Schedule.class.getName(), "faceliftFilesPresent()", e);
+			return true;
+		}
+	}
+
+	/** "Validate Data": read every Excel of the facelift folder and check the rows. */
+	private void validateFaceliftFolder(ScheduleBean sessionBean)
+	{
+		sessionBean.setAutomationItemsList(new ArrayList<ItemDetails>());
+		sessionBean.setInputDataList(new ArrayList<ExcelRowDetails>());
+		sessionBean.setShowIdenitfyButton(false);
+		sessionBean.setShowAutomationGridBlock(false);
+		try
+		{
+			File folder = SourceContentPaths.faceliftFolder(serverPath());
+			List<File> files = AutomationUtils.listFaceliftFiles(folder);
+			refreshFaceliftFiles(sessionBean);
+			if(files.isEmpty())
+			{
+				logger.info("validateFaceliftFolder :: no Excel in "+PathUtil.winPath(folder));
+				sessionBean.setErrorMessage(msgProps().addMessage("error.facelift.no.excel", PathUtil.winPath(folder)));
+				return;
+			}
+			List<String> readErrors = new ArrayList<String>();
+			ArrayList<ExcelRowDetails> inputDataList = AutomationUtils.readFaceliftFolder(files, readErrors);
+			if(!readErrors.isEmpty())
+			{
+				StringBuilder errorMessage = new StringBuilder();
+				for(String m : readErrors)
+				{
+					errorMessage.append(errorMessage.length()>0 ? "<MSG_TOKEN>" : "").append(m);
+				}
+				decideErrorDisplay(sessionBean, errorMessage, readErrors.size());
+				return;
+			}
+			if(inputDataList.isEmpty())
+			{
+				logger.info("validateFaceliftFolder :: No Data Read from the facelift Excel files.");
+				sessionBean.setErrorMessage(msgProps().getProperty("error.no.data.excel"));
+				return;
+			}
+			logger.info("validateFaceliftFolder :: rows read from "+files.size()+" file(s) :: > "+inputDataList.size()+". Proceed to Validate them.");
+			if(validateExcel(inputDataList, sessionBean))
+			{
+				sessionBean.setInputDataList(inputDataList);
+				sessionBean.setShowIdenitfyButton(true);
+				sessionBean.setSuccessMessage(msgProps().getMessage(new String[] { String.valueOf(inputDataList.size()), String.valueOf(files.size()) },
+						"facelift.validate.success"));
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(Schedule.class.getName(), "validateFaceliftFolder()", e);
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
+		}
+	}
+
+	/** "Row No.<n> (<file>)" - commas taken out, the messages are split on them. */
+	private static String rowRef(ExcelRowDetails data)
+	{
+		return String.valueOf(data.getRowNo())+(null==data.getFileName() ? "" : " ("+data.getFileName().replace(",", " ")+")");
+	}
+
+	/** MNAO: WMI+VDS+VISstart+VISend; MC / MME: CARLINE+WMI+VDS+VISstart+VISend with a "-" WMI as "___" - upper case. */
+	private static String vinRefKey(String locale, String carline, String wmi, String vds, String visStart, String visEnd)
+	{
+		String key;
+		if(AutomationDAO.isLocaleOf("mnao.locales", locale))
+		{
+			key = wmi+vds+visStart+visEnd;
+		}
+		else
+		{
+			key = carline+("-".equals(wmi.trim()) ? "___" : wmi)+vds+visStart+visEnd;
+		}
+		return Utilities.replaceCharsForRefKeys(key.trim().toUpperCase()).trim().toUpperCase();
+	}
+
+	/** The VIN as the messages show it: MNAO WMI+VDS+VIS; MC / MME "<model> <carline> <wmi>-<vds>-<start>-<end>". */
+	private static String vinLabel(ExcelRowDetails data, boolean old)
+	{
+		String model = old ? data.getOldModelName() : data.getNewModelName();
+		String carline = old ? data.getOldCarlineCode() : data.getNewCarlineCode();
+		String wmi = old ? data.getOldWmiCode() : data.getNewWmiCode();
+		String vds = old ? data.getOldVdsCode() : data.getNewVdsCode();
+		String start = old ? data.getOldVisStartRange() : data.getNewVisStartRange();
+		String end = old ? data.getOldVisEndRange() : data.getNewVisEndRange();
+		if(AutomationDAO.isLocaleOf("mnao.locales", data.getLocale()))
+		{
+			return (wmi+vds+start+end).trim().toUpperCase();
+		}
+		String label = null!=model && !"".equals(model) ? model.replace(",", " ")+" " : "";
+		return label+carline+" "+("-".equals(wmi.trim()) ? "" : wmi+"-")+vds+"-"+start+"-"+end;
+	}
+
+	/**
+	 * The rows of the facelift Excel files:
+	 *  - all 11 cells given, reference keys built (as before)
+	 *  - locale in MDM and Kapture; OLD VIN range in MDM and Kapture (the documents carry it)
+	 *  - NEW VIN range in MDM and Kapture - OR in the ALL_VIN master data file of the locale (loaded by "Master Data with
+	 *    Facelift" at the start of the update job; "Only Facelift" cannot be scheduled while it is missing in Kapture)
+	 * More than 10 errors go to a text file with a link (decideErrorDisplay). A check that cannot be made fails the
+	 * validation - it never lets the rows through.
 	 */
 	private boolean validateExcel(ArrayList<ExcelRowDetails> inputDataList, ScheduleBean sessionBean)
 	{
@@ -5848,426 +5978,105 @@ public class Schedule extends HttpServlet {
 		int errorCount=0;
 		try
 		{
-			if(null!=inputDataList && inputDataList.size()>0)
+			for(ExcelRowDetails data : inputDataList)
 			{
-				ExcelRowDetails data = new ExcelRowDetails();
-				String vinRefKey=null;
-				String localeCheck=null;
-				String wmiCode=null;
-
-				for(int a=0;a<inputDataList.size();a++)
+				// all mandatory columns are provided or not
+				if(blank(data.getLocale()) || blank(data.getOldCarlineCode()) || blank(data.getOldWmiCode()) || blank(data.getOldVdsCode())
+						|| blank(data.getOldVisStartRange()) || blank(data.getOldVisEndRange()) || blank(data.getNewCarlineCode())
+						|| blank(data.getNewWmiCode()) || blank(data.getNewVdsCode()) || blank(data.getNewVisStartRange()) || blank(data.getNewVisEndRange()))
 				{
-					data = (ExcelRowDetails) inputDataList.get(a);
-					int rowNo = a+1+1;
-					data.setRowNo(rowNo);
-					// all mandatory columns are provided or not.
-					if(null==data.getLocale() || "".equals(data.getLocale()) || 
-							null==data.getOldCarlineCode() || "".equals(data.getOldCarlineCode()) || 
-							null==data.getOldWmiCode() || "".equals(data.getOldWmiCode()) ||
-							null==data.getOldVdsCode() || "".equals(data.getOldVdsCode()) ||
-							null==data.getOldVisStartRange() || "".equals(data.getOldVisStartRange()) ||
-							null==data.getOldVisEndRange() || "".equals(data.getOldVisEndRange()) ||
-							null==data.getNewCarlineCode() || "".equals(data.getNewCarlineCode()) ||
-							null==data.getNewWmiCode() || "".equals(data.getNewWmiCode()) ||
-							null==data.getNewVdsCode() || "".equals(data.getNewVdsCode()) ||
-							null==data.getNewVisStartRange() || "".equals(data.getNewVisStartRange()) ||
-							null==data.getNewVisEndRange() || "".equals(data.getNewVisEndRange()))
+					append(errorMessage, msgProps().addMessage("error.excel.row.data.invalid", rowRef(data)));
+					errorCount++;
+					continue;
+				}
+				data.setOldRefKey(vinRefKey(data.getLocale(), data.getOldCarlineCode(), data.getOldWmiCode(), data.getOldVdsCode(),
+						data.getOldVisStartRange(), data.getOldVisEndRange()));
+				data.setNewRefKey(vinRefKey(data.getLocale(), data.getNewCarlineCode(), data.getNewWmiCode(), data.getNewVdsCode(),
+						data.getNewVisStartRange(), data.getNewVisEndRange()));
+				if("".equals(data.getOldRefKey()))
+				{
+					append(errorMessage, msgProps().getMessage(new String[] { "Old", rowRef(data) }, "error.execel.row.data.fail.generate.refkey"));
+					errorCount++;
+				}
+				if("".equals(data.getNewRefKey()))
+				{
+					append(errorMessage, msgProps().getMessage(new String[] { "New", rowRef(data) }, "error.execel.row.data.fail.generate.refkey"));
+					errorCount++;
+				}
+			}
+
+			// NO ERRORS FOUND - CHECK THE ROWS IN MDM, KAPTURE AND THE MASTER DATA FILES
+			if(errorCount==0)
+			{
+				AutomationDAO.validateExcelData(inputDataList, SourceContentPaths.masterDataFolder(serverPath()));
+				for(ExcelRowDetails data : inputDataList)
+				{
+					if(!data.isLocaleExistsInIM())
 					{
-						if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-						{
-							errorMessage.append("<MSG_TOKEN>");
-						}
-						errorMessage.append(msgProps.addMessage("error.excel.row.data.invalid", String.valueOf(rowNo)));
-						// increment errorCount by 1
+						append(errorMessage, msgProps().getMessage(new String[] { data.getLocale(), rowRef(data) }, "error.execel.row.data.fail.locale.exists.im"));
 						errorCount++;
 					}
-
-					/*
-					 * Generate Old & New VIN Reference Keys
-					 */
-					if(null!=data.getLocale() && !"".equals(data.getLocale()) && 
-							null!=data.getOldCarlineCode() && !"".equals(data.getOldCarlineCode()) && 
-							null!=data.getOldWmiCode() && !"".equals(data.getOldWmiCode()) &&
-							null!=data.getOldVdsCode() && !"".equals(data.getOldVdsCode()) &&
-							null!=data.getOldVisStartRange() && !"".equals(data.getOldVisStartRange()) &&
-							null!=data.getOldVisEndRange() && !"".equals(data.getOldVisEndRange()) &&
-							null!=data.getNewCarlineCode() && !"".equals(data.getNewCarlineCode()) &&
-							null!=data.getNewWmiCode() && !"".equals(data.getNewWmiCode()) &&
-							null!=data.getNewVdsCode() && !"".equals(data.getNewVdsCode()) &&
-							null!=data.getNewVisStartRange() && !"".equals(data.getNewVisStartRange()) &&
-							null!=data.getNewVisEndRange() && !"".equals(data.getNewVisEndRange()))
+					if(!data.isLocaleExistsInMDM())
 					{
-						/*
-						 * Prepare Old Reference Key & New Reference Key
-						 */
-						// generate OLV VIN REF KEY
-
-						/*
-						 * CHECK HERE IF MNAO LOCALE - 
-						 * 	THEN REF KEY = WMICODE+VDSCODE+VISSTART+VISEND
-						 * CHECK HERE IF MC // MME LOCALE - 
-						 * 	THEN REF KEY = CARLINECODE+WMICODE+VDSCODE+VISSTART+VISEND  
-						 */
-						localeCheck = data.getLocale();
-						localeCheck= localeCheck.replace("-", "_");
-						if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase()) > -1)
+						append(errorMessage, msgProps().getMessage(new String[] { data.getLocale(), rowRef(data) }, "error.execel.row.data.fail.locale.exists.mdm"));
+						errorCount++;
+					}
+					if(!data.isOldVinExistsinIM())
+					{
+						append(errorMessage, msgProps().getMessage(new String[] { vinLabel(data, true), "Old", rowRef(data) }, "error.execel.row.data.fail.vin.exists.im"));
+						errorCount++;
+					}
+					if(!data.isOldVinExistsinMDM())
+					{
+						append(errorMessage, msgProps().getMessage(new String[] { vinLabel(data, true), "Old", rowRef(data) }, "error.execel.row.data.fail.vin.exists.mdm"));
+						errorCount++;
+					}
+					// a new range the master data file carries is loaded by "Master Data with Facelift"
+					if(!data.isNewVinInMasterDataFile())
+					{
+						if(!data.isNewVinExistsinIM())
 						{
-							// MNAO LOCALES
-							vinRefKey = data.getOldWmiCode()+data.getOldVdsCode()+data.getOldVisStartRange()+data.getOldVisEndRange();
-						}
-						else
-						{
-							// MC // MME LOCALES
-							wmiCode = data.getOldWmiCode();
-							if(wmiCode.trim().equals("-"))
-							{
-								wmiCode ="___";
-							}
-							vinRefKey=data.getOldCarlineCode()+wmiCode+data.getOldVdsCode()+data.getOldVisStartRange()+data.getOldVisEndRange();
-							wmiCode = null;
-						}
-
-						if(null!=vinRefKey && !"".equals(vinRefKey))
-						{
-							vinRefKey = Utilities.replaceCharsForRefKeys(vinRefKey.trim().toUpperCase());
-							data.setOldRefKey(vinRefKey.trim().toUpperCase());
-						}
-						else
-						{
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							String edata = "Old,"+String.valueOf(rowNo);
-							String[] id = edata.split(",");
-							errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.generate.refkey"));
-							edata = null;
-							id = null;
-							// increment errorCount by 1
+							append(errorMessage, msgProps().getMessage(new String[] { vinLabel(data, false), "New", rowRef(data) }, "error.execel.row.data.fail.vin.exists.im"));
 							errorCount++;
 						}
-						vinRefKey = null;
-						localeCheck = null;
-
-
-						// generate New VIN Reference Key
-						/*
-						 * CHECK HERE IF MNAO LOCALE - 
-						 * 	THEN REF KEY = WMICODE+VDSCODE+VISSTART+VISEND
-						 * CHECK HERE IF MC // MME LOCALE - 
-						 * 	THEN REF KEY = CARLINECODE+WMICODE+VDSCODE+VISSTART+VISEND  
-						 */
-						localeCheck = data.getLocale();
-						localeCheck= localeCheck.replace("-", "_");
-						if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase()) > -1)
+						if(!data.isNewVinExistsinMDM())
 						{
-							// MNAO LOCALES
-							vinRefKey = data.getNewWmiCode()+data.getNewVdsCode()+data.getNewVisStartRange()+data.getNewVisEndRange();
-						}
-						else
-						{
-							// MC // MME LOCALES
-							wmiCode = data.getNewWmiCode();
-							if(wmiCode.trim().equals("-"))
-							{
-								wmiCode ="___";
-							}
-							vinRefKey=data.getNewCarlineCode()+wmiCode+data.getNewVdsCode()+data.getNewVisStartRange()+data.getNewVisEndRange();
-							wmiCode = null;
-						}
-
-						if(null!=vinRefKey && !"".equals(vinRefKey))
-						{
-							vinRefKey = Utilities.replaceCharsForRefKeys(vinRefKey.trim().toUpperCase());
-							data.setNewRefKey(vinRefKey.trim().toUpperCase());
-						}
-						else
-						{
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							String edata = "New,"+String.valueOf(rowNo);
-							String[] id = edata.split(",");
-							errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.generate.refkey"));
-							edata = null;
-							id = null;
-							// increment errorCount by 1
+							append(errorMessage, msgProps().getMessage(new String[] { vinLabel(data, false), "New", rowRef(data) }, "error.execel.row.data.fail.vin.exists.mdm"));
 							errorCount++;
 						}
-						vinRefKey = null;
-						localeCheck = null;
 					}
 				}
-
-
-
-				/*
-				 * CHECK HERE IF NO ERRORS FOUND, E.G. ERROR COUNT=0
-				 * VALIDATE FOR ALL ROWS WHETHER LOCALE, OLD CARLINE AND NEW CARLINE EXISTS IN
-				 * MDM & IM OR NOT
-				 */
-
-				if(errorCount==0)
-				{
-					// no errorsFound - proceed for checking data in MDM & IM
-					inputDataList = AutomationDAO.validateExcelData(inputDataList);
-					String vinLabel="";
-					localeCheck = "";
-					if(null!=inputDataList && inputDataList.size()>0)
-					{
-						/* 
-						 * ITERATE AND CHECK FOR ALL FAILURES
-						 */
-						data = new ExcelRowDetails();
-						for(int a=0;a<inputDataList.size();a++)
-						{
-							data = (ExcelRowDetails)inputDataList.get(a);
-
-							if(data.isLocaleExistsInIM()==false)
-							{
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = data.getLocale()+","+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.locale.exists.im"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-							}
-
-							if(data.isLocaleExistsInMDM()==false)
-							{
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = data.getLocale()+","+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.locale.exists.mdm"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-							}
-
-							if(data.isOldVinExistsinIM()==false)
-							{
-								/*
-								 * Prepare OLD VIN Label
-								 */
-								vinLabel="";
-								localeCheck = data.getLocale();
-								localeCheck   = localeCheck.replace("-", "_");
-								if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase())>-1)
-								{
-									// MNAO LOCALE
-									vinLabel = data.getOldWmiCode()+data.getOldVdsCode()+data.getOldVisStartRange()+data.getOldVisEndRange();
-									vinLabel = vinLabel.trim().toUpperCase();
-								}
-								else
-								{
-									// MC / MME LOCALE - Mazda3/Mazda3 MPS BK JM0-BK103100-100001-ZZZZZZ
-									vinLabel = "";
-									if(null!=data.getOldModelName() && !"".equals(data.getOldModelName()))
-									{
-										vinLabel = data.getOldModelName()+" ";
-									}
-									if(data.getOldWmiCode().trim().equals("-"))
-									{
-										vinLabel+=data.getOldCarlineCode()+" "+data.getOldVdsCode()+"-"+data.getOldVisStartRange()+"-"+data.getOldVisEndRange();
-									}
-									else
-									{
-										vinLabel+=data.getOldCarlineCode()+" "+data.getOldWmiCode()+"-"+data.getOldVdsCode()+"-"+data.getOldVisStartRange()+"-"+data.getOldVisEndRange();
-									}
-								}
-
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = vinLabel+",Old,"+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.vin.exists.im"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-								vinLabel = null;
-								localeCheck =  null;
-							}
-
-							if(data.isOldVinExistsinMDM()==false)
-							{
-								/*
-								 * Prepare OLD VIN Label
-								 */
-								vinLabel="";
-								localeCheck = data.getLocale();
-								localeCheck   = localeCheck.replace("-", "_");
-								if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase())>-1)
-								{
-									// MNAO LOCALE
-									vinLabel = data.getOldWmiCode()+data.getOldVdsCode()+data.getOldVisStartRange()+data.getOldVisEndRange();
-									vinLabel = vinLabel.trim().toUpperCase();
-								}
-								else
-								{
-									// MC / MME LOCALE - Mazda3/Mazda3 MPS BK JM0-BK103100-100001-ZZZZZZ
-									vinLabel = "";
-									if(null!=data.getOldModelName() && !"".equals(data.getOldModelName()))
-									{
-										vinLabel = data.getOldModelName()+" ";
-									}
-									if(data.getOldWmiCode().trim().equals("-"))
-									{
-										vinLabel+=data.getOldCarlineCode()+" "+data.getOldVdsCode()+"-"+data.getOldVisStartRange()+"-"+data.getOldVisEndRange();
-									}
-									else
-									{
-										vinLabel+=data.getOldCarlineCode()+" "+data.getOldWmiCode()+"-"+data.getOldVdsCode()+"-"+data.getOldVisStartRange()+"-"+data.getOldVisEndRange();
-									}
-								}
-
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = vinLabel+",Old,"+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.vin.exists.mdm"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-								vinLabel =  null;
-								localeCheck=  null;
-							}
-
-							if(data.isNewVinExistsinIM()==false)
-							{
-								/*
-								 * Prepare NEW VIN Label
-								 */
-								vinLabel="";
-								localeCheck = data.getLocale();
-								localeCheck   = localeCheck.replace("-", "_");
-								if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase())>-1)
-								{
-									// MNAO LOCALE
-									vinLabel = data.getNewWmiCode()+data.getNewVdsCode()+data.getNewVisStartRange()+data.getNewVisEndRange();
-									vinLabel = vinLabel.trim().toUpperCase();
-								}
-								else
-								{
-									// MC / MME LOCALE - Mazda3/Mazda3 MPS BK JM0-BK103100-100001-ZZZZZZ
-									vinLabel = "";
-									if(null!=data.getNewModelName() && !"".equals(data.getNewModelName()))
-									{
-										vinLabel = data.getNewModelName()+" ";
-									}
-									if(data.getNewWmiCode().trim().equals("-"))
-									{
-										vinLabel+=data.getNewCarlineCode()+" "+data.getNewVdsCode()+"-"+data.getNewVisStartRange()+"-"+data.getNewVisEndRange();
-									}
-									else
-									{
-										vinLabel+=data.getNewCarlineCode()+" "+data.getNewWmiCode()+"-"+data.getNewVdsCode()+"-"+data.getNewVisStartRange()+"-"+data.getNewVisEndRange();
-									}
-								}
-
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = vinLabel+",New,"+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.vin.exists.im"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-								vinLabel =  null;
-								localeCheck=  null;
-							}
-
-							if(data.isNewVinExistsinMDM()==false)
-							{
-								/*
-								 * Prepare NEW VIN Label
-								 */
-								vinLabel="";
-								localeCheck = data.getLocale();
-								localeCheck   = localeCheck.replace("-", "_");
-								if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(localeCheck.trim().toLowerCase())>-1)
-								{
-									// MNAO LOCALE
-									vinLabel = data.getNewWmiCode()+data.getNewVdsCode()+data.getNewVisStartRange()+data.getNewVisEndRange();
-									vinLabel = vinLabel.trim().toUpperCase();
-								}
-								else
-								{
-									// MC / MME LOCALE - Mazda3/Mazda3 MPS BK JM0-BK103100-100001-ZZZZZZ
-									vinLabel = "";
-									if(null!=data.getNewModelName() && !"".equals(data.getNewModelName()))
-									{
-										vinLabel = data.getNewModelName()+" ";
-									}
-									if(data.getNewWmiCode().trim().equals("-"))
-									{
-										vinLabel+=data.getNewCarlineCode()+" "+data.getNewVdsCode()+"-"+data.getNewVisStartRange()+"-"+data.getNewVisEndRange();
-									}
-									else
-									{
-										vinLabel+=data.getNewCarlineCode()+" "+data.getNewWmiCode()+"-"+data.getNewVdsCode()+"-"+data.getNewVisStartRange()+"-"+data.getNewVisEndRange();
-									}
-								}
-
-								if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-								{
-									errorMessage.append("<MSG_TOKEN>");
-								}
-								String edata = vinLabel+",New,"+String.valueOf(data.getRowNo());
-								String[] id = edata.split(",");
-								errorMessage.append(msgProps.getMessage(id, "error.execel.row.data.fail.vin.exists.mdm"));
-								edata = null;
-								id = null;
-								// increment errorCount by 1
-								errorCount++;
-								vinLabel =  null;
-								localeCheck=  null;
-							}
-						}
-					}
-					vinLabel = null;
-					localeCheck = null;
-				}
-				data = null;
-				vinRefKey = null;
-				localeCheck = null;
 			}
-
-			/*
-			 * HERE Check, if the Error Count is more than 10, then do not show error Messages on the screen.
-			 * Instead, show a message, Multiple errors found while performing the transaction. Please Click <a>here</a> to view the details.
-			 */
-			if(errorCount>0)
-			{
-				decideErrorDisplay(sessionBean, errorMessage, errorCount);
-				return false;
-			}
-			errorMessage = null;
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "validateExcel()", e);
+			// a check that could not be made is not a passed check
+			append(errorMessage, msgProps().addMessage("error.facelift.validation.failed", String.valueOf(e.getMessage())));
+			errorCount++;
+		}
+		if(errorCount>0)
+		{
+			decideErrorDisplay(sessionBean, errorMessage, errorCount);
+			return false;
 		}
 		return true;
 	}
+
+	private static boolean blank(String s)
+	{
+		return null==s || "".equals(s.trim());
+	}
+
+	private static void append(StringBuilder errorMessage, String message)
+	{
+		if(errorMessage.length()>0)
+		{
+			errorMessage.append("<MSG_TOKEN>");
+		}
+		errorMessage.append(message);
+	}
+
 
 	private  void decideErrorDisplay(ScheduleBean sessionBean, StringBuilder errorMessage, int errorCount)
 	{
@@ -6304,10 +6113,10 @@ public class Schedule extends HttpServlet {
 			// label.error.screen.help.text.start
 			// label.here
 			// label.view.the.details
-			String message=msgProps.addMessage("error.import.invalid.custom.message", String.valueOf(errorCount));
-			message = message + " "+msgProps.getProperty("label.error.screen.help.text.start");
-			message = message+ " <a href=\""+webPath+"\" target=\"_blank\">" +msgProps.getProperty("label.here")+"</a>";
-			message = message +" " +msgProps.getProperty("label.view.the.details");
+			String message=msgProps().addMessage("error.import.invalid.custom.message", String.valueOf(errorCount));
+			message = message + " "+msgProps().getProperty("label.error.screen.help.text.start");
+			message = message+ " <a href=\""+webPath+"\" target=\"_blank\">" +msgProps().getProperty("label.here")+"</a>";
+			message = message +" " +msgProps().getProperty("label.view.the.details");
 
 			// set message in errorMessage
 			sessionBean.setErrorMessage(message);
@@ -6332,7 +6141,7 @@ public class Schedule extends HttpServlet {
 	{
 		//		if(null==sessionBean.getAutomationItemsList() || sessionBean.getAutomationItemsList().size()<=0)
 		//		{
-		//			sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item"));
+		//			sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item"));
 		//			return false;
 		//		}
 
@@ -6350,7 +6159,7 @@ public class Schedule extends HttpServlet {
 
 			if(anyRowSelected==false)
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item"));
 				return false;
 			}
 			long totalDocsCount=0;
@@ -6365,7 +6174,7 @@ public class Schedule extends HttpServlet {
 
 			if(totalDocsCount==0)
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.no.docs.found.ipm.facelist.vin.update"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.no.docs.found.ipm.facelist.vin.update"));
 				return false;
 			}
 		}
@@ -6376,7 +6185,7 @@ public class Schedule extends HttpServlet {
 			 */
 			if(null==sessionBean.getInputDataList() || sessionBean.getInputDataList().size()<=0)
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item"));
 				return false;
 			}
 		}
@@ -6395,209 +6204,136 @@ public class Schedule extends HttpServlet {
 		}
 		if(count>0)
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.fail.ipm.facelift.vin.update"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.fail.ipm.facelift.vin.update"));
 			return false;
 		}
 		return true;
 	}
-
+	/**
+	 * Schedules the update job (job B) for the selected items of the viewed identification job. The load type comes from
+	 * the radios beside the Schedule button ("Master Data with Facelift" / "Only Facelift", gms3_dmt_conv_schedule.dc_load_type).
+	 * "Only Facelift" is refused while a NEW VIN category of the selected items is still missing in Kapture (a range that
+	 * was accepted because the master data file carries it) - checked against Kapture now, not as it was at validation.
+	 */
 	private void scheduleAutomation(ScheduleBean sessionBean)
 	{
 		try
 		{
-			if(validateAutomationConversion(sessionBean))
+			if(!validateAutomationConversion(sessionBean))
 			{
-				/*
-				 *  PROCEED FOR CREATING A SCHEDULE FOR AUTOMATION AND START PROCESSING DOCUMENTS UPDATE
-				 *  FOR SM & WD CHANNELS AND FOR OTHER CHANNELS - GENERATE ONLY REPORTS
-				 *  
-				 *  PREPARE UNIQUE APPLICABLE VINLIST FOR THE SELECTED ITEMS AS INPUT LIST - RATHER THAN PICKING UP FROM SESSION
-				 */
-				ArrayList<ExcelRowDetails> uniqueVinsInputList = new ArrayList<ExcelRowDetails>();
-				String itemIdsForFetchingUniqueVinsInputList = null;
-				ScheduleDetails schDetails = new ScheduleDetails();
-				schDetails.setScheduleName(ApplicationProperties.getProperty("automation.sch.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
-				schDetails.setThreadId(ApplicationProperties.getProperty("automation.sch.key"));
-				schDetails.setUserId(wslId);
-				schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
-				long totalDocsCount=0;
-				ArrayList<ItemDetails> itemsList = new ArrayList<ItemDetails>();
-				for(int i=0;i<sessionBean.getAutomationItemsList().size();i++)
+				return;
+			}
+			ScheduleDetails schDetails = new ScheduleDetails();
+			schDetails.setScheduleName(ApplicationProperties.getProperty("automation.sch.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
+			schDetails.setThreadId(ApplicationProperties.getProperty("automation.sch.key"));
+			schDetails.setUserId(wslId());
+			schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
+			long totalDocsCount=0;
+			ArrayList<ItemDetails> itemsList = new ArrayList<ItemDetails>();
+			List<Long> itemIds = new ArrayList<Long>();
+			if(null!=sessionBean.getAutomationItemsList())
+			{
+				for(ItemDetails schItemDetails : sessionBean.getAutomationItemsList())
 				{
-					ItemDetails schItemDetails = (ItemDetails)sessionBean.getAutomationItemsList().get(i);
-					if(schItemDetails.isRowSelected()==true)
+					if(schItemDetails.isRowSelected())
 					{
-						totalDocsCount= totalDocsCount+schItemDetails.getTotalDocumentsCount();
-						if(null==itemIdsForFetchingUniqueVinsInputList)
+						totalDocsCount += null==schItemDetails.getTotalDocumentsCount() ? 0 : schItemDetails.getTotalDocumentsCount().longValue();
+						if(null!=schItemDetails.getDocIdnItemId())
 						{
-							itemIdsForFetchingUniqueVinsInputList="";
+							itemIds.add(schItemDetails.getDocIdnItemId());
 						}
-						// add docIdentificationJobItemId to itemIdsForFetchingUniqueVinsInputList
-						itemIdsForFetchingUniqueVinsInputList+=String.valueOf(schItemDetails.getDocIdnItemId().longValue())+",";
 						itemsList.add(schItemDetails);
 					}
 				}
-				schDetails.setTotalDocsForProcessing(totalDocsCount);
-
-				schDetails.setAutomationItemsList(new ArrayList<ItemDetails>());
-				if(null!=itemsList && itemsList.size()>0)
-				{
-					schDetails.setAutomationItemsList(itemsList);
-				}
-				
-				if(null!=itemIdsForFetchingUniqueVinsInputList && !"".equals(itemIdsForFetchingUniqueVinsInputList))
-				{
-					if(itemIdsForFetchingUniqueVinsInputList.endsWith(","))
-					{
-						itemIdsForFetchingUniqueVinsInputList = itemIdsForFetchingUniqueVinsInputList.substring(0, itemIdsForFetchingUniqueVinsInputList.length()-1);
-					}
-					/*
-					 * PROCEED FOR FETCHING UNIQUE VINS LIST FOR THE SELECTED ITEMS
-					 * UNIQUE KEY = LOCALE+O CARLINECODE+O WMI+O VDS+O VIS START+O VIS END+O MODEL NAME+N CARLINECODE+N WMI+N VDS+N VIS START+N VIS END+N MODEL NAME
-					 */
-					uniqueVinsInputList = AutomationIdentificationDAO.getUniqueVINsListForSelectedItems(itemIdsForFetchingUniqueVinsInputList);
-				}
-				itemIdsForFetchingUniqueVinsInputList = null;
-				
-				/*
-				 * call function to store data
-				 */
-				schDetails= ScheduleDAO.createAutomationSchedule(schDetails);
-				if(null!=schDetails && schDetails.getScheduleId()>0)
-				{
-					sessionBean.setScheduleATName(schDetails.getScheduleName());
-					String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
-					sessionBean.setSuccessMessage(message);
-					message= null;
-					/*
-					 * Update Thread and start with customName
-					 */
-					String threadId = schDetails.getThreadId();
-					final ScheduleDetails scheduleDetails = schDetails;
-					final StartAutomationProcessingImpl startAutoImpl = new StartAutomationProcessingImpl();
-//					final ArrayList<ExcelRowDetails> inputDataList = sessionBean.getInputDataList();
-					final ArrayList<ExcelRowDetails> inputDataList = uniqueVinsInputList;
-					Runnable runn = new Runnable() 
-					{
-						@Override
-						public void run() {
-
-							synchronized (startAutoImpl) {
-								try {
-									startAutoImpl.startAutomation(scheduleDetails, inputDataList);
-								} catch (Exception e) {
-									Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
-								}
-							}
-						}
-					};
-
-					Thread th = new Thread(runn, threadId);
-					th.start();
-
-					threadId = null;
-
-				}
-				else
-				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.ipm.facelift.vin.update.conversion"));
-				}
-				schDetails = null;
-				itemsList = null;
-				uniqueVinsInputList = null;
 			}
-		}
-		catch(Exception  e)
-		{
-			Utilities.printStackTraceToLogs(Schedule.class.getName(), "scheduleAutomation()", e);
-		}
-	}
-	
-	private void scheduleAutomation_OldBeforeImpactedDocsJobImplementation(ScheduleBean sessionBean)
-	{
-		try
-		{
-			if(validateAutomationConversion(sessionBean))
+			schDetails.setTotalDocsForProcessing(totalDocsCount);
+			schDetails.setAutomationItemsList(itemsList);
+
+			/*
+			 * THE UNIQUE VINS OF THE SELECTED ITEMS AS INPUT LIST - RATHER THAN PICKING UP FROM SESSION
+			 * UNIQUE KEY = LOCALE + OLD / NEW CARLINE, WMI, VDS, VIS START, VIS END, MODEL NAMES
+			 */
+			ArrayList<ExcelRowDetails> uniqueVinsInputList = AutomationIdentificationDAO.getUniqueVINsListForSelectedItems(itemIds);
+			if(null==uniqueVinsInputList)
 			{
-				/*
-				 *  PROCEED FOR CREATING A SCHEDULE FOR AUTOMATION AND START PROCESSING DOCUMENTS UPDATE
-				 *  FOR SM & WD CHANNELS AND FOR OTHER CHANNELS - GENERATE ONLY REPORTS
-				 */
-				ScheduleDetails schDetails = new ScheduleDetails();
-				schDetails.setScheduleName(ApplicationProperties.getProperty("automation.sch.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
-				schDetails.setThreadId(ApplicationProperties.getProperty("automation.sch.key"));
-				schDetails.setUserId(wslId);
-				schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
-				long totalDocsCount=0;
-				ArrayList<ItemDetails> itemsList = new ArrayList<ItemDetails>();
-				for(int i=0;i<sessionBean.getAutomationItemsList().size();i++)
+				uniqueVinsInputList = new ArrayList<ExcelRowDetails>();
+			}
+
+			String loadType = ScheduleDAO.LOAD_TYPE_MASTER_DATA_WITH_CONTENT.equals(sessionBean.getAtLoadTypeId())
+					? ScheduleDAO.LOAD_TYPE_MASTER_DATA_WITH_CONTENT : ScheduleDAO.LOAD_TYPE_ONLY_CONTENT;
+			if(ScheduleDAO.LOAD_TYPE_ONLY_CONTENT.equals(loadType))
+			{
+				// "ONLY FACELIFT" - EVERY NEW VIN CATEGORY MUST BE IN KAPTURE NOW
+				List<ExcelRowDetails> notThen = new ArrayList<ExcelRowDetails>();
+				for(ExcelRowDetails v : uniqueVinsInputList)
 				{
-					ItemDetails schItemDetails = (ItemDetails)sessionBean.getAutomationItemsList().get(i);
-					if(schItemDetails.isRowSelected()==true)
+					if(!v.isNewVinExistsinIM())
 					{
-						totalDocsCount= totalDocsCount+schItemDetails.getTotalDocumentsCount();
-						itemsList.add(schItemDetails);
+						notThen.add(v);
 					}
 				}
-				schDetails.setTotalDocsForProcessing(totalDocsCount);
-
-				schDetails.setAutomationItemsList(new ArrayList<ItemDetails>());
-				if(null!=itemsList && itemsList.size()>0)
+				if(!notThen.isEmpty())
 				{
-					schDetails.setAutomationItemsList(itemsList);
-				}
-				/*
-				 * call function to store data
-				 */
-
-				schDetails= ScheduleDAO.createAutomationSchedule(schDetails);
-				if(null!=schDetails && schDetails.getScheduleId()>0)
-				{
-					sessionBean.setScheduleATName(schDetails.getScheduleName());
-					String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
-					sessionBean.setSuccessMessage(message);
-					message= null;
-					/*
-					 * Update Thread and start with customName
-					 */
-					String threadId = schDetails.getThreadId();
-					final ScheduleDetails scheduleDetails = schDetails;
-					final StartAutomationProcessingImpl startAutoImpl = new StartAutomationProcessingImpl();
-					final ArrayList<ExcelRowDetails> inputDataList = sessionBean.getInputDataList();
-					Runnable runn = new Runnable() 
+					Set<String> now = AutomationDAO.newVinsInKapture(notThen);
+					Set<String> missing = new java.util.TreeSet<String>();
+					for(ExcelRowDetails v : notThen)
 					{
-						@Override
-						public void run() {
-
-							synchronized (startAutoImpl) {
-								try {
-									startAutoImpl.startAutomation(scheduleDetails, inputDataList);
-								} catch (Exception e) {
-									Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
-								}
-							}
+						if(!now.contains(v.getLocale().trim().replace("-", "_").toUpperCase()+"|"+v.getNewRefKey().trim().toUpperCase()))
+						{
+							missing.add(v.getLocale()+" "+v.getNewRefKey());
 						}
-					};
-
-					Thread th = new Thread(runn, threadId);
-					th.start();
-
-					threadId = null;
-
+					}
+					if(!missing.isEmpty())
+					{
+						logger.info("scheduleAutomation :: Only Facelift refused - new VIN categories not in Kapture :: > "+missing);
+						sessionBean.setErrorMessage(msgProps().getMessage(new String[] { String.valueOf(missing.size()),
+								String.join(" / ", missing).replace(",", " ") }, "error.facelift.only.new.vin.missing"));
+						return;
+					}
 				}
-				else
-				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.ipm.facelift.vin.update.conversion"));
-				}
-				schDetails = null;
-				itemsList = null;
 			}
+
+			schDetails= ScheduleDAO.createAutomationSchedule(schDetails);
+			if(null==schDetails || schDetails.getScheduleId()<=0)
+			{
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.ipm.facelift.vin.update.conversion"));
+				return;
+			}
+			// what the job loads - read by the job itself (ScheduleDAO.isMasterDataWithContent)
+			ScheduleDAO.saveScheduleLoadType(Long.valueOf(schDetails.getScheduleId()), loadType);
+			sessionBean.setScheduleATName(schDetails.getScheduleName());
+			sessionBean.setSuccessMessage(msgProps().addMessage("conversion.schedule.success", schDetails.getScheduleName()));
+
+			String threadId = schDetails.getThreadId();
+			final ScheduleDetails scheduleDetails = schDetails;
+			final StartAutomationProcessingImpl startAutoImpl = new StartAutomationProcessingImpl();
+			final ArrayList<ExcelRowDetails> inputDataList = uniqueVinsInputList;
+			// captured here - the job thread has no request
+			final String settingsPath = serverPath();
+			Runnable runn = new Runnable()
+			{
+				@Override
+				public void run() {
+
+					synchronized (startAutoImpl) {
+						try {
+							startAutoImpl.startAutomation(scheduleDetails, inputDataList, settingsPath);
+						} catch (Exception e) {
+							Utilities.printStackTraceToLogs(Schedule.class.getName(), "run()", e);
+						}
+					}
+				}
+			};
+			Thread th = new Thread(runn, threadId);
+			th.start();
 		}
 		catch(Exception  e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "scheduleAutomation()", e);
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
+
 
 	private void identifyImpactedDocumentsDataForSchedule(ScheduleBean sessionBean)
 	{
@@ -6611,7 +6347,7 @@ public class Schedule extends HttpServlet {
 				ScheduleDetails schDetails = new ScheduleDetails();
 				schDetails.setScheduleName(ApplicationProperties.getProperty("automation.identification.sch.key")+DateFormatter.parseDateToString_YYYY_MM_DD(new Date())+"_");
 				schDetails.setThreadId(ApplicationProperties.getProperty("automation.identification.sch.key"));
-				schDetails.setUserId(wslId);
+				schDetails.setUserId(wslId());
 				schDetails.setScheduleStatus(ApplicationProperties.getProperty("schedule.status.pending.value"));
 				/*
 				 * call function to store data
@@ -6620,7 +6356,7 @@ public class Schedule extends HttpServlet {
 				if(null!=scheduleId && scheduleId>0)
 				{
 					sessionBean.setScheduleName(schDetails.getScheduleName());
-					String message = msgProps.addMessage("conversion.schedule.success", schDetails.getScheduleName());
+					String message = msgProps().addMessage("conversion.schedule.success", schDetails.getScheduleName());
 					sessionBean.setSuccessMessage(message);
 					message= null;
 					/*
@@ -6660,7 +6396,7 @@ public class Schedule extends HttpServlet {
 				}
 				else
 				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.schedule.conversion"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.schedule.conversion"));
 				}
 				scheduleId = null;
 				schDetails = null;
@@ -6668,13 +6404,13 @@ public class Schedule extends HttpServlet {
 			else
 			{
 				logger.info("identifyImpactedDocumentsData :: Input Data List is null. Failed to read Excel File or Not data found in the uploaded Excel for Processing.");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "identifyImpactedDocumentsData()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 
@@ -6726,164 +6462,29 @@ public class Schedule extends HttpServlet {
 								// showCheckBox = false;
 								itemDetails.setShowCheckBox(false);
 								// set remarks
-								itemDetails.setRemarks(msgProps.getProperty("label.document.noupdate.info"));
+								itemDetails.setRemarks(msgProps().getProperty("label.document.noupdate.info"));
 							}
 						}
 					}
+				}
+				// an update job takes its items out of the identification job (legacy) - say so instead of a blank page
+				if(null==sessionBean.getAutomationItemsList() || sessionBean.getAutomationItemsList().isEmpty())
+				{
+					logger.info("viewImpactedDocumentsDetails :: no item left to schedule for identification job {"+sessionBean.getJobIdForATOperation()+"}.");
+					sessionBean.setShowAutomationGridBlock(false);
+					sessionBean.setErrorMessage(msgProps().getProperty("error.facelift.view.no.items"));
 				}
 			}
 			else
 			{
 				logger.info("viewImpactedDocumentsDetails :: Schedule Id from request as param are null. Throw Message");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(Schedule.class.getName(), "viewImpactedDocumentsDetails()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
-		}
-	}
-	
-	
-	
-	private void identifyImpactedDocumentsData(ScheduleBean sessionBean)
-	{
-		try
-		{
-			if(null!=sessionBean.getInputDataList() && sessionBean.getInputDataList().size()>0)
-			{
-				sessionBean.setShowAutomationGridBlock(true);
-				//PROCEED FOR IDENTIFYING IMPACTED DOCUMENT DETAILS
-				sessionBean.setAutomationItemsList(AutomationUtils.identifyImpactedDocumentsListModelWise(sessionBean.getInputDataList()));
-
-				// remove Items with docsCount 0
-				if(null!=sessionBean.getAutomationItemsList() && sessionBean.getAutomationItemsList().size()>0)
-				{
-					ItemDetails itemDetails = new ItemDetails();
-					for(int a=0;a<sessionBean.getAutomationItemsList().size();a++)
-					{
-						itemDetails = (ItemDetails)sessionBean.getAutomationItemsList().get(a);
-						logger.info("----- getCarlineInfo>"+ itemDetails.getCarlineInfo());
-						logger.info("----- getChannelLabel>"+ itemDetails.getChannelLabel());
-						logger.info("----- getChannelRefKey>"+ itemDetails.getChannelRefKey());
-						logger.info("----- getDisplayCarlineInfo>"+ itemDetails.getDisplayCarlineInfo());
-						logger.info("----- getDocumentTypeLabel>"+ itemDetails.getDocumentTypeLabel());
-						logger.info("----- getDocumentTypeRefKey>"+ itemDetails.getDocumentTypeRefKey());
-						logger.info("----- getItemId>"+ itemDetails.getItemId());
-						logger.info("----- getLocale>"+ itemDetails.getLocale());
-						logger.info("----- getRemarks>"+ itemDetails.getRemarks());
-						logger.info("----- getSrNo>"+ itemDetails.getSrNo());
-						if(null!=itemDetails.getApplicableVINList())
-						{
-							logger.info("----- getApplicableVINList: Size>"+ itemDetails.getApplicableVINList().size());
-							ExcelRowDetails disp = null;
-							for(int rt=0;rt<itemDetails.getApplicableVINList().size();rt++)
-							{
-								disp = (ExcelRowDetails) itemDetails.getApplicableVINList().get(rt);
-								logger.info("----- excelData AppVin getRowNo :: >"+ disp.getRowNo());
-								logger.info("----- excelData AppVin getNewCarlineCode :: >"+ disp.getNewCarlineCode());
-								logger.info("----- excelData AppVin getNewModelName :: >"+ disp.getNewModelName());
-								logger.info("----- excelData AppVin getNewModelNameEngForMC :: >"+ disp.getNewModelNameEngForMC());
-								logger.info("----- excelData AppVin getNewModelNameRegForMNAOMME :: >"+ disp.getNewModelNameRegForMNAOMME());
-								logger.info("----- excelData AppVin getNewRefKey :: >"+ disp.getNewRefKey());
-								logger.info("----- excelData AppVin getNewVdsCode :: >"+ disp.getNewVdsCode());
-								logger.info("----- excelData AppVin getNewVisEndRange :: >"+ disp.getNewVisEndRange());
-								logger.info("----- excelData AppVin getNewVisStartRange :: >"+ disp.getNewVisStartRange());
-								logger.info("----- excelData AppVin getNewWmiCode :: >"+ disp.getNewWmiCode());
-								
-								logger.info("----- excelData AppVin getOldCarlineCode :: >"+ disp.getOldCarlineCode());
-								logger.info("----- excelData AppVin getOldModelName :: >"+ disp.getOldModelName());
-								logger.info("----- excelData AppVin getOldModelNameEngForMC :: >"+ disp.getOldModelNameEngForMC());
-								logger.info("----- excelData AppVin getOldModelNameRegForMNAOMME :: >"+ disp.getOldModelNameRegForMNAOMME());
-								logger.info("----- excelData AppVin getOldRefKey :: >"+ disp.getOldRefKey());
-								logger.info("----- excelData AppVin getOldVdsCode :: >"+ disp.getOldVdsCode());
-								logger.info("----- excelData AppVin getOldVisEndRange :: >"+ disp.getOldVisEndRange());
-								logger.info("----- excelData AppVin getOldVisStartRange :: >"+ disp.getOldVisStartRange());
-								logger.info("----- excelData AppVin getOldWmiCode :: >"+ disp.getOldWmiCode());
-								logger.info("----- excelData AppVin getProcessingStatus :: >"+ disp.getProcessingStatus());
-								logger.info("----- excelData AppVin getRemarks :: >"+ disp.getRemarks());
-								logger.info("----- excelData AppVin isLocaleExistsInIM :: >"+ disp.isLocaleExistsInIM());
-								logger.info("----- excelData AppVin isLocaleExistsInMDM :: >"+ disp.isLocaleExistsInMDM());
-								logger.info("----- excelData AppVin isNewVinExistsinIM :: >"+ disp.isNewVinExistsinIM());
-								logger.info("----- excelData AppVin isNewVinExistsinMDM :: >"+ disp.isNewVinExistsinMDM());
-								logger.info("----- excelData AppVin isOldVinExistsinIM :: >"+ disp.isOldVinExistsinIM());
-								logger.info("----- excelData AppVin isOldVinExistsinMDM :: >"+ disp.isOldVinExistsinMDM());
-								if(null!=disp.getNewDetails())
-								{
-									logger.info("----- excelData AppVin getNewDetails :: >"+ disp.getNewDetails());
-								}
-								if(null!=disp.getOldDetails())
-								{
-									logger.info("----- excelData AppVin getOldDetails :: >"+ disp.getOldDetails());
-								}
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-								
-									
-							}
-									
-							
-						}
-						
-						if(null==itemDetails.getTotalDocumentsCount() || itemDetails.getTotalDocumentsCount()==0)
-						{
-							sessionBean.getAutomationItemsList().remove(a);
-							a--;
-						}
-					}
-
-					if(null!=sessionBean.getAutomationItemsList() && sessionBean.getAutomationItemsList().size()>0)
-					{
-						// reset srNo
-						itemDetails = new ItemDetails();
-						for(int a=0;a<sessionBean.getAutomationItemsList().size();a++)
-						{
-							itemDetails = (ItemDetails)sessionBean.getAutomationItemsList().get(a);
-							// UPDATE SR NO
-							itemDetails.setSrNo(a+1);
-							itemDetails.setDisplayCarlineInfo(itemDetails.getCarlineInfo());
-
-							/*
-							 * SET REMAKRS FOR SI, ACC, TR, VI
-							 */
-							if(null!=itemDetails.getChannelRefKey() && (itemDetails.getChannelRefKey().equals(AutomationConstants.CHANNEL_REFKEY_ACCESSORIES) || 
-									itemDetails.getChannelRefKey().equals(AutomationConstants.CHANNEL_REFKEY_SERVICE_INFORMATION_TYPE) || 
-									itemDetails.getChannelRefKey().equals(AutomationConstants.CHANNEL_REFKEY_TRAINING) || 
-									itemDetails.getChannelRefKey().equals(AutomationConstants.CHANNEL_REFKEY_VIDEOS) ))
-							{
-								// showCheckBox = false;
-								itemDetails.setShowCheckBox(false);
-								// set remarks
-								itemDetails.setRemarks(msgProps.getProperty("label.document.noupdate.info"));
-							}
-						}
-					}
-				}
-			}
-			else
-			{
-				logger.info("identifyImpactedDocumentsData :: Input Data List is null. Failed to read Excel File or Not data found in the uploaded Excel for Processing.");
-			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(Schedule.class.getName(), "identifyImpactedDocumentsData()", e);
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 }

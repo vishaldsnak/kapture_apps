@@ -4,7 +4,6 @@ import com.mazda.gms3.dmt.utils.PathUtil;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Set;
 
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
@@ -18,9 +17,6 @@ import com.mazda.gms3.dmt.metadataval.utils.MetaDataValidationUtils;
 import com.mazda.gms3.dmt.metadataval.utils.PrintReportsUtil;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
 import com.mazda.gms3.dmt.utils.Utilities;
-import com.mazda.gms3.dmt.vo.LeftMenuFileDetails;
-import com.mazda.gms3.dmt.vo.VINEntFileDetails;
-import com.mazda.gms3.dmt.vo.VinAttributeEntFileDetails;
 
 public class MetaDataValidationScheduleImpl {
 
@@ -171,8 +167,6 @@ public class MetaDataValidationScheduleImpl {
 			mmeLocales=  null;
 		}
 		
-		// call function to stop thread
-		stopActiveThead(scheduleId);
 	}
 	
 	/**
@@ -180,59 +174,22 @@ public class MetaDataValidationScheduleImpl {
 	 * @param scheduleCode
 	 */
 	@SuppressWarnings("deprecation")
-	private void stopActiveThead(String scheduleCode)
-	{
-		try
-		{
-			String threadId=ApplicationProperties.getProperty("metadata.sch.key")+scheduleCode;
-			Set<Thread> threadSet = Thread.getAllStackTraces().keySet();
-			Thread[] threadArray = threadSet.toArray(new Thread[threadSet.size()]);
-			if (null != threadArray && threadArray.length > 0) 
-			{
-				for (int i = 0; i < threadArray.length; i++) 
-				{
-					Thread at = threadArray[i];
-					if (null != at.getName() && !"".equals(at.getName())) {
-						if (at.getName().equals(threadId)) 
-						{
-							try 
-							{
-								if (at.isAlive()) 
-								{
-									logger.info(" ################################### STOPPING THREAD ID :: > " + threadId);
-									com.mazda.gms3.dmt.utils.ThreadAbortUtil.abort(at);
-								}
-							}
-							catch (Exception e) 
-							{
-								Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "stopActiveThead()", e);
-							}
-						}
-					}
-				}
-			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "stopActiveThead()", e);
-		}
-	}
-	
+
 	private void mnaoOperations(String scheduleId, File processingFile, String metaDataType, String locale)
 	{
 		try
 		{
 			if(metaDataType.equals("VIN"))
 			{
-				mnaoVINOperation(scheduleId, processingFile, metaDataType, locale);
+				mmemcVINOperation(scheduleId, processingFile, metaDataType, locale, true);
 			}
-			else if(metaDataType.equals("VINATTRIBUTE"))
+			else if(metaDataType.startsWith("ESICATEGORY"))
 			{
-				vinAttributeOperation(scheduleId, processingFile, metaDataType, locale);
+				esiCategoryOperation(scheduleId, processingFile, metaDataType, locale);
 			}
-			else if(metaDataType.equals("LEFTMENU"))
+			else if(metaDataType.equals("DISPLAYORDER"))
 			{
-				leftMenuOperation(scheduleId, processingFile, locale);
+				displayOrderOperation(scheduleId, processingFile, metaDataType, locale);
 			}
 		}
 		catch(Exception e)
@@ -247,7 +204,7 @@ public class MetaDataValidationScheduleImpl {
 		{
 			if(metaDataType.equals("VIN"))
 			{
-				mmemcVINOperation(scheduleId, processingFile, metaDataType, locale);
+				mmemcVINOperation(scheduleId, processingFile, metaDataType, locale, false);
 			}
 			else if(metaDataType.startsWith("ESICATEGORY"))
 			{
@@ -272,7 +229,7 @@ public class MetaDataValidationScheduleImpl {
 	{
 		if(metaDataType.equals("VIN"))
 		{
-			mmemcVINOperation(scheduleId, processingFile, metaDataType, locale);
+			mmemcVINOperation(scheduleId, processingFile, metaDataType, locale, false);
 		}
 		else if(metaDataType.startsWith("ESICATEGORY"))
 		{
@@ -335,7 +292,7 @@ public class MetaDataValidationScheduleImpl {
 		}
 	}
 
-	private void mmemcVINOperation(String scheduleId, File processingFile, String metaDataType, String locale)
+	private void mmemcVINOperation(String scheduleId, File processingFile, String metaDataType, String locale, boolean mnao)
 	{
 		boolean updateFailureStatus=false;
 		boolean updateSuccessStatus=false;
@@ -348,7 +305,12 @@ public class MetaDataValidationScheduleImpl {
 		try
 		{
 			locale = locale.replace("-", "_");
-			if(ApplicationProperties.getProperty("mc.locales").indexOf(locale)>-1)
+			if(mnao)
+			{
+				// read the MNAO vin.txt (11 fields: ... model, model year, display order file)
+				vinList = MetaDataValidationUtils.readVINTextFileForMNAO(processingFile);
+			}
+			else if(ApplicationProperties.getProperty("mc.locales").indexOf(locale)>-1)
 			{
 				// read VIN File
 				vinList = MetaDataValidationUtils.readVINTextFile(processingFile);
@@ -419,10 +381,10 @@ public class MetaDataValidationScheduleImpl {
 
 				if(proceedFurther==true)
 				{
-					// PROCEED FOR CHECKING VIN EXISTS IN MDM + IM.
+					// PROCEED FOR CHECKING VIN EXISTS IN MDM + KAPTURE.
 					try
 					{
-						vinList = metaDataDAO.checkMCMMEVINStatus(vinList, locale, scheduleId);
+						vinList = mnao ? metaDataDAO.checkMNAOVINStatus(vinList, locale, scheduleId) : metaDataDAO.checkMCMMEVINStatus(vinList, locale, scheduleId);
 						if(null!=vinList && vinList.size()>0)
 						{
 							failureList = new ArrayList<VinDetails>();
@@ -470,7 +432,14 @@ public class MetaDataValidationScheduleImpl {
 							 */
 							if(updateFailureStatus==true)
 							{
-								printReportsUtil.printMCMMEVinReport(scheduleId, failureList, locale);
+								if(mnao)
+								{
+									printReportsUtil.printMNAOVinReport(scheduleId, failureList, locale);
+								}
+								else
+								{
+									printReportsUtil.printMCMMEVinReport(scheduleId, failureList, locale);
+								}
 								/*
 								 * call function to generate Zip
 								 * no need of generating zip, simply update the text file path
@@ -482,7 +451,7 @@ public class MetaDataValidationScheduleImpl {
 						{
 							// update scheduleStatus to failure
 							updateFailureStatus=true;
-							schdeuleRemarks="Failed to identify VINs in MDM & IM. List is returned as null.";
+							schdeuleRemarks="Failed to identify VINs in MDM & Kapture. List is returned as null.";
 						}
 					}
 					catch (Exception e1) 
@@ -490,7 +459,7 @@ public class MetaDataValidationScheduleImpl {
 						Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mmemcVINOperation()", e1);
 						// update failureStatus
 						updateFailureStatus=true;
-						schdeuleRemarks="Failed to identify VINs in MDM & IM. Exception while performing operation ->"+ e1.getMessage()+".";
+						schdeuleRemarks="Failed to identify VINs in MDM & Kapture. Exception while performing operation ->"+ e1.getMessage()+".";
 					}
 				}
 			}
@@ -653,7 +622,6 @@ public class MetaDataValidationScheduleImpl {
 								updateFailureStatus=true;
 							}
 
-
 							/*
 							 * call function to PRINT REPORTS
 							 * do this only when scheduleStatus is failure
@@ -673,7 +641,7 @@ public class MetaDataValidationScheduleImpl {
 						{
 							// update scheduleStatus to failure
 							updateFailureStatus=true;
-							schdeuleRemarks="Failed to identify Display Orders in MDM & IM. List is returned as null";
+							schdeuleRemarks="Failed to identify Display Orders in MDM & Kapture. List is returned as null";
 						}
 					}
 					catch (Exception e1) 
@@ -681,7 +649,7 @@ public class MetaDataValidationScheduleImpl {
 						Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "displayOrderOperation()", e1);
 						// update failureStatus
 						updateFailureStatus=true;
-						schdeuleRemarks="Failed to identify Display Orders in MDM & IM. Exception while performing operation ->"+ e1.getMessage()+".";
+						schdeuleRemarks="Failed to identify Display Orders in MDM & Kapture. Exception while performing operation ->"+ e1.getMessage()+".";
 					}
 				}
 			}
@@ -841,7 +809,6 @@ public class MetaDataValidationScheduleImpl {
 								// update scheduleStatus to failure
 								updateFailureStatus=true;
 							}
-
 
 							/*
 							 * call function to PRINT REPORTS
@@ -1101,520 +1068,6 @@ public class MetaDataValidationScheduleImpl {
 			catch (Exception e1) 
 			{
 				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "esiCategoryOperation()", e1);
-			}
-		}
-		updateFailureStatus = false;
-		updateSuccessStatus = false;
-		schdeuleRemarks=  null;
-	}
-
-	private void leftMenuOperation(String scheduleId, File processingFile, String locale)
-	{
-		boolean updateFailureStatus=false;
-		boolean updateSuccessStatus=false;
-		String schdeuleRemarks=null;
-
-		ArrayList<LeftMenuFileDetails> leftMenuList=new ArrayList<LeftMenuFileDetails>();
-		ArrayList<LeftMenuFileDetails> failureList = new ArrayList<LeftMenuFileDetails>();
-		boolean proceedFurther=true;
-		try
-		{
-			// read LEFT MENU TEXT File
-			leftMenuList = MetaDataValidationUtils.readLeftMenuTextFile(processingFile);
-		}
-		catch(Exception e)
-		{
-			leftMenuList=null;
-			Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "leftMenuOperation()", e);
-			proceedFurther=false;
-			// update failureStatus
-			updateFailureStatus=true;
-			schdeuleRemarks="Failed to read data for LeftMenu Data from MetaData Processing File. Exception while reading File ->"+ e.getMessage()+".";
-		}
-
-		// proceedFurther is true
-		if(proceedFurther==true)
-		{
-			if(null!=leftMenuList && leftMenuList.size()>0)
-			{
-				// UPDATE TOTAL & FAILURE COUNT(FOR INVALID LINES ALL TOGETHER)
-				LeftMenuFileDetails details = null;
-				int totalCount = leftMenuList.size();
-				int failureCount=0;
-
-				// update failureCount & totalCount
-				proceedFurther=true;
-				try
-				{
-					metaDataDAO.updateScheduleTotalAndFailureCount(scheduleId, totalCount, failureCount);
-				}
-				catch (Exception e1) 
-				{
-					Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "leftMenuOperation()", e1);
-					proceedFurther=false;
-					// update failureStatus
-					updateFailureStatus=true;
-					schdeuleRemarks="Failed to update Total Lines count for the MetaData Processing File. Exception while updating ->"+e1.getMessage();
-				}
-
-				if(proceedFurther==true)
-				{
-					/*
-					 *  PROCEED FOR CHECKING NAMES FOR EACH ESI CATEGORY CODE AVAILABLE
-					 */
-					try
-					{
-						leftMenuList = metaDataDAO.checkLeftMenuStatus(leftMenuList, locale, scheduleId);
-						if(null!=leftMenuList && leftMenuList.size()>0)
-						{
-							failureList = new ArrayList<LeftMenuFileDetails>();
-							/*
-							 * iterate and check for all if PROCESSING STATUS AS SUCCESS
-							 * IF any FAILURE STATUS FOUND - Fail Schedule
-							 */
-							boolean schSuccess=true;
-							for(int a=0;a<leftMenuList.size();a++)
-							{
-								details = (LeftMenuFileDetails)leftMenuList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									schSuccess = false;
-									break;
-								}
-							}
-							
-							for(int a=0;a<leftMenuList.size();a++)
-							{
-								details = (LeftMenuFileDetails)leftMenuList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									failureList.add(details);
-								}
-								details=null;
-							}
-							details=null;
-
-							if(schSuccess==true)
-							{
-								// update scheduleStatus to success
-								updateSuccessStatus = true;
-							}
-							else
-							{
-								// update scheduleStatus to failure
-								updateFailureStatus=true;
-							}
-
-							/*
-							 * call function to PRINT REPORTS
-							 * do this only when scheduleStatus is failure
-							 * and only for failed records in a text file with delimiter as ||
-							 */
-							if(updateFailureStatus==true)
-							{
-								printReportsUtil.printLeftMenuReport(scheduleId, failureList, locale);
-								/*
-								 * call function to generate Zip
-								 * no need of generating zip, simply update the text file path
-								 */
-								generateZIPForReports(scheduleId);
-							}
-						}
-					}
-					catch (Exception e1) 
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "leftMenuOperation()", e1);
-						// update failureStatus
-						updateFailureStatus=true;
-						schdeuleRemarks="Failed to identify Left Menu Data in MDM. Exception while performing operation ->"+ e1.getMessage()+".";
-					}
-				}
-			}
-			else
-			{
-				logger.info("leftMenuOperation :: No Data read for Left Menu from Processing File {"+processingFile.getName()+"}.");
-				// update failureStatus
-				updateFailureStatus=true;
-				schdeuleRemarks="No Data read for Left Menu from MetaData Processing File.";	
-			}
-		}
-		leftMenuList=null;
-		failureList=null;
-
-		if(updateFailureStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Failure - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_FAILURE, schdeuleRemarks);
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "leftMenuOperation()", e1);
-			}
-		}
-		
-		if(updateSuccessStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Success - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_SUCCESS, "");
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "leftMenuOperation()", e1);
-			}
-		}
-		updateFailureStatus = false;
-		updateSuccessStatus = false;
-		schdeuleRemarks=  null;
-	}
-	
-	private void mnaoVINOperation(String scheduleId, File processingFile, String metaDataType, String locale)
-	{
-		boolean updateFailureStatus=false;
-		boolean updateSuccessStatus=false;
-		String schdeuleRemarks=null;
-
-		ArrayList<VINEntFileDetails> vinList=new ArrayList<VINEntFileDetails>();
-		ArrayList<VINEntFileDetails> failureList=new ArrayList<VINEntFileDetails>();
-		boolean proceedFurther=true;
-		VINEntFileDetails details = null;
-		try
-		{
-			// read VIN File
-			vinList = MetaDataValidationUtils.readVINENTFile(processingFile);
-		}
-		catch(Exception e)
-		{
-			vinList=null;
-			Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mnaoVINOperation()", e);
-			proceedFurther=false;
-			// update failureStatus
-			updateFailureStatus=true;
-			schdeuleRemarks="Failed to read data for VIN from MetaData Processing File. Exception while reading File ->"+ e.getMessage()+".";
-		}
-		
-		// proceedFurther is true
-		if(proceedFurther==true)
-		{
-			if(null!=vinList && vinList.size()>0)
-			{
-				// UPDATE TOTAL & FAILURE COUNT(FOR INVALID LINES ALL TOGETHER)
-				int totalCount = vinList.size();
-				int failureCount=0;
-
-				// update failureCount & totalCount
-				proceedFurther=true;
-				try
-				{
-					metaDataDAO.updateScheduleTotalAndFailureCount(scheduleId, totalCount, failureCount);
-				}
-				catch (Exception e1) 
-				{
-					Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mnaoVINOperation()", e1);
-					proceedFurther=false;
-					// update failureStatus
-					updateFailureStatus=true;
-					schdeuleRemarks="Failed to update Total Lines count for the MetaData Processing File. Exception while updating ->"+e1.getMessage();
-				}
-
-				if(proceedFurther==true)
-				{
-					// PROCEED FOR CHECKING VIN EXISTS IN MDM + IM.
-					try
-					{
-						vinList = metaDataDAO.checkMNAOVINStatus(vinList, locale, scheduleId);
-						if(null!=vinList && vinList.size()>0)
-						{
-							failureList = new ArrayList<VINEntFileDetails>();
-							/*
-							 * iterate and check for all if PROCESSING STATUS AS SUCCESS
-							 * IF any FAILURE STATUS FOUND - Fail Schedule
-							 */
-							boolean schSuccess=true;
-							for(int a=0;a<vinList.size();a++)
-							{
-								details = (VINEntFileDetails)vinList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									schSuccess = false;
-									break;
-								}
-							}
-							
-							for(int a=0;a<vinList.size();a++)
-							{
-								details = (VINEntFileDetails)vinList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									failureList.add(details);
-								}
-								details=null;
-							}
-							details=null;
-							
-							if(schSuccess==true)
-							{
-								// update scheduleStatus to success
-								updateSuccessStatus = true;
-							}
-							else
-							{
-								// update scheduleStatus to failure
-								updateFailureStatus=true;
-							}
-
-							/*
-							 * call function to PRINT REPORTS
-							 * do this only when scheduleStatus is failure
-							 * and only for failed records in a text file with delimiter as ||
-							 */
-							if(updateFailureStatus==true)
-							{
-								printReportsUtil.printMNAOVinReport(scheduleId, failureList, locale);
-								/*
-								 * call function to generate Zip
-								 * no need of generating zip, simply update the text file path
-								 */
-								generateZIPForReports(scheduleId);
-							}
-						}
-						else
-						{
-							// update scheduleStatus to failure
-							updateFailureStatus=true;
-							schdeuleRemarks="Failed to identify VINs in MDM & IM. List is returned as null.";
-						}
-					}
-					catch (Exception e1) 
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mnaoVINOperation()", e1);
-						// update failureStatus
-						updateFailureStatus=true;
-						schdeuleRemarks="Failed to identify VINs in MDM & IM. Exception while performing operation ->"+ e1.getMessage()+".";
-					}
-				}
-			}
-			else
-			{
-				logger.info("mnaoVINOperation :: No Data read for VIN from Processing File {"+processingFile.getName()+"}.");
-				// update failureStatus
-				updateFailureStatus=true;
-				schdeuleRemarks="No Data read for VIN from MetaData Processing File.";	
-			}
-		}
-		vinList=null;
-		failureList = null;
-
-		if(updateFailureStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Failure - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_FAILURE, schdeuleRemarks);
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mnaoVINOperation()", e1);
-			}
-		}
-		
-		if(updateSuccessStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Success - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_SUCCESS, "");
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "mnaoVINOperation()", e1);
-			}
-		}
-		
-		updateFailureStatus = false;
-		updateSuccessStatus = false;
-		schdeuleRemarks=  null;
-	}
-
-	private void vinAttributeOperation(String scheduleId, File processingFile, String metaDataType, String locale)
-	{
-		boolean updateFailureStatus=false;
-		boolean updateSuccessStatus=false;
-		String schdeuleRemarks=null;
-
-		ArrayList<VinAttributeEntFileDetails> vinAttributeList=new ArrayList<VinAttributeEntFileDetails>();
-		ArrayList<VinAttributeEntFileDetails> failureList=new ArrayList<VinAttributeEntFileDetails>();
-		boolean proceedFurther=true;
-		try
-		{
-			// read VIN ATTRIBUTE END File
-			vinAttributeList = MetaDataValidationUtils.readVINAttributeENTFile(processingFile);
-		}
-		catch(Exception e)
-		{
-			vinAttributeList=null;
-			Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "vinAttributeOperation()", e);
-			proceedFurther=false;
-			// update failureStatus
-			updateFailureStatus=true;
-			schdeuleRemarks="Failed to read data for VIN Attribute from MetaData Processing File. Exception while reading File ->"+ e.getMessage()+".";
-		}
-
-		// proceedFurther is true
-		if(proceedFurther==true)
-		{
-			if(null!=vinAttributeList && vinAttributeList.size()>0)
-			{
-				// UPDATE TOTAL & FAILURE COUNT(FOR INVALID LINES ALL TOGETHER)
-				VinAttributeEntFileDetails details = null;
-				int totalCount = vinAttributeList.size();
-				int failureCount=0;
-
-				// update failureCount & totalCount
-				proceedFurther=true;
-				try
-				{
-					metaDataDAO.updateScheduleTotalAndFailureCount(scheduleId, totalCount, failureCount);
-				}
-				catch (Exception e1) 
-				{
-					Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "vinAttributeOperation()", e1);
-					proceedFurther=false;
-					// update failureStatus
-					updateFailureStatus=true;
-					schdeuleRemarks="Failed to update Total Lines count for the MetaData Processing File. Exception while updating ->"+e1.getMessage();
-				}
-
-				if(proceedFurther==true)
-				{
-					/*
-					 *  PROCEED FOR CHECKING CATEGORIES FROM VIN ATTRIBUTE - ENIGNE TYPE, MISSION TYPE, BODY TYPE, AXLE TYPE
-					 *  IN MDM & IM
-					 */
-					try
-					{
-						vinAttributeList = metaDataDAO.checkVINAttributeStatus(vinAttributeList, locale, scheduleId);
-						if(null!=vinAttributeList && vinAttributeList.size()>0)
-						{
-							failureList = new ArrayList<VinAttributeEntFileDetails>();
-							/*
-							 * iterate and check for all if PROCESSING STATUS AS SUCCESS
-							 * IF any FAILURE STATUS FOUND - Fail Schedule
-							 */
-							boolean schSuccess=true;
-							for(int a=0;a<vinAttributeList.size();a++)
-							{
-								details = (VinAttributeEntFileDetails)vinAttributeList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									schSuccess = false;
-									break;
-								}
-							}
-							
-							for(int a=0;a<vinAttributeList.size();a++)
-							{
-								details = (VinAttributeEntFileDetails)vinAttributeList.get(a);
-								if((null==details.getProcessingStatus()) || (null!=details.getProcessingStatus() && details.getProcessingStatus().equals(MetaDataScheduleConstants.STATUS_FAILURE)))
-								{
-									failureList.add(details);
-								}
-								details=null;
-							}
-							details=null;
-
-							if(schSuccess==true)
-							{
-								// update scheduleStatus to success
-								updateSuccessStatus = true;
-							}
-							else
-							{
-								// update scheduleStatus to failure
-								updateFailureStatus=true;
-							}
-
-
-							/*
-							 * call function to PRINT REPORTS
-							 * do this only when scheduleStatus is failure
-							 * and only for failed records in a text file with delimiter as ||
-							 */
-							if(updateFailureStatus==true)
-							{
-								printReportsUtil.printVinAttributeReport(scheduleId, failureList, locale);
-								/*
-								 * call function to generate Zip
-								 * no need of generating zip, simply update the text file path
-								 */
-								generateZIPForReports(scheduleId);
-							}
-						}
-						else
-						{
-							// update scheduleStatus to failure
-							updateFailureStatus=true;
-							schdeuleRemarks="Failed to identify VIN Attributes in MDM & IM. List is returned as null";
-						}
-					}
-					catch (Exception e1) 
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "vinAttributeOperation()", e1);
-						// update failureStatus
-						updateFailureStatus=true;
-						schdeuleRemarks="Failed to identify VIN Attributes in MDM & IM. Exception while performing operation ->"+ e1.getMessage()+".";
-					}
-				}
-			}
-			else
-			{
-				logger.info("vinAttributeOperation :: No Data read for VIN Attributes from Processing File {"+processingFile.getName()+"}.");
-				// update failureStatus
-				updateFailureStatus=true;
-				schdeuleRemarks="No Data read for VIN Attributes from MetaData Processing File.";	
-			}
-		}
-		vinAttributeList=null;
-		failureList=null;
-
-		if(updateFailureStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Failure - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_FAILURE, schdeuleRemarks);
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "vinAttributeOperation()", e1);
-			}
-		}
-		
-		if(updateSuccessStatus==true)
-		{
-			/*
-			 * update schdeuleStatus to Success - Exit Conversion
-			 */
-			try 
-			{
-				metaDataDAO.updateScheduleStatus(scheduleId, MetaDataScheduleConstants.STATUS_SUCCESS, "");
-			} 
-			catch (Exception e1) 
-			{
-				Utilities.printStackTraceToLogs(MetaDataValidationScheduleImpl.class.getName(), "vinAttributeOperation()", e1);
 			}
 		}
 		updateFailureStatus = false;

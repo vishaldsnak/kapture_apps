@@ -53,6 +53,16 @@ public class ScheduleBean {
 	private boolean showAutomationGridBlock=false;
 	private ArrayList<ExcelRowDetails> inputDataList = new ArrayList<ExcelRowDetails>();
 	private boolean showIdenitfyButton = false;
+	/** IPM Facelift VIN Update: the Excel files of the facelift folder (empty = none / no folder - a message is shown) */
+	private List<String> faceliftFileNames = new ArrayList<String>();
+	/** IPM Facelift VIN Update: what the update job loads - ScheduleDAO.LOAD_TYPE_MASTER_DATA_WITH_CONTENT / LOAD_TYPE_ONLY_CONTENT */
+	private String atLoadTypeId=null;
+	/** Conversion "Go": the user confirmed the IPM Facelift VIN Update was run for the facelift folder (this request only) */
+	private boolean faceliftRunConfirmed = false;
+	/** Conversion "Go": facelift Excel files found and not yet confirmed - the page asks before the records are listed */
+	private boolean faceliftConfirmPending = false;
+	/** IPM Facelift: View listed the items - the page opens at the Select Items grid (this request only) */
+	private boolean scrollToSelectItems = false;
 	
 	
 	private String toDate=null;
@@ -486,5 +496,35 @@ public class ScheduleBean {
 
 	public void setLoadTypeId(String loadTypeId) {
 		this.loadTypeId = loadTypeId;
+	}
+	public List<String> getFaceliftFileNames() {
+		return faceliftFileNames;
+	}
+	public void setFaceliftFileNames(List<String> faceliftFileNames) {
+		this.faceliftFileNames = faceliftFileNames;
+	}
+	public String getAtLoadTypeId() {
+		return atLoadTypeId;
+	}
+	public void setAtLoadTypeId(String atLoadTypeId) {
+		this.atLoadTypeId = atLoadTypeId;
+	}
+	public boolean isFaceliftRunConfirmed() {
+		return faceliftRunConfirmed;
+	}
+	public void setFaceliftRunConfirmed(boolean faceliftRunConfirmed) {
+		this.faceliftRunConfirmed = faceliftRunConfirmed;
+	}
+	public boolean isFaceliftConfirmPending() {
+		return faceliftConfirmPending;
+	}
+	public void setFaceliftConfirmPending(boolean faceliftConfirmPending) {
+		this.faceliftConfirmPending = faceliftConfirmPending;
+	}
+	public boolean isScrollToSelectItems() {
+		return scrollToSelectItems;
+	}
+	public void setScrollToSelectItems(boolean scrollToSelectItems) {
+		this.scrollToSelectItems = scrollToSelectItems;
 	}
 }

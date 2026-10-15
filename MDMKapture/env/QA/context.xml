@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ENVIRONMENT: QA (MC QA). build.bat QA packages this file as META-INF/context.xml. Values: Environment_Config/Kapture_Environment_Config.xlsx. -->
+<!--
+  Application-SCOPED JNDI resources for MDM.
+
+  This file ships inside the application (WebContent/META-INF/context.xml -> the WAR's
+  META-INF/context.xml), so the DataSource below is visible ONLY to this application.
+  Tomcat's server.xml is NOT touched and no other application deployed on the same
+  Tomcat is affected.
+
+  DBConnectionHelper.getConnection() looks these names up through
+  java:comp/env/<jdbc.datasource> - the same code path used on the VDI / production
+  servers, so local and server behaviour match exactly.
+
+  Per environment only the url/username/password below change.
+-->
+<Context>
+
+	<!-- Main MDM / conversion schema -->
+	<Resource name="jdbc/conv_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://oclut0147:6450/kapture_dc?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;useServerPrepStmts=false&amp;rewriteBatchedStatements=true&amp;characterEncoding=UTF-8&amp;serverTimezone=Asia/Tokyo"
+		username="kapture_dc_dl"
+		password="kapture_dc_dl$#2026"
+		initialSize="2"
+		maxTotal="20"
+		maxIdle="5"
+		minIdle="2"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="true"
+		removeAbandonedOnBorrow="true"
+		removeAbandonedTimeout="300"
+		defaultAutoCommit="true" />
+
+	<!--
+	  KAPTURE CMS schema (kapture_cms_db) - the replacement for the Oracle OK_IM schema,
+	  referenced by jdbc.cms.datasource and read through DBConnectionHelper.getCMSConnection().
+
+	  This is a SEPARATE resource rather than a cross-database reference on
+	  jdbc/conv_datasource because the two schemas are NOT always co-located: on the VDI
+	  server both live on the same MySQL instance, but on a developer workstation
+	  kapture_dc is local while kapture_cms_db is the shared AWS-hosted server. Where they
+	  ARE co-located, simply point this resource at the same url as conv_datasource above.
+
+	  All CMS tables are referenced fully qualified (kapture_cms_db.<table>), so the
+	  database named in the url below is only the connection default.
+	-->
+	<Resource name="jdbc/cms_datasource"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://oclut0147:6450/kapture_cms_db?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;useServerPrepStmts=false&amp;rewriteBatchedStatements=true&amp;characterEncoding=UTF-8&amp;serverTimezone=Asia/Tokyo"
+		username="kapture_dc_dl"
+		password="kapture_dc_dl$#2026"
+		initialSize="1"
+		maxTotal="10"
+		maxIdle="3"
+		minIdle="1"
+		maxWaitMillis="10000"
+		validationQuery="SELECT 1"
+		testOnBorrow="true"
+		removeAbandonedOnBorrow="true"
+		removeAbandonedTimeout="300"
+		defaultAutoCommit="true" />
+
+	<!--
+	  THERE IS NO THIRD DATASOURCE. A commented-out jdbc/im_datasource pointing at the
+	  InfoManager schema (kapture_im) used to sit here, kept "in case an InfoManager-backed
+	  screen needs it". InfoManager was removed from MDM entirely, so nothing can need it -
+	  the schema does not exist on the migrated servers and no code reads the property.
+	  Do not reinstate it.
+	-->
+
+</Context>

@@ -110,6 +110,7 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
            
             
             <input type="hidden" name="DMT_SCH_ActionClicked" id="DMT_SCH_ActionClicked" value="">
+            <input type="hidden" name="DMT_SCH_FaceliftConfirmed" id="DMT_SCH_FaceliftConfirmed" value="">
              <input type="hidden" name="DMT_SCH_SelectedLocales" id="DMT_SCH_SelectedLocales" value="<c:out value="${scheduleBean.selectedLocalesString }"/>">
               <input type="hidden" name="DMT_SCH_SelectedModels" id="DMT_SCH_SelectedModels" value="<c:out value="${scheduleBean.selectedModelsString }"/>">
                <input type="hidden" name="DMT_SCH_SelectedManualTypes" id="DMT_SCH_SelectedManualTypes" value="<c:out value="${scheduleBean.selectedManualTypesString }"/>">
@@ -196,24 +197,32 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 								<table width="100%" cellspacing="1" cellpadding="3" >	
 									<tr>
 										<td>
-											<h3><fmt:message key="label.upload" /> <fmt:message key="label.vinmapping" /></h3>
+											<h3><fmt:message key="label.facelift.folder.title" /></h3>
 											<br />
 										</td>
 									</tr>
 									<tr>
 										<td>
 											<table width="100%" border="0" cellspacing="0" cellpadding="0" class="inputTable">
+												<%-- every Excel of the facelift folder is read; none = a message instead of the button --%>
 												<tr>
 													<td>
 														<div class="formElement_row leftpadding_none" style="margin: 0px !important;">
-															<label style="width: 250px;"><fmt:message key="label.upload" /> <fmt:message key="label.vinmapping"/> <fmt:message key="label.excel"/> <span class="mandatory">*</span></label> 
-															<input id="uploadFile" class="fileInput" style="width:300px !important;" placeholder="<fmt:message key="label.choose.file"/>" disabled="disabled" />
-															<div class="fileUpload btn">
-																<span><fmt:message key="label.browse"/></span>
-																<input id="DMT_SCHAT_File" name="DMT_SCHAT_File" type="file" class="upload" />
-															</div>
-															<button style="margin-left:25px;padding:6px 10px;float: left;" type="button" onclick="dmt_schat_file_upload();" id="DST_SCHAT_Upload" name="DMT_SCHAT_Upload" 
-															class="bluebutton cursorPointer"><i class="uploadIcon"></i><fmt:message key="label.validatedata"/></button>
+															<c:choose>
+																<c:when test="${!empty scheduleBean.faceliftFileNames}">
+																	<label style="width: 250px;"><fmt:message key="label.facelift.files"/></label>
+																	<span id="DMT_SCHAT_FaceliftFiles" style="float: left; padding-top: 6px; max-width: 600px;">
+																		<c:forEach var="faceliftFile" items="${scheduleBean.faceliftFileNames}" varStatus="faceliftStatus">
+																			<c:out value="${faceliftFile}"/><c:if test="${!faceliftStatus.last}">, </c:if>
+																		</c:forEach>
+																	</span>
+																	<button style="margin-left:25px;padding:6px 10px;float: left;" type="button" onclick="dmt_schat_validate_folder();" id="DMT_SCHAT_Validate" name="DMT_SCHAT_Validate"
+																	class="bluebutton cursorPointer"><i class="uploadIcon"></i><fmt:message key="label.validatedata"/></button>
+																</c:when>
+																<c:otherwise>
+																	<label id="DMT_SCHAT_NoFaceliftExcel" style="width: auto;"><span class="mandatory"><fmt:message key="label.facelift.no.excel"/></span></label>
+																</c:otherwise>
+															</c:choose>
 															<div class="cb"></div>
 														</div>
 													</td>
@@ -347,7 +356,7 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 								<c:if test="${scheduleBean.showAutomationGridBlock eq true}">
 									<c:if test="${!empty scheduleBean.automationItemsList }">	
 									<p style="height: 5px;">&nbsp;</p>
-									<h4>
+									<h4 id="DMT_SCHAT_SelectItems">
 										<fmt:message key="label.select" /> <fmt:message key="label.items" />
 									</h4>
 									<br />
@@ -725,6 +734,12 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 	</p>
 </div>
 
+<div id="faceliftrun_dialog-confirm" title="<fmt:message key="label.facelift.run.confirm.title"/>" class="hide">
+	<p>
+		<fmt:message key="label.facelift.run.confirm.description"/>
+	</p>
+</div>
+
 <div id="scheduleautomation_dialog-confirm" title="<fmt:message key="label.schedule"/>" class="hide">
 	<p>
 		<fmt:message key="label.scheduleautomationdescription"/>
@@ -746,6 +761,16 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 <script type="text/javascript">
 $(window).load(function() {
 	$("#loader").fadeOut("slow");
+	<c:if test="${scheduleBean.scrollToSelectItems eq true}">
+	// IPM Facelift View: the Select Items grid is below the job list - bring it into view (View only)
+	if($("#DMT_SCHAT_SelectItems").length > 0)
+	{
+		$("html, body").animate({ scrollTop: $("#DMT_SCHAT_SelectItems").offset().top - 20 }, 400);
+	}
+	</c:if>
+	<c:if test="${scheduleBean.faceliftConfirmPending}">
+	dmt_sch_faceliftRunConfirm();
+	</c:if>
 });
 
 //performs Operation Type Change Submit
@@ -798,21 +823,13 @@ function dmt_sch_optype(thisObj)
 
 
 <script type="text/javascript">
-//FILE COMPONENT VALUE SET
-if(null!=document.getElementById("DMT_SCHAT_File"))
-{
-	document.getElementById("DMT_SCHAT_File").onchange = function () {
-    	document.getElementById("uploadFile").value = this.value;
-	};
-}
-
-
-function dmt_schat_file_upload()
+// reads and checks every Excel of the facelift folder
+function dmt_schat_validate_folder()
 {
 	// show Loader
 	$("#loader").show();
 	dmt_schatDocsIden_readDataTableValues();
- 	$("#DMT_SCH_ActionClicked").val("FILE_UPLOAD");
+ 	$("#DMT_SCH_ActionClicked").val("VALIDATE_FACELIFT");
 	$("#DMT_SCH_Form").submit();
 }
 
@@ -1006,6 +1023,17 @@ function dmt_schatDocsIden_readDataTableValues()
 }
 
 var htmlATContent="";
+<%-- IPM Facelift VIN Update: what the update job loads - in the grid toolbar, beside Search --%>
+<c:if test="${!empty scheduleBean.automationItemsList }">
+htmlATContent="<div class=\"separator\"></div>";
+htmlATContent=htmlATContent+"<div class=\"loadtype_box\">";
+htmlATContent=htmlATContent+"<span class=\"loadtype_box_title\"><fmt:message key="label.facelift.loadtype.title"/></span>";
+htmlATContent=htmlATContent+"<input type=\"radio\" name=\"DMT_SCHAT_LoadType\" value=\"MASTER_DATA_WITH_CONTENT\" id=\"DMT_SCHAT_LoadType_MasterData\" <c:if test="${scheduleBean.atLoadTypeId eq 'MASTER_DATA_WITH_CONTENT'}">checked=\"checked\"</c:if>>";
+htmlATContent=htmlATContent+"<label for=\"DMT_SCHAT_LoadType_MasterData\"><fmt:message key="label.facelift.loadtype.masterdata"/></label>";
+htmlATContent=htmlATContent+"<input type=\"radio\" name=\"DMT_SCHAT_LoadType\" value=\"ONLY_CONTENT\" id=\"DMT_SCHAT_LoadType_OnlyFacelift\" <c:if test="${scheduleBean.atLoadTypeId ne 'MASTER_DATA_WITH_CONTENT'}">checked=\"checked\"</c:if>>";
+htmlATContent=htmlATContent+"<label for=\"DMT_SCHAT_LoadType_OnlyFacelift\"><fmt:message key="label.facelift.loadtype.only"/></label>";
+htmlATContent=htmlATContent+"</div>";
+</c:if>
 </script>
 
 <script type="text/javascript">
@@ -1127,7 +1155,7 @@ function loadATDataTable()
         }
     });
 	
-	$("div.toolbar").html(htmlATContent);
+	$("#example_wrapper .top .toolbar").html(htmlATContent);
 	// change pagination text
 	$('.paginate_page').text(page);
 	var pageOfVal=$('.paginate_of:first').text();
@@ -1463,11 +1491,13 @@ var htmlContent="<div class=\"separator\"></div>";
 	<script type="text/javascript">
 		var masterDataChecked="<c:if test="${scheduleBean.loadTypeId eq 'MASTER_DATA_WITH_CONTENT'}">checked=\"checked\"</c:if>";
 		var onlyContentChecked="<c:if test="${scheduleBean.loadTypeId ne 'MASTER_DATA_WITH_CONTENT'}">checked=\"checked\"</c:if>";
-		htmlContent=htmlContent+"<span style=\"margin-left:30px;\"></span>";
+		htmlContent=htmlContent+"<div class=\"loadtype_box\">";
+		htmlContent=htmlContent+"<span class=\"loadtype_box_title\"><fmt:message key="label.facelift.loadtype.title"/></span>";
 		htmlContent=htmlContent+"<input type=\"radio\" name=\"DMT_SCH_LoadType\" value=\"MASTER_DATA_WITH_CONTENT\" id=\"DMT_SCH_LoadType_MasterData\" "+masterDataChecked+">";
-		htmlContent=htmlContent+"<label>Master Data with Content</label>";
+		htmlContent=htmlContent+"<label for=\"DMT_SCH_LoadType_MasterData\">Master Data with Content</label>";
 		htmlContent=htmlContent+"<input type=\"radio\" name=\"DMT_SCH_LoadType\" value=\"ONLY_CONTENT\" id=\"DMT_SCH_LoadType_OnlyContent\" "+onlyContentChecked+">";
-		htmlContent=htmlContent+"<label>Only Content</label>";
+		htmlContent=htmlContent+"<label for=\"DMT_SCH_LoadType_OnlyContent\">Only Content</label>";
+		htmlContent=htmlContent+"</div>";
 	</script>
 </c:if>
 
@@ -1794,6 +1824,33 @@ function dmt_filterRecords()
 		window.scrollTo(0,0);
 		message=null;
 	}	
+}
+
+// facelift Excel files present: the IPM Facelift VIN Update must have run before the conversion
+function dmt_sch_faceliftRunConfirm()
+{
+	$( "#faceliftrun_dialog-confirm" ).removeClass('hide').dialog({
+		  draggable:false,
+		  closeOnEscape: false,
+		  open: function(event, ui) { $(".ui-dialog-titlebar-close", ui.dialog | ui).hide(); },
+	      resizable: false,
+	      width:480,
+	      modal: true,
+	      buttons: {
+	    	  "<fmt:message key="label.yes"/>": function() {
+	    		  $( this ).dialog( "close" );
+	    		  $("#DMT_SCH_FaceliftConfirmed").val("Y");
+	    		  dmt_filterRecords();
+		        }
+		  	,
+		  	"<fmt:message key="label.no"/>": function() {
+	          $( this ).dialog( "close" );
+	        }
+	      }
+	    });
+
+		$("#faceliftrun_dialog-confirm").closest(".ui-dialog").find(".ui-button").eq(1).addClass("bluebutton_dialog"); // first button
+		$("#faceliftrun_dialog-confirm").closest(".ui-dialog").find(".ui-button").eq(2).addClass("gear_button_dialog"); // second button
 }
 
 function dmt_sch_reset()

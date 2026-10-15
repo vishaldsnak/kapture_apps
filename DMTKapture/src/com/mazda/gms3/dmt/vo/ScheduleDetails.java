@@ -70,6 +70,8 @@ public class ScheduleDetails {
 	private String jobStatus=null;
 	private String jobStatusLabel=null;
 	private boolean showViewButton=false;
+	/** IPM Facelift identification job: items not yet taken into an update job (-1 = not known). */
+	private long remainingItemsCount=-1;
 	/** MC job with an offline preview holding at least one unpublished document. */
 	private boolean showPreview=false;
 
@@ -83,6 +85,12 @@ public class ScheduleDetails {
 	
 	public boolean isShowViewButton() {
 		return showViewButton;
+	}
+	public long getRemainingItemsCount() {
+		return remainingItemsCount;
+	}
+	public void setRemainingItemsCount(long remainingItemsCount) {
+		this.remainingItemsCount = remainingItemsCount;
 	}
 	public void setShowViewButton(boolean showViewButton) {
 		this.showViewButton = showViewButton;

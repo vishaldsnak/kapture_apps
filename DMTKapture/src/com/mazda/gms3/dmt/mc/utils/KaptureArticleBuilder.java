@@ -9,6 +9,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mazda.gms3.dmt.conversion.utils.SpecialCharactersUtils;
 import com.mazda.gms3.dmt.kapture.KaptureArticle;
+import com.mazda.gms3.dmt.utils.OkAssetsWeb;
 import com.mazda.gms3.dmt.vo.ContentDetails;
 
 /**
@@ -49,7 +50,30 @@ public class KaptureArticleBuilder {
 		} else {
 			a.fields = serviceManualFields(cd, a.title);
 		}
+		prefixLibraryPaths(a.fields);
 		return a;
+	}
+
+	/**
+	 * Every OKAssets library path DMT sends to Kapture gets the kapture.library.path.context prefix
+	 * (/library/... -> /content/library/...): the path attributes (HTML5_UPLOAD_DIRECTORY,
+	 * DJVU_FILE_LOCATION, OASIS_FILE_LOCATION, OEM_FILE_LOCATION) and the src / href of images, links
+	 * and PDFs inside the HTML attributes. Values read back from Kapture (JsonElement) and attachment
+	 * files are sent as they are. The paths DMT keeps in its own tables are not changed.
+	 */
+	@SuppressWarnings("unchecked")
+	private static void prefixLibraryPaths(Map<String, Object> fields) {
+		if (null == fields) {
+			return;
+		}
+		for (Map.Entry<String, Object> e : fields.entrySet()) {
+			Object v = e.getValue();
+			if (v instanceof String) {
+				e.setValue(OkAssetsWeb.forKapture((String) v));
+			} else if (v instanceof Map) {
+				prefixLibraryPaths((Map<String, Object>) v);
+			}
+		}
 	}
 
 	/**
@@ -173,6 +197,7 @@ public class KaptureArticleBuilder {
 			merged.put("DJVU_FILE_LOCATION", wdFileLocation(cd));
 			merged.put("HTML5_FONT_SELECTION", fontSelection(cd));
 		}
+		prefixLibraryPaths(merged);
 		a.fields = merged;
 		return true;
 	}

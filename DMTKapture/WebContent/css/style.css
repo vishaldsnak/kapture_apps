@@ -536,6 +536,13 @@ p.margin_top{ margin-top:5px; line-height:18px;}
 	
 }
 
+/* Schedule page load type radios (conversion + IPM Facelift) - a highlighted box in the grid toolbar */
+.toolbar .loadtype_box { float: left; margin-top: -4px; padding: 6px 12px; border: 1px solid #D0021B; border-radius: 3px; background: #FFF6F6; }
+.toolbar .loadtype_box .loadtype_box_title { font-family: OpenSans; font-size: 13px; font-weight: bold; color: #1F2D3D; margin-right: 10px; }
+.toolbar .loadtype_box input[type=radio] { width: 15px; height: 15px; margin: 0 4px 0 8px; vertical-align: middle; accent-color: #D0021B; cursor: pointer; }
+.toolbar .loadtype_box label { font-family: OpenSans; font-size: 13px; font-weight: 600; color: #1F2D3D; margin: 0 6px 0 0; vertical-align: middle; cursor: pointer; }
+.toolbar .loadtype_box input[type=radio]:checked + label { color: #D0021B; }
+
 .toolbar input
 {
 	margin-top:2px;

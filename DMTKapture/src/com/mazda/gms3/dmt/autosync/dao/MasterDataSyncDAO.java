@@ -167,6 +167,16 @@ public class MasterDataSyncDAO extends DBConnectionHelper{
 	
 	public ArrayList<AutoSyncScheduleItemDetails> getItemsCountForProcessing(String[] selCats, String market)
 	{
+		return getItemsCountForProcessing(selCats, market, null);
+	}
+
+	/**
+	 * locales = null: every locale of the market's mapping, with its alternate locale (the Master Data Syncing tab).
+	 * locales given (MDM form, e.g. en-US): only those locales, each with ITS OWN rows - what "Master Data with Content"
+	 * of a conversion syncs for its locale (KaptureCategorySync), so a content load is checked against that.
+	 */
+	public ArrayList<AutoSyncScheduleItemDetails> getItemsCountForProcessing(String[] selCats, String market, String[] locales)
+	{
 		ArrayList<AutoSyncScheduleItemDetails> itemsList = null;
 		Connection conn  =null;
 		Statement stmt = null;
@@ -200,6 +210,29 @@ public class MasterDataSyncDAO extends DBConnectionHelper{
 				stmt.close();stmt=null;
 				sql = null;
 				
+				if(null!=locales)
+				{
+					java.util.Set<String> wanted = new java.util.HashSet<String>();
+					for(String l : locales)
+					{
+						if(null!=l && !"".equals(l.trim()))
+						{
+							wanted.add(l.trim().replace("_", "-").toLowerCase());
+						}
+					}
+					List<MarketLocaleMasterDataTypeMapping> own = new ArrayList<MarketLocaleMasterDataTypeMapping>();
+					for(MarketLocaleMasterDataTypeMapping m : localesList)
+					{
+						if(null!=m.getLocale() && wanted.contains(m.getLocale().trim().replace("_", "-").toLowerCase()))
+						{
+							m.setAlternateLocale(m.getLocale());
+							own.add(m);
+						}
+					}
+					logger.info("getItemsCountForProcessing :: "+market+" :: locales "+wanted+" :: mapping rows "+own.size()+" (own rows of each locale)");
+					localesList = own;
+				}
+
 				if(null!=localesList && localesList.size()>0)
 				{
 					ModelYearDataDAO modelYearDAO = new ModelYearDataDAO();

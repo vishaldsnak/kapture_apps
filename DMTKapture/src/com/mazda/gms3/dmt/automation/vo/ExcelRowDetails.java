@@ -5,6 +5,14 @@ import com.mazda.gms3.dmt.vo.VinMLMappingDetails;
 public class ExcelRowDetails {
 
 	private int rowNo;
+	/** The facelift Excel the row was read from. */
+	private String fileName=null;
+
+	/**
+	 * true when the NEW VIN range is not (yet) in Kapture / MDM but is in the ALL_VIN file of the locale in the
+	 * master data folder - it is loaded by "Master Data with Facelift" at the start of the update job.
+	 */
+	private boolean newVinInMasterDataFile=false;
 	private String locale=null;
 	private String oldCarlineCode=null;
 	private String oldWmiCode=null;
@@ -269,5 +277,17 @@ public class ExcelRowDetails {
 	}
 	public void setNewVinExistsinIM(boolean newVinExistsinIM) {
 		this.newVinExistsinIM = newVinExistsinIM;
+	}
+	public String getFileName() {
+		return fileName;
+	}
+	public void setFileName(String fileName) {
+		this.fileName = fileName;
+	}
+	public boolean isNewVinInMasterDataFile() {
+		return newVinInMasterDataFile;
+	}
+	public void setNewVinInMasterDataFile(boolean newVinInMasterDataFile) {
+		this.newVinInMasterDataFile = newVinInMasterDataFile;
 	}
 }

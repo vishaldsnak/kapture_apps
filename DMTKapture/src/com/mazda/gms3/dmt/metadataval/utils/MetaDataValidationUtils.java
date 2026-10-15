@@ -3,14 +3,10 @@ package com.mazda.gms3.dmt.metadataval.utils;
 import com.mazda.gms3.dmt.utils.PathUtil;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
@@ -19,11 +15,6 @@ import com.mazda.gms3.dmt.mc.vo.DisplayOrderDetails;
 import com.mazda.gms3.dmt.mc.vo.ESICategoryDetails;
 import com.mazda.gms3.dmt.mc.vo.VinDetails;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
-import com.mazda.gms3.dmt.utils.ParseXMLDoc;
-import com.mazda.gms3.dmt.utils.Utilities;
-import com.mazda.gms3.dmt.vo.LeftMenuFileDetails;
-import com.mazda.gms3.dmt.vo.VINEntFileDetails;
-import com.mazda.gms3.dmt.vo.VinAttributeEntFileDetails;
 
 public class MetaDataValidationUtils {
 
@@ -31,8 +22,7 @@ public class MetaDataValidationUtils {
 	
 	public static final String LINE_TYPE_VALID="VALID";
 	public static final String LINE_TYPE_INVALID="INVALID";
-	
-	
+
 	/**
 	 * Function will read all the Information from ESI CATEGORY TEXT FILE FOR MC AS WELL AS MME MARKET
 	 * @param esiCategoryFile
@@ -343,7 +333,6 @@ public class MetaDataValidationUtils {
 						catch(Exception e){
 						}
 
-
 						try{
 							if(tokens.length>=6)
 							{
@@ -439,7 +428,6 @@ public class MetaDataValidationUtils {
 		return esiCategoryDetailsList;
 	}
 
-	
 	/**
 	 * Function will read all the Information from VIN TEXT FILE for MC Market
 	 * @param vinFile
@@ -816,7 +804,6 @@ public class MetaDataValidationUtils {
 						details.setLineType(LINE_TYPE_INVALID);
 					}
 
-
 					details.setVinSourceFileName(vinFile.getName());
 					details.setVinSorceFilePath(PathUtil.winPath(vinFile));
 					if(null==vinDetailsList || vinDetailsList.size()<=0)
@@ -848,7 +835,6 @@ public class MetaDataValidationUtils {
 		return vinDetailsList;
 	}
 
-	
 	/**
 	 * Function will read all the information from DISPLAY ORDER TEXT FILE
 	 * @param displayOrderFile
@@ -895,7 +881,6 @@ public class MetaDataValidationUtils {
 						line = line.substring(0, line.length()-1);
 					}
 
-
 					// IDENTIFY SEQUENCE NO, IT WILL ALWAYS BE THE VALUE AFTER LAST INDEX OF ||
 					sequenceNo="";
 					if(line.lastIndexOf("||")!=-1)
@@ -912,14 +897,14 @@ public class MetaDataValidationUtils {
 					}
 					// <MODEL FOLDER NAME>||<MANUAL TYPE FOLDERNAME>||<FC FOLDERNAME>||<MATERIAL FOLDERNAME>||
 					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||EngineType||Transmission Type||BodyType||DriveAxleType||
-					//	<DISPORD LEVEL 1 CODE>||<DISPORD LEVEL 2 CODE>|| <DISPORD LEVEL 3 CODE>||
-					// <DISPORD LEVEL 4 CODE>||<DISPORD LEVEL 5 CODE>||<DISPORD LEVEL 6 CODE>
+					//	<DISPORD LEVEL 1 NAME>||<DISPORD LEVEL 2 NAME>|| <DISPORD LEVEL 3 NAME>||
+					// <DISPORD LEVEL 4 NAME>||<DISPORD LEVEL 5 NAME>||<DISPORD LEVEL 6 NAME>
 
 					// OR 
 
 					// <MODEL FOLDER NAME>||<MANUAL TYPE FOLDERNAME>||<FC FOLDERNAME>||<MATERIAL FOLDERNAME>||
-					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||<DISPORD LEVEL 1 CODE>||<DISPORD LEVEL 2 CODE>|| <DISPORD LEVEL 3 CODE>||
-					// <DISPORD LEVEL 4 CODE>||<DISPORD LEVEL 5 CODE>||<DISPORD LEVEL 6 CODE>
+					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||<DISPORD LEVEL 1 NAME>||<DISPORD LEVEL 2 NAME>|| <DISPORD LEVEL 3 NAME>||
+					// <DISPORD LEVEL 4 NAME>||<DISPORD LEVEL 5 NAME>||<DISPORD LEVEL 6 NAME>
 					if(null!=line && !"".equals(line))
 					{
 						tokens = line.split("\\|\\|");
@@ -988,7 +973,6 @@ public class MetaDataValidationUtils {
 							catch(Exception e){
 							}
 
-
 							if(null!=checkEngMissionCriteriaValue && !"".equals(checkEngMissionCriteriaValue))
 							{
 								if(checkEngMissionCriteriaValue.trim().toLowerCase().equals(ApplicationProperties.getProperty("check.engine.mc.label").trim().toLowerCase()) || 
@@ -1034,7 +1018,6 @@ public class MetaDataValidationUtils {
 						// MAKE LINE TYPE AS INVALIDA
 						details.setLineType(LINE_TYPE_INVALID);
 					}
-
 
 					details.setDisplayOrderSourceFileName(displayOrderFile.getName());
 					details.setDisplayOrderSourceFilePath(PathUtil.winPath(displayOrderFile));
@@ -1112,7 +1095,6 @@ public class MetaDataValidationUtils {
 						line = line.substring(0, line.length()-1);
 					}
 
-
 					// IDENTIFY SEQUENCE NO, IT WILL ALWAYS BE THE VALUE AFTER LAST INDEX OF ||
 					sequenceNo="";
 					if(line.lastIndexOf("||")!=-1)
@@ -1129,14 +1111,14 @@ public class MetaDataValidationUtils {
 					}
 					// <MODEL FOLDER NAME>||<MANUAL TYPE FOLDERNAME>||<FC FOLDERNAME>||<MATERIAL FOLDERNAME>||
 					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||EngineType||Transmission Type||BodyType||DriveAxleType||
-					//	<DISPORD LEVEL 1 CODE>||<DISPORD LEVEL 2 CODE>|| <DISPORD LEVEL 3 CODE>||
-					// <DISPORD LEVEL 4 CODE>||<DISPORD LEVEL 5 CODE>||<DISPORD LEVEL 6 CODE>
+					//	<DISPORD LEVEL 1 NAME>||<DISPORD LEVEL 2 NAME>|| <DISPORD LEVEL 3 NAME>||
+					// <DISPORD LEVEL 4 NAME>||<DISPORD LEVEL 5 NAME>||<DISPORD LEVEL 6 NAME>
 
 					// OR 
 
 					// <MODEL FOLDER NAME>||<MANUAL TYPE FOLDERNAME>||<FC FOLDERNAME>||<MATERIAL FOLDERNAME>||
-					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||<DISPORD LEVEL 1 CODE>||<DISPORD LEVEL 2 CODE>|| <DISPORD LEVEL 3 CODE>||
-					// <DISPORD LEVEL 4 CODE>||<DISPORD LEVEL 5 CODE>||<DISPORD LEVEL 6 CODE>
+					//	<PROCESSING FOLDERNAME>||<FILENAME>||<TITLE>||<DISPORD LEVEL 1 NAME>||<DISPORD LEVEL 2 NAME>|| <DISPORD LEVEL 3 NAME>||
+					// <DISPORD LEVEL 4 NAME>||<DISPORD LEVEL 5 NAME>||<DISPORD LEVEL 6 NAME>
 					if(null!=line && !"".equals(line))
 					{
 						tokens = line.split("\\|\\|");
@@ -1411,8 +1393,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[11] && !"".equals(tokens[11]))
 				{
-					// set DISPLAY ORDER LEVEL 1 CODE
-					details.setDisplayOrderLevel1Code(String.valueOf(tokens[11]));
+					// set DISPLAY ORDER LEVEL 1 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel1Name(String.valueOf(tokens[11]));
 				}
 			}
 		}
@@ -1424,8 +1406,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[12] && !"".equals(tokens[12]))
 				{
-					// set DISPLAY ORDER LEVEL 2 CODE
-					details.setDisplayOrderLevel2Code(String.valueOf(tokens[12]));
+					// set DISPLAY ORDER LEVEL 2 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel2Name(String.valueOf(tokens[12]));
 				}
 			}
 		}
@@ -1437,8 +1419,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[13] && !"".equals(tokens[13]))
 				{
-					// set DISPLAY ORDER LEVEL 3 CODE
-					details.setDisplayOrderLevel3Code(String.valueOf(tokens[13]));
+					// set DISPLAY ORDER LEVEL 3 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel3Name(String.valueOf(tokens[13]));
 				}
 			}
 		}
@@ -1450,8 +1432,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[14] && !"".equals(tokens[14]))
 				{
-					// set DISPLAY ORDER LEVEL 4 CODE
-					details.setDisplayOrderLevel4Code(String.valueOf(tokens[14]));
+					// set DISPLAY ORDER LEVEL 4 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel4Name(String.valueOf(tokens[14]));
 				}
 			}
 		}
@@ -1463,8 +1445,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[15] && !"".equals(tokens[15]))
 				{
-					// set DISPLAY ORDER LEVEL 5 CODE
-					details.setDisplayOrderLevel5Code(String.valueOf(tokens[15]));
+					// set DISPLAY ORDER LEVEL 5 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel5Name(String.valueOf(tokens[15]));
 				}
 			}
 		}
@@ -1476,8 +1458,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[16] && !"".equals(tokens[16]))
 				{
-					// set DISPLAY ORDER LEVEL 6 CODE
-					details.setDisplayOrderLevel6Code(String.valueOf(tokens[16]));
+					// set DISPLAY ORDER LEVEL 6 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel6Name(String.valueOf(tokens[16]));
 				}
 			}
 		}
@@ -1486,8 +1468,7 @@ public class MetaDataValidationUtils {
 		
 		return details;
 	}
-	
-	
+
 	/**
 	 * Function will read Values from Line Tokens for Engine / AT / MT from Display Order File
 	 * @param tokens
@@ -1569,8 +1550,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[7] && !"".equals(tokens[7]))
 				{
-					// set DISPLAY ORDER LEVEL 1 CODE
-					details.setDisplayOrderLevel1Code(String.valueOf(tokens[7]));
+					// set DISPLAY ORDER LEVEL 1 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel1Name(String.valueOf(tokens[7]));
 				}
 			}
 		}
@@ -1582,8 +1563,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[8] && !"".equals(tokens[8]))
 				{
-					// set DISPLAY ORDER LEVEL 2 CODE
-					details.setDisplayOrderLevel2Code(String.valueOf(tokens[8]));
+					// set DISPLAY ORDER LEVEL 2 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel2Name(String.valueOf(tokens[8]));
 				}
 			}
 		}
@@ -1595,8 +1576,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[9] && !"".equals(tokens[9]))
 				{
-					// set DISPLAY ORDER LEVEL 3 CODE
-					details.setDisplayOrderLevel3Code(String.valueOf(tokens[9]));
+					// set DISPLAY ORDER LEVEL 3 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel3Name(String.valueOf(tokens[9]));
 				}
 			}
 		}
@@ -1608,8 +1589,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[10] && !"".equals(tokens[10]))
 				{
-					// set DISPLAY ORDER LEVEL 4 CODE
-					details.setDisplayOrderLevel4Code(String.valueOf(tokens[10]));
+					// set DISPLAY ORDER LEVEL 4 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel4Name(String.valueOf(tokens[10]));
 				}
 			}
 		}
@@ -1621,8 +1602,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[11] && !"".equals(tokens[11]))
 				{
-					// set DISPLAY ORDER LEVEL 5 CODE
-					details.setDisplayOrderLevel5Code(String.valueOf(tokens[11]));
+					// set DISPLAY ORDER LEVEL 5 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel5Name(String.valueOf(tokens[11]));
 				}
 			}
 		}
@@ -1634,8 +1615,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[12] && !"".equals(tokens[12]))
 				{
-					// set DISPLAY ORDER LEVEL 6 CODE
-					details.setDisplayOrderLevel6Code(String.valueOf(tokens[12]));
+					// set DISPLAY ORDER LEVEL 6 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel6Name(String.valueOf(tokens[12]));
 				}
 			}
 		}
@@ -1777,8 +1758,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[11] && !"".equals(tokens[11]))
 				{
-					// set DISPLAY ORDER LEVEL 1 CODE
-					details.setDisplayOrderLevel1Code(String.valueOf(tokens[11]));
+					// set DISPLAY ORDER LEVEL 1 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel1Name(String.valueOf(tokens[11]));
 				}
 			}
 		}
@@ -1790,8 +1771,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[12] && !"".equals(tokens[12]))
 				{
-					// set DISPLAY ORDER LEVEL 2 CODE
-					details.setDisplayOrderLevel2Code(String.valueOf(tokens[12]));
+					// set DISPLAY ORDER LEVEL 2 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel2Name(String.valueOf(tokens[12]));
 				}
 			}
 		}
@@ -1803,8 +1784,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[13] && !"".equals(tokens[13]))
 				{
-					// set DISPLAY ORDER LEVEL 3 CODE
-					details.setDisplayOrderLevel3Code(String.valueOf(tokens[13]));
+					// set DISPLAY ORDER LEVEL 3 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel3Name(String.valueOf(tokens[13]));
 				}
 			}
 		}
@@ -1816,8 +1797,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[14] && !"".equals(tokens[14]))
 				{
-					// set DISPLAY ORDER LEVEL 4 CODE
-					details.setDisplayOrderLevel4Code(String.valueOf(tokens[14]));
+					// set DISPLAY ORDER LEVEL 4 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel4Name(String.valueOf(tokens[14]));
 				}
 			}
 		}
@@ -1829,8 +1810,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[15] && !"".equals(tokens[15]))
 				{
-					// set DISPLAY ORDER LEVEL 5 CODE
-					details.setDisplayOrderLevel5Code(String.valueOf(tokens[15]));
+					// set DISPLAY ORDER LEVEL 5 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel5Name(String.valueOf(tokens[15]));
 				}
 			}
 		}
@@ -1842,8 +1823,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[16] && !"".equals(tokens[16]))
 				{
-					// set DISPLAY ORDER LEVEL 6 CODE
-					details.setDisplayOrderLevel6Code(String.valueOf(tokens[16]));
+					// set DISPLAY ORDER LEVEL 6 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel6Name(String.valueOf(tokens[16]));
 				}
 			}
 		}
@@ -1852,8 +1833,7 @@ public class MetaDataValidationUtils {
 		
 		return details;
 	}
-	
-	
+
 	/**
 	 * Function will read Values from Line Tokens for Engine / AT / MT from CD Processing File
 	 * @param tokens
@@ -1935,8 +1915,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[7] && !"".equals(tokens[7]))
 				{
-					// set DISPLAY ORDER LEVEL 1 CODE
-					details.setDisplayOrderLevel1Code(String.valueOf(tokens[7]));
+					// set DISPLAY ORDER LEVEL 1 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel1Name(String.valueOf(tokens[7]));
 				}
 			}
 		}
@@ -1948,8 +1928,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[8] && !"".equals(tokens[8]))
 				{
-					// set DISPLAY ORDER LEVEL 2 CODE
-					details.setDisplayOrderLevel2Code(String.valueOf(tokens[8]));
+					// set DISPLAY ORDER LEVEL 2 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel2Name(String.valueOf(tokens[8]));
 				}
 			}
 		}
@@ -1961,8 +1941,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[9] && !"".equals(tokens[9]))
 				{
-					// set DISPLAY ORDER LEVEL 3 CODE
-					details.setDisplayOrderLevel3Code(String.valueOf(tokens[9]));
+					// set DISPLAY ORDER LEVEL 3 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel3Name(String.valueOf(tokens[9]));
 				}
 			}
 		}
@@ -1974,8 +1954,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[10] && !"".equals(tokens[10]))
 				{
-					// set DISPLAY ORDER LEVEL 4 CODE
-					details.setDisplayOrderLevel4Code(String.valueOf(tokens[10]));
+					// set DISPLAY ORDER LEVEL 4 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel4Name(String.valueOf(tokens[10]));
 				}
 			}
 		}
@@ -1987,8 +1967,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[11] && !"".equals(tokens[11]))
 				{
-					// set DISPLAY ORDER LEVEL 5 CODE
-					details.setDisplayOrderLevel5Code(String.valueOf(tokens[11]));
+					// set DISPLAY ORDER LEVEL 5 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel5Name(String.valueOf(tokens[11]));
 				}
 			}
 		}
@@ -2000,8 +1980,8 @@ public class MetaDataValidationUtils {
 			{
 				if(null!=tokens[12] && !"".equals(tokens[12]))
 				{
-					// set DISPLAY ORDER LEVEL 6 CODE
-					details.setDisplayOrderLevel6Code(String.valueOf(tokens[12]));
+					// set DISPLAY ORDER LEVEL 6 NAME (the file carries names; codes are no longer supplied)
+					details.setDisplayOrderLevel6Name(String.valueOf(tokens[12]));
 				}
 			}
 		}
@@ -2010,390 +1990,94 @@ public class MetaDataValidationUtils {
 		return details;
 	}
 
-	
-	public static ArrayList<LeftMenuFileDetails> readLeftMenuTextFile(File leftMenuFile) throws IOException
+	/**
+	 * READS AN MNAO vin.txt (the new MNAO content layout - the same rule as ConversionUtils.readVINTextFileForMNAO):
+	 *
+	 * <MANUAL TYPE>||<FACELIFT>||<MATERIAL>||<CARLINE>||<WMI>||<VDS>||<VIS START>||<VIS END>||<MODEL>||<YEAR>||<DISPLAY ORDER FILE>
+	 * e.g. WM||FL0012||E-WZE-8FC2_MY2026_HTML||TF||AMP2||TFR**JT*||600001||649999||CX90||2026MY||d01.txt
+	 *
+	 * ALL 11 fields are required: a line with fewer fields or a blank field is an INVALID line. Every field is trimmed.
+	 */
+	public static ArrayList<VinDetails> readVINTextFileForMNAO(File vinFile) throws IOException
 	{
-		BufferedReader br = null;
-		ArrayList<LeftMenuFileDetails> leftMenuDetailsList = null;
-
-
-		if(null!=leftMenuFile && leftMenuFile.exists() && leftMenuFile.isFile())
+		ArrayList<VinDetails> vinDetailsList = null;
+		if(null==vinFile || !vinFile.exists() || !vinFile.isFile())
 		{
-			String categoryCode=null;
-			String subCategoryCode=null;
-			String subSubCategoryCode=null;
-			String title=null;
-			String fileName=null;
-			String vtocFileName=null;
-			br = new BufferedReader(new InputStreamReader(PathUtil.fileInputStream(leftMenuFile.getAbsoluteFile()), "UTF-8"));
-
+			logger.info("readVINTextFileForMNAO :: VIN Text file is either Corrupted or Does not Exist.");
+			return null;
+		}
+		BufferedReader br = new BufferedReader(new InputStreamReader(PathUtil.fileInputStream(vinFile.getAbsoluteFile()), "UTF-8"));
+		try
+		{
 			String line;
-			while ((line = br.readLine()) != null) 
+			while((line = br.readLine()) != null)
 			{
-				if(null!=line && !"".equals(line))
+				if("".equals(line.trim()))
 				{
-					if(line.indexOf("SIE=")!=-1)
-					{
-						String beforeData = line.substring(0,line.indexOf("SIE="));
-
-						String dataFromSIE = line.substring(line.indexOf("SIE="), line.length());
-						if(null!=dataFromSIE && !"".equals(dataFromSIE))
-						{
-							dataFromSIE = dataFromSIE.trim();
-							/*
-							 * CHECK HERE FOR FILENAME ATTRIBUTE (e.g. VTOC File Name)
-							 * if found, then set VTOC File Name in LEFT MENU
-							 */
-							if(dataFromSIE.indexOf("FILENAME=")!=-1)
-							{
-								fileName = dataFromSIE.substring(0, dataFromSIE.indexOf("FILENAME="));
-								if(null!=fileName && !"".equals(fileName))
-								{
-									fileName= fileName.replace("SIE=", "");
-									fileName= fileName.trim();
-								}
-								vtocFileName = dataFromSIE.substring(dataFromSIE.indexOf("FILENAME="), dataFromSIE.length());
-								if(null!=vtocFileName && !"".equals(vtocFileName))
-								{
-									vtocFileName= vtocFileName.replace("FILENAME=", "");
-									vtocFileName = vtocFileName.trim();
-								}
-							}
-							else
-							{
-								// FILE NAME ATTRIBUTE DOES NOT EXISTS - THE DATA IS SIE ID
-								fileName= dataFromSIE.trim();
-								if(null!=fileName && !"".equals(fileName))
-								{
-									fileName= fileName.replace("SIE=", "");
-									fileName= fileName.trim();
-								}
-							}
-						}
-						dataFromSIE = null;
-						if(null!=beforeData && !"".equals(beforeData))
-						{
-							beforeData = beforeData.trim();
-							int catCheckLength=0;
-							int subCatCheckLength=0;
-							int subSubCatCheckLength=0;
-							if(beforeData.trim().toLowerCase().startsWith("d"))
-							{
-								catCheckLength = 4;
-								subCatCheckLength = 7;
-								subSubCatCheckLength= 2;
-							}
-							else
-							{
-								catCheckLength = 3;
-								subCatCheckLength = 6;
-								subSubCatCheckLength= 2;
-							}
-							if(beforeData.length()>catCheckLength)
-							{
-								categoryCode = beforeData.substring(0,catCheckLength);
-								String afterCatCode = beforeData.substring(catCheckLength,beforeData.length());
-								if(null!=afterCatCode && !"".equals(afterCatCode))
-								{
-									afterCatCode = afterCatCode.trim();
-									if(afterCatCode.length()>subCatCheckLength)
-									{
-										subCategoryCode = afterCatCode.substring(0,subCatCheckLength);
-										String afterSubCatCode = afterCatCode.substring(subCatCheckLength, afterCatCode.length());
-										if(null!=afterSubCatCode && !"".equals(afterSubCatCode))
-										{
-											afterSubCatCode = afterSubCatCode.trim();
-											if(afterSubCatCode.length()>subSubCatCheckLength)
-											{
-												subSubCategoryCode = afterSubCatCode.substring(0, subSubCatCheckLength);
-												title = afterSubCatCode.substring(subSubCatCheckLength, afterSubCatCode.length());
-											}
-										}
-										afterSubCatCode = null;
-									}
-								}
-								afterCatCode = null;
-							}
-						}
-						beforeData = null;
-
-
-						/*
-						 * Check here whether the record has to be skipped or not.
-						 * if subCategoryCode endsWith - C00 - these are CONN HTMLs 
-						 * skip these entries
-						 */
-						if(null!=categoryCode && !"".equals(categoryCode) && 
-								null!=subCategoryCode && !"".equals(subCategoryCode) && null!=subSubCategoryCode && !"".equals(subSubCategoryCode) 
-								&& null!=title && !"".equals(title) && null!=fileName && !"".equals(fileName))
-						{
-							if(!subCategoryCode.trim().toLowerCase().endsWith("c00"))
-							{
-								categoryCode = categoryCode.trim();
-								subCategoryCode = subCategoryCode.trim();
-								subSubCategoryCode = subSubCategoryCode.trim();
-								/*
-								 * add to Left Menu List - not for CONN HTMLs
-								 */
-								LeftMenuFileDetails lfDetails = new LeftMenuFileDetails();
-								if(categoryCode.trim().toLowerCase().startsWith("d"))
-								{
-									categoryCode = categoryCode.substring(1,categoryCode.length());
-								}
-								if(subCategoryCode.trim().toLowerCase().startsWith("d"))
-								{
-									subCategoryCode = subCategoryCode.substring(1, subCategoryCode.length());
-								}
-
-								//		    					logger.info("readLeftMenuTextFile :: CAT {"+categoryCode.trim()+"}  SUB CAT {"+subCategoryCode+"}  TITLE {"+title+"}  FILE NAME {"+fileName+"}");
-								lfDetails.setCategoryCode(categoryCode.trim());
-								lfDetails.setSubCategoryCode(subCategoryCode.trim());
-								lfDetails.setSubSubCategoryCode(subSubCategoryCode.trim());
-								lfDetails.setTitle(title.trim());
-								lfDetails.setFileName(fileName.trim());
-								if(null!=vtocFileName && !"".equals(vtocFileName))
-								{
-									lfDetails.setVtocFileNameAttribute(vtocFileName.trim());
-								}
-								
-								lfDetails.setLeftMenuSourceFileName(leftMenuFile.getName());
-								lfDetails.setLeftMenuSourceFilePath(PathUtil.winPath(leftMenuFile));
-								if(null==leftMenuDetailsList || leftMenuDetailsList.size()<=0)
-								{
-									leftMenuDetailsList = new ArrayList<LeftMenuFileDetails>();
-								}
-								// add lfDetails to leftMenuDetailsList
-								leftMenuDetailsList.add(lfDetails);
-								lfDetails=null;
-							}
-						}
-					}
+					continue;
 				}
+				line = line.trim();
+				if(line.endsWith(";"))
+				{
+					line = line.substring(0, line.length()-1);
+				}
+				String[] tokens = line.split("\\|\\|", -1);
+				VinDetails details = new VinDetails();
+				details.setAllTokensExists(tokens.length==11);
+				details.setManualType(token(tokens, 0));
+				details.setFaceLiftFolder(token(tokens, 1));
+				details.setMaterialFolder(token(tokens, 2));
+				details.setCarlineCode(token(tokens, 3));
+				details.setWmiCode(token(tokens, 4));
+				details.setVdsCode(token(tokens, 5));
+				details.setVisStartRange(token(tokens, 6));
+				details.setVisEndRange(token(tokens, 7));
+				if(tokens.length==11)
+				{
+					details.setModelName(token(tokens, 8));
+					details.setModelYear(token(tokens, 9));
+					details.setDisplayOrderTextFileName(token(tokens, 10));
+				}
+				else if(tokens.length>8)
+				{
+					// the display order file is always the LAST field - kept for the report of the invalid line
+					details.setDisplayOrderTextFileName(token(tokens, tokens.length-1));
+				}
+				if(details.isAllTokensExists() && null!=details.getManualType() && null!=details.getFaceLiftFolder() && null!=details.getMaterialFolder()
+						&& null!=details.getCarlineCode() && null!=details.getWmiCode() && null!=details.getVdsCode()
+						&& null!=details.getVisStartRange() && null!=details.getVisEndRange() && null!=details.getModelName()
+						&& null!=details.getModelYear() && null!=details.getDisplayOrderTextFileName())
+				{
+					details.setLineType(LINE_TYPE_VALID);
+				}
+				else
+				{
+					details.setLineType(LINE_TYPE_INVALID);
+				}
+				details.setVinSourceFileName(vinFile.getName());
+				details.setVinSorceFilePath(PathUtil.winPath(vinFile));
+				if(null==vinDetailsList)
+				{
+					vinDetailsList = new ArrayList<VinDetails>();
+				}
+				vinDetailsList.add(details);
 			}
-			line = null;
 		}
-		else
-		{
-			logger.info("readLeftMenuTextFile :: Left Menu Text file is either Corrupted or Does not Exist.");
-			leftMenuDetailsList = null;
-		}
-
-		if(null!=br)
+		finally
 		{
 			br.close();
 		}
-		return leftMenuDetailsList;
-	}
-	
-	public static ArrayList<VINEntFileDetails> readVINENTFile(File vinEntFile) 
-	{
-		ArrayList<VINEntFileDetails> vinEntDetailsList = new ArrayList<VINEntFileDetails>();
-		try
-		{
-			if(null!=vinEntFile && vinEntFile.isFile() && vinEntFile.exists())
-			{
-				Document document = ParseXMLDoc.parseFile(PathUtil.winPath(vinEntFile));
-				if(null!=document)
-				{
-					NodeList vinInfoNodeList = document.getElementsByTagName("VININFO");
-					if(null!=vinInfoNodeList && vinInfoNodeList.getLength()>0)
-					{
-						/*
-						 * Parse Strcuture
-						 * 	<VININFO>
-								<VINDATA>
-								<Modelyear>2016MY</Modelyear>
-								<VINWMI>JM1</VINWMI>
-								<VINcarline>ND</VINcarline>
-								<VINVDS>NDAA7*G#</VINVDS>
-								<VINStart>100001</VINStart>
-								<VINEnd>zzzzzz</VINEnd>
-								</VINDATA>
-							</VININFO>
-						*/
-						NodeList vinDataNodesList = vinInfoNodeList.item(0).getChildNodes();
-						if(null!=vinDataNodesList && vinDataNodesList.getLength()>0)
-						{
-							for(int i=0;i<vinDataNodesList.getLength();i++)
-							{
-								Node vinDataNode = (Node)vinDataNodesList.item(i);
-								if (!"#text".equalsIgnoreCase(vinDataNode.getNodeName()))
-								{
-									if(vinDataNode.getNodeName().equals("VINDATA"))
-									{
-										
-										VINEntFileDetails details = new VINEntFileDetails();
-										
-										
-										NodeList childNodesList = vinDataNode.getChildNodes();
-										if(null!=childNodesList && childNodesList.getLength()>0)
-										{
-											for(int j=0;j<childNodesList.getLength();j++)
-											{
-												Node childNode = (Node)childNodesList.item(j);
-												if (!"#text".equalsIgnoreCase(childNode.getNodeName()))
-												{
-													if(childNode.getNodeName().equals("Modelyear"))
-													{
-														details.setModelYear(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINWMI"))
-													{
-														details.setVinWMI(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINcarline"))
-													{
-														details.setVinCarline(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINVDS"))
-													{
-														details.setVinVDS(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINStart"))
-													{
-														details.setVinStartRange(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINEnd"))
-													{
-														details.setVinEndRange(ParseXMLDoc.getElementValue(childNode));
-													}
-												}
-												childNode=  null;
-											}
-										}
-										
-										/*
-										 * add details to vinENtList
-										 */
-										// ADD FILE NAME & PATH AS WELL TO THE LIST
-										details.setFileName(vinEntFile.getName());
-										details.setFilePath(PathUtil.winPath(vinEntFile));
-										vinEntDetailsList.add(details);
-										details =null;
-										
-										childNodesList=  null;
-									}
-								}
-								vinDataNode=  null;
-							}
-						}
-						vinDataNodesList = null;
-					}
-					vinInfoNodeList = null;
-				}
-				document = null;
-			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(MetaDataValidationUtils.class.getName(), "readVINENTFile()", e);
-			vinEntDetailsList = null;
-		}
-		return vinEntDetailsList;
+		return vinDetailsList;
 	}
 
-	public static ArrayList<VinAttributeEntFileDetails> readVINAttributeENTFile(File vinAttributeEntFile) 
+	/** Field i of a split line, trimmed; null when missing or blank. */
+	private static String token(String[] tokens, int i)
 	{
-		ArrayList<VinAttributeEntFileDetails> vinAttributeEntDetailsList = new ArrayList<VinAttributeEntFileDetails>();
-		try
+		if(i<0 || i>=tokens.length || null==tokens[i] || "".equals(tokens[i].trim()))
 		{
-			if(null!=vinAttributeEntFile && vinAttributeEntFile.isFile() && vinAttributeEntFile.exists())
-			{
-				Document document = ParseXMLDoc.parseFile(PathUtil.winPath(vinAttributeEntFile));
-				if(null!=document)
-				{
-					NodeList vinAttrNodeList = document.getElementsByTagName("VINATTR");
-					if(null!=vinAttrNodeList && vinAttrNodeList.getLength()>0)
-					{
-						/*
-						 * Parse Structure
-						 * 	<VINATTR>
-								<VINATTRDATA>
-								<VINtranstype>B48</VINtranstype>
-								<VINenginetype>A27</VINenginetype>
-								<VINbodytype>3</VINbodytype>
-								<VINbodytypevalue>OPEN</VINbodytypevalue>
-								<VINdriveaxle>2</VINdriveaxle>
-								<VINdriveaxlevakue>2WD</VINdriveaxlevakue>
-								</VINATTRDATA>
-							</VINATTR>
-						*/
-						NodeList vinAttrDataNodeList = vinAttrNodeList.item(0).getChildNodes();
-						if(null!=vinAttrDataNodeList && vinAttrDataNodeList.getLength()>0)
-						{
-							for(int i=0;i<vinAttrDataNodeList.getLength();i++)
-							{
-								Node vinAttrDataNode = (Node)vinAttrDataNodeList.item(i);
-								if (!"#text".equalsIgnoreCase(vinAttrDataNode.getNodeName()))
-								{
-									if(vinAttrDataNode.getNodeName().equals("VINATTRDATA"))
-									{
-										VinAttributeEntFileDetails details = new VinAttributeEntFileDetails();
-										
-										NodeList childNodesList = vinAttrDataNode.getChildNodes();
-										if(null!=childNodesList && childNodesList.getLength()>0)
-										{
-											for(int j=0;j<childNodesList.getLength();j++)
-											{
-												Node childNode = (Node)childNodesList.item(j);
-												if (!"#text".equalsIgnoreCase(childNode.getNodeName()))
-												{
-													if(childNode.getNodeName().equals("VINtranstype"))
-													{
-														details.setVinTransType(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINenginetype"))
-													{
-														details.setVinEngineType(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINbodytype"))
-													{
-														details.setVinBodyType(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINbodytypevalue"))
-													{
-														details.setVinBodyTypeValue(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINdriveaxle"))
-													{
-														details.setVinAxleType(ParseXMLDoc.getElementValue(childNode));
-													}
-													else if(childNode.getNodeName().equals("VINdriveaxlevakue"))
-													{
-														details.setVinAxleTypeValue(ParseXMLDoc.getElementValue(childNode));
-													}
-												}
-												childNode=  null;
-											}
-										}
-										/*
-										 * add details to vinAttribnuteENtList
-										 */
-										// ADD FILE NAME & PATH AS WELL TO THE LIST
-										details.setFileName(vinAttributeEntFile.getName());
-										details.setFilePath(PathUtil.winPath(vinAttributeEntFile));
-										vinAttributeEntDetailsList.add(details);
-										details =null;
-										
-										childNodesList=  null;
-									}
-								}
-								vinAttrDataNode=  null;
-							}
-						}
-						vinAttrDataNodeList = null;
-					}
-					vinAttrNodeList = null;
-				}
-				document = null;
-			}
+			return null;
 		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(MetaDataValidationUtils.class.getName(), "readVINAttributeENTFile()", e);
-			vinAttributeEntDetailsList = null;
-		}
-		return vinAttributeEntDetailsList;
+		return tokens[i].trim();
 	}
-	
+
 }

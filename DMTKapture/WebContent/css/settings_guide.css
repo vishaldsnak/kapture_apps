@@ -1,0 +1,88 @@
+/* Settings page - Content Provision Guide. All selectors are prefixed sg- so style.css is not affected. */
+
+.sg-wrap{margin:30px 0 10px; border:1px solid #DADADA; border-radius:4px; background:#fff; font-family:"InterstateMazda-Regular",Arial; color:#4A4A4A;}
+.sg-head{padding:16px 20px; border-bottom:1px solid #DADADA; background:#FAFAFA; border-radius:4px 4px 0 0;}
+.sg-head h3{margin:0; font-size:17px; color:#2B2B2B;}
+.sg-head p{margin:4px 0 0; font-size:12.5px; color:#777;}
+.sg-pdf{float:right; margin-top:4px; padding:7px 14px; border:1px solid #D0021B; border-radius:3px; background:#fff; color:#D0021B !important; font-size:12.5px; font-weight:bold; text-decoration:none; cursor:pointer;}
+.sg-pdf:hover{background:#D0021B; color:#fff !important;}
+.sg-pdf-icon:before{content:"\f1c1"; font-family:"FontAwesome"; font-style:normal; font-weight:normal; margin-right:7px;}
+
+.sg-body{display:table; width:100%; table-layout:fixed;}
+.sg-nav{display:table-cell; width:230px; vertical-align:top; border-right:1px solid #DADADA; background:#FAFAFA; padding:10px 0;}
+.sg-panel-wrap{display:table-cell; vertical-align:top; padding:22px 28px 26px;}
+
+.sg-nav a{display:block; padding:9px 18px 9px 16px; font-size:13px; color:#4A4A4A; text-decoration:none; border-left:3px solid transparent; cursor:pointer;}
+.sg-nav a .sg-num{display:inline-block; width:20px; height:20px; line-height:20px; margin-right:8px; border-radius:50%; background:#E6E6E6; color:#555; font-size:11px; text-align:center;}
+.sg-nav a:hover{background:#F0F0F0;}
+.sg-nav a.sg-active{background:#fff; border-left-color:#D0021B; color:#D0021B; font-weight:bold;}
+.sg-nav a.sg-active .sg-num{background:#D0021B; color:#fff;}
+
+.sg-panel{display:none;}
+.sg-panel.sg-show{display:block;}
+.sg-panel h4{margin:0 0 4px; font-size:16px; color:#2B2B2B;}
+.sg-panel .sg-lead{margin:0 0 18px; font-size:13px; color:#777;}
+.sg-panel h5{margin:22px 0 8px; font-size:13.5px; color:#2B2B2B; text-transform:uppercase; letter-spacing:.4px;}
+.sg-panel p, .sg-panel li{font-size:13px; line-height:1.6;}
+.sg-panel ul{margin:6px 0 6px 18px; padding:0;}
+.sg-panel code, .sg-code{font-family:Consolas,"Courier New",monospace; font-size:12px; background:#F4F4F4; border:1px solid #E6E6E6; border-radius:3px; padding:1px 5px; color:#2B2B2B;}
+
+/* cards */
+.sg-grid{display:table; width:100%; border-spacing:12px 0; margin:0 -12px;}
+.sg-grid > div{display:table-cell; vertical-align:top;}
+.sg-card{border:1px solid #E3E3E3; border-radius:4px; padding:14px 16px; background:#fff;}
+.sg-card h6{margin:0 0 6px; font-size:13px; color:#D0021B;}
+.sg-card p{margin:0; font-size:12.5px; line-height:1.55;}
+
+/* worked examples + file / report snapshots */
+.sg-ex-block{margin-top:26px; padding-top:4px; border-top:1px solid #E6E6E6;}
+.sg-ex{background:#FCFCFC; margin-bottom:14px;}
+.sg-ex p{margin:4px 0 8px;}
+.sg-ex .sg-ex-result{margin:10px 0 0; padding:8px 12px; background:#F3F8F3; border-left:4px solid #3C8D40; border-radius:3px; color:#2B2B2B;}
+.sg-snap{border:1px solid #D5D9DE; border-radius:4px; background:#fff; margin:8px 0; overflow:hidden;}
+.sg-snap-bar{background:#EEF1F4; border-bottom:1px solid #D5D9DE; padding:4px 10px; font-size:11.5px; color:#555; font-family:Consolas,"Courier New",monospace;}
+.sg-snap pre{margin:0; padding:8px 10px; font-family:Consolas,"Courier New",monospace; font-size:11.5px; line-height:1.7; color:#2B2B2B; white-space:pre; overflow-x:auto;}
+.sg-snap-2{border:none; background:transparent; overflow:visible;}
+.sg-snap-2 > div{border:1px solid #D5D9DE; border-radius:4px; background:#fff; overflow:hidden; margin-bottom:8px;}
+.sg-snap-2 > div:last-child{margin-bottom:0;}
+.sg-del{color:#A10015; text-decoration:line-through; background:#FDF0F1;}
+.sg-keep{background:#FFF7D6;}
+.sg-tag{display:inline-block; padding:0 6px; border-radius:8px; background:#FDF0F1; color:#A10015; font-size:10.5px; font-family:Arial,sans-serif; text-decoration:none;}
+.sg-tag-k{background:#FFF0C2; color:#7A5A00;}
+.sg-snap-table{width:100%; border-collapse:collapse; font-size:11.5px;}
+.sg-snap-table th{background:#E2EFDA; color:#2B2B2B; text-align:left; padding:4px 8px; border:1px solid #D5D9DE; font-weight:bold;}
+.sg-snap-table td{padding:4px 8px; border:1px solid #E1E1E1; vertical-align:top;}
+
+/* stepper */
+.sg-steps{list-style:none; margin:4px 0 0 !important; padding:0; counter-reset:sgstep;}
+.sg-steps li{position:relative; padding:0 0 16px 44px; counter-increment:sgstep;}
+.sg-steps li:before{content:counter(sgstep); position:absolute; left:0; top:0; width:28px; height:28px; line-height:28px; border-radius:50%; background:#D0021B; color:#fff; font-size:13px; font-weight:bold; text-align:center;}
+.sg-steps li:after{content:""; position:absolute; left:13px; top:30px; bottom:2px; width:2px; background:#EBC3C8;}
+.sg-steps li:last-child:after{display:none;}
+.sg-steps li > b{display:block; font-size:13.5px; color:#2B2B2B;}
+.sg-steps li > span{display:block; font-size:12.5px; color:#666;}
+.sg-steps.sg-grey li:before{background:#6B7B8C;}
+.sg-steps.sg-grey li:after{background:#D3D9DF;}
+
+/* folder tree */
+.sg-tree{font-family:Consolas,"Courier New",monospace; font-size:12.5px; line-height:1.75; background:#FAFAFA; border:1px solid #E6E6E6; border-radius:4px; padding:12px 16px; white-space:pre; overflow-x:auto; color:#2B2B2B;}
+.sg-tree .f{color:#B07A00; font-weight:bold;}
+.sg-tree .x{color:#2E6DA4;}
+.sg-tree .c{color:#999;}
+
+/* tables */
+.sg-table{width:100%; border-collapse:collapse; margin:6px 0 4px; font-size:12.5px;}
+.sg-table th{background:#F2F2F2; color:#2B2B2B; text-align:left; font-weight:bold; padding:7px 10px; border:1px solid #E1E1E1;}
+.sg-table td{padding:7px 10px; border:1px solid #E1E1E1; vertical-align:top; line-height:1.5;}
+.sg-table tr:nth-child(even) td{background:#FCFCFC;}
+
+/* callouts */
+.sg-note, .sg-warn{border-radius:4px; padding:10px 14px; margin:14px 0 4px; font-size:12.5px; line-height:1.55;}
+.sg-note{background:#EEF4FA; border-left:4px solid #2E6DA4;}
+.sg-warn{background:#FDF0F1; border-left:4px solid #D0021B;}
+.sg-note b, .sg-warn b{color:#2B2B2B;}
+
+/* message list */
+.sg-msg{font-style:italic; color:#555;}
+.sg-pill{display:inline-block; padding:1px 8px; margin:0 2px 2px 0; border-radius:10px; background:#F0F0F0; border:1px solid #E1E1E1; font-size:11.5px; color:#444;}
+.sg-pill.r{background:#FDF0F1; border-color:#F2C6CB; color:#A10015;}

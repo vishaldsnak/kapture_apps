@@ -29,6 +29,8 @@ import com.mazda.gms3.dmt.email.generator.NotificationEmailHelper;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
 import com.mazda.gms3.dmt.mc.dao.MCDocumentManagementDAO;
+import com.mazda.gms3.dmt.dao.UnlistedDisplayDataDAO;
+import com.mazda.gms3.dmt.conversion.utils.UnlistedDisplayData;
 import com.mazda.gms3.dmt.mc.utils.CDProcessingUtils;
 import com.mazda.gms3.dmt.mc.utils.CategoryUtils;
 import com.mazda.gms3.dmt.mc.utils.ConversionUtils;
@@ -180,6 +182,7 @@ public class StartMCConversionImpl {
 				boolean updateProcessingStatus = ScheduleDAO.updateScheduleStatus(scheduleId, ApplicationProperties.getProperty("schedule.status.processing.value"));
 				if(updateProcessingStatus==true)
 				{
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.discard(scheduleId);
 					preview = new com.mazda.gms3.dmt.preview.PreviewBuilder(scheduleId);
 					masterDataFailed = false;
 					/*
@@ -352,7 +355,7 @@ public class StartMCConversionImpl {
 														tempList= null;
 													}
 													else if(chF.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-															&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+															&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 															chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 													{
 														// DISPLAY ORDER TEXT FILE FOUND.
@@ -553,7 +556,7 @@ public class StartMCConversionImpl {
 									logger.info("startConversion :: Start CD DATA PROCESSING for Material Directory at Path :: > " + materialDirPath);
 									logger.info("startConversion :: CD PROCESSING STARTED AT :: >"+ new Date());
 									// CD DATA PROCESSING
-									startCDProcessing(materialDir, itemDetails, wslId, allCDProcessingList,channelFolderName);
+									startCDProcessing(materialDir, itemDetails, wslId, allCDProcessingList,channelFolderName, applicableVINListForMaterialFolder);
 									allCDProcessingList=null;
 									
 									logger.info("startConversion :: CD PROCESSING STARTED AT :: >"+ new Date());
@@ -647,7 +650,7 @@ public class StartMCConversionImpl {
 													tempList= null;
 												}
 												else if(chF.getName().trim().toLowerCase().startsWith(ApplicationProperties.getProperty("file.name.displayorder")) 
-														&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete")) &&  
+														&& !chF.getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("file.name.delete") + ApplicationProperties.getProperty("extension.txt")) &&  
 														chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
 												{
 													// DISPLAY ORDER TEXT FILE FOUND.
@@ -735,14 +738,14 @@ public class StartMCConversionImpl {
 									startProcessingDisplayOrderForFaceLift(faceLiftDir, itemDetails, wslId, allDisplayOrderList, allVINList, channelFolderName);
 									logger.info("startConversion :: DISPLAY ORDER PROCESSING ENDED AT :: >"+ new Date());
 									allDisplayOrderList= null;
-									allVINList = null;
 									
 									// CD DATA PROCESSING
 									logger.info("startConversion :: Start CD DATA PROCESSING for FaceLift Directory at Path :: > " + faceLiftDirPath);
 									logger.info("startConversion :: CD PROCESSING STARTED AT :: >"+ new Date());
 									
-									startCDProcessingForFaceLift(faceLiftDir, itemDetails, wslId, allCDProcessingList, channelFolderName);
+									startCDProcessingForFaceLift(faceLiftDir, itemDetails, wslId, allCDProcessingList, channelFolderName, allVINList);
 									allCDProcessingList = null;
+									allVINList = null;
 									logger.info("startConversion :: CD PROCESSING ENDED AT :: >"+ new Date());
 									
 									/*
@@ -765,6 +768,7 @@ public class StartMCConversionImpl {
 						 * OFFLINE PREVIEW: tree, filters and the job's rows - from what the job holds in memory
 						 */
 						preview.finish(mcDocumentManagementDAO.getViewContentDataList());
+						com.mazda.gms3.dmt.dao.ClearedDisplayData.discard(scheduleId);
 
 						/**
 						 * PROCEED FOR PRINTING REPORTS.
@@ -5969,6 +5973,38 @@ public class StartMCConversionImpl {
 		return saved;
 	}
 
+	/** View content of the documents of the vin.txt material folders the display order files do not list - see UnlistedDisplayData. */
+	private void removeUnlistedViewContent(ScheduleItemDetails itemDetails, List<VinDetails> vinList, List<ContentDetails> listed)
+	{
+		String documentTable = newModel(itemDetails) ? "gms3_dmt_mc_newm_imdoc" : "gms3_dmt_mc_imdoc";
+		List<UnlistedDisplayDataDAO.ViewContentTable> viewContent = java.util.Collections.singletonList(
+				new UnlistedDisplayDataDAO.ViewContentTable("gms3_vc_japan_vin_details", "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID"));
+		List<DisplayOrderDetails> rows = UnlistedDisplayData.removeViewContent(itemDetails, documentTable, "DC_DOC_STATUS", viewContent,
+				UnlistedDisplayData.vinMaterialFolders(itemDetails, vinList), listed);
+		if(null==finalDisplayOrderList)
+		{
+			finalDisplayOrderList = new ArrayList<DisplayOrderDetails>();
+		}
+		finalDisplayOrderList.addAll(rows);
+	}
+
+	/** CD data of the documents of the vin.txt material folders the CD files do not list - see UnlistedDisplayData. */
+	private void removeUnlistedCDData(ScheduleItemDetails itemDetails, List<VinDetails> vinList, List<CDProcessingDetails> listed)
+	{
+		String cdTable = newModel(itemDetails) ? "gms3_dmt_mc_newm_cd_data" : "gms3_dmt_mc_cd_data";
+		List<CDProcessingDetails> rows = UnlistedDisplayData.removeCDData(itemDetails, cdTable, UnlistedDisplayData.vinMaterialFolders(itemDetails, vinList), listed);
+		if(null==finalCDProcessingList)
+		{
+			finalCDProcessingList = new ArrayList<CDProcessingDetails>();
+		}
+		finalCDProcessingList.addAll(rows);
+	}
+
+	private static boolean newModel(ScheduleItemDetails itemDetails)
+	{
+		return null!=itemDetails.getModelType() && itemDetails.getModelType().trim().toLowerCase().equals(ApplicationProperties.getProperty("model.type.new").trim().toLowerCase());
+	}
+
 	private void startProcessingDisplayOrder(File materialDirFolder, ScheduleItemDetails itemDetails, String wslId, ArrayList<DisplayOrderDetails> displayOrderList, ArrayList<VinDetails> applicableVINListForMaterialFolder,String channelFolderName)
 	{
 		try
@@ -5981,6 +6017,8 @@ public class StartMCConversionImpl {
 			 * 
 			 */
 			ScheduleDAO.updateCurrentJobStatus(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), "DISPLAY ORDER PROCESSING");
+			// the documents the display order files list - the view content of the others of the material folder is removed
+			ArrayList<ContentDetails> listedDocuments = new ArrayList<ContentDetails>();
 			// retrieve Display Order for the current Processing Material Folder
 			ArrayList<DisplayOrderDetails> processingDisplayOrderList = ScheduleDAO.getApplicableDisplayOrderForMaterialOrFaceLiftFolder(itemDetails.getModelFolderName(), itemDetails.getManualType(), itemDetails.getFaceLiftFolderName(), itemDetails.getMaterialFolderName());
 			if(null!=processingDisplayOrderList && processingDisplayOrderList.size()>0)
@@ -6208,6 +6246,7 @@ public class StartMCConversionImpl {
 				 * PREPARE DATA FOR VIEW CONTENT AND INSERT IN DATA BASE TABLE
 				 */
 				List<DisplayOrderDetails> tList = mcDocumentManagementDAO.saveDisplayOrderDetails(documentsList, itemDetails.getModelType(), "CHECK_INSIDE_LIST", channelFolderName, itemDetails.getLocale(), model, itemDetails.getManualType());
+				listedDocuments.addAll(documentsList);
 				if(null!=tList && tList.size()>0)
 				{
 					details = null;
@@ -6300,6 +6339,8 @@ public class StartMCConversionImpl {
 			{
 				logger.info("startProcessingDisplayOrder :: No Display Order Information Found for Processing Display Order for Material Folder :: > " + itemDetails.getMaterialFolderName());
 			}
+			// also when no display order row was given: nothing listed = the view content of the whole material folder goes
+			removeUnlistedViewContent(itemDetails, applicableVINListForMaterialFolder, listedDocuments);
 			processingDisplayOrderList = null;
 			channelFolderName = null;
 		}
@@ -6328,6 +6369,8 @@ public class StartMCConversionImpl {
 			ScheduleDAO.updateCurrentJobStatus(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), "DISPLAY ORDER PROCESSING");
 
 			ArrayList<DisplayOrderDetails> processingDisplayOrderList = new ArrayList<DisplayOrderDetails>();
+			// the documents the display order files list - the view content of the others of the material folders is removed
+			ArrayList<ContentDetails> listedDocuments = new ArrayList<ContentDetails>();
 
 			if(null!=displayOrderList && displayOrderList.size()>0)
 			{
@@ -6636,6 +6679,10 @@ public class StartMCConversionImpl {
 							}
 
 							List<DisplayOrderDetails> tList = mcDocumentManagementDAO.saveDisplayOrderDetails(documentsList, itemDetails.getModelType(), "CHECK_INSIDE_LIST", channelFolderName, itemDetails.getLocale(), model, itemDetails.getManualType());
+							if(null!=documentsList)
+							{
+								listedDocuments.addAll(documentsList);
+							}
 							/*
 							 * NOW DOCUMENT LIST FOR MATERIAL FOLDER IS READY FOR PROCESSING
 							 * FIRST DELETE ALL EXISTING DOCUMENTS DATA OF MATERIAL FOLDER FROM  
@@ -6761,6 +6808,8 @@ public class StartMCConversionImpl {
 			{
 				logger.info("startProcessingDisplayOrderForFaceLift :: No Display Order Information Found for Processing in FaceLift Folder at Path :: > " + PathUtil.winPath(faceLiftDirFolder));
 			}
+			// also when no display order row was given: nothing listed = the view content of the whole material folder goes
+			removeUnlistedViewContent(itemDetails, allVINList, listedDocuments);
 			channelFolderName = null;
 		}
 		catch(Exception e)
@@ -6769,7 +6818,7 @@ public class StartMCConversionImpl {
 		}
 	}
 
-	private void startCDProcessing(File materialDirFolder, ScheduleItemDetails itemDetails, String wslId, ArrayList<CDProcessingDetails> cdProcessingList,String channelFolderName)
+	private void startCDProcessing(File materialDirFolder, ScheduleItemDetails itemDetails, String wslId, ArrayList<CDProcessingDetails> cdProcessingList,String channelFolderName, ArrayList<VinDetails> vinList)
 	{
 		try
 		{
@@ -6785,6 +6834,8 @@ public class StartMCConversionImpl {
 			logger.info("startCDProcessing :: current job status updated :: CD rows read for the schedule :: >" + (null == cdProcessingList ? 0 : cdProcessingList.size()));
 
 			ArrayList<CDProcessingDetails> processingCDDataList = new ArrayList<CDProcessingDetails>();
+			// the documents the CD files list - the CD data of the others of the material folder(s) is removed
+			ArrayList<CDProcessingDetails> listedCDRows = new ArrayList<CDProcessingDetails>();
 			
 			if(null!=cdProcessingList && cdProcessingList.size()>0)
 			{
@@ -6858,6 +6909,7 @@ public class StartMCConversionImpl {
 					 * CALL DATABASE FUNCTION - ONLY FOR CD PROCESSING FOR THIS PARTICULAR MATERIAL FOLDER
 					 */
 					ArrayList<CDProcessingDetails> tempList = mcDocumentManagementDAO.saveCDProcessingDetails(processingCDDataList, itemDetails.getModelType(), pathToBeReplaced, channelFolderName, itemDetails.getLocale());
+					listedCDRows.addAll(processingCDDataList);
 					if(null!=tempList && tempList.size()>0)
 					{
 						if(null==finalCDProcessingList || finalCDProcessingList.size()<=0)
@@ -6878,6 +6930,8 @@ public class StartMCConversionImpl {
 			{
 				logger.info("startCDProcessing :: No Information Found for Processing CD Data in Material Folder at Path :: > " + PathUtil.winPath(materialDirFolder));
 			}
+			// also when no CD row was given: nothing listed = the CD data of the whole material folder goes
+			removeUnlistedCDData(itemDetails, vinList, listedCDRows);
 			channelFolderName = null;
 		}
 		catch(Exception e)
@@ -6886,7 +6940,7 @@ public class StartMCConversionImpl {
 		}
 	}
 
-	private void startCDProcessingForFaceLift(File faceLiftDir, ScheduleItemDetails itemDetails, String wslId, ArrayList<CDProcessingDetails> cdProcessingList,String channelFolderName)
+	private void startCDProcessingForFaceLift(File faceLiftDir, ScheduleItemDetails itemDetails, String wslId, ArrayList<CDProcessingDetails> cdProcessingList,String channelFolderName, ArrayList<VinDetails> vinList)
 	{
 		try
 		{
@@ -6900,6 +6954,8 @@ public class StartMCConversionImpl {
 			logger.info("startCDProcessing :: current job status updated :: CD rows read for the schedule :: >" + (null == cdProcessingList ? 0 : cdProcessingList.size()));
 
 			ArrayList<CDProcessingDetails> processingCDDataList = new ArrayList<CDProcessingDetails>();
+			// the documents the CD files list - the CD data of the others of the material folder(s) is removed
+			ArrayList<CDProcessingDetails> listedCDRows = new ArrayList<CDProcessingDetails>();
 			
 			if(null!=cdProcessingList && cdProcessingList.size()>0)
 			{
@@ -6939,6 +6995,7 @@ public class StartMCConversionImpl {
 					 * CALL DATABASE FUNCTION - ONLY FOR CD PROCESSING FOR THIS PARTICULAR MATERIAL FOLDER
 					 */
 					ArrayList<CDProcessingDetails> tempList = mcDocumentManagementDAO.saveCDProcessingDetails(processingCDDataList, itemDetails.getModelType(), pathToBeReplaced, channelFolderName, itemDetails.getLocale());
+					listedCDRows.addAll(processingCDDataList);
 					if(null!=tempList && tempList.size()>0)
 					{
 						if(null==finalCDProcessingList || finalCDProcessingList.size()<=0)
@@ -6959,6 +7016,8 @@ public class StartMCConversionImpl {
 			{
 				logger.info("startCDProcessingForFaceLift :: No Information Found for Processing CD Data in FaceLift Folder at Path :: > " + PathUtil.winPath(faceLiftDir));
 			}
+			// also when no CD row was given: nothing listed = the CD data of the whole material folder goes
+			removeUnlistedCDData(itemDetails, vinList, listedCDRows);
 			channelFolderName = null;
 		}
 		catch(Exception e)

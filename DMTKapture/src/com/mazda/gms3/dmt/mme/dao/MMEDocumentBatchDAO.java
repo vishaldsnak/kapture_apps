@@ -211,6 +211,9 @@ public class MMEDocumentBatchDAO {
 					deleteByDocumentIds(conn, t.masterVin, list);
 					deleteByDocumentIds(conn, t.displayOrder, list);
 					deleteByDocumentIds(conn, t.cvc, list);
+					// the documents that had CD data / view content - UnlistedDisplayData reports the ones no longer listed
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.CD_DATA, t.cdData, null, "DC_IM_DOC_ID", list);
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, t.viewContent, "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID", list);
 					deleteByDocumentIds(conn, t.cdData, list);
 					deleteViewContent(conn, t, list);
 				}

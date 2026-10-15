@@ -43,6 +43,10 @@ public class PrintReportsUtil {
 	Logger logger = LogManager.getLogger(PrintReportsUtil.class);
 
 	private int partitionSize=700000;
+
+	/** OPERATION column of the display order and CD data reports */
+	public static final String OPERATION_INSERT = "INSERT";
+	public static final String OPERATION_DELETE = "DELETE";
 	
 	/**
 	 * Function will proceed for generating reports.
@@ -2376,6 +2380,12 @@ public class PrintReportsUtil {
 
 					// set totalCount
 					totalCount=  displayOrderList.size();
+					// DELETE rows (view content of unlisted documents removed) are not rows of the file - not counted, a failed delete is
+					for (DisplayOrderDetails d : displayOrderList) {
+						if (OPERATION_DELETE.equals(d.getOperation()) && "SUCCESS".equals(d.getProcessingStatus())) {
+							totalCount--;
+						}
+					}
 
 					ArrayList<List<DisplayOrderDetails>> partitions = new ArrayList<List<DisplayOrderDetails>>();
 					for (int i=0; i<displayOrderList.size(); i += partitionSize) {
@@ -2426,52 +2436,55 @@ public class PrintReportsUtil {
 								Cell lineTypeCell = headerRow.createCell(3);
 								lineTypeCell.setCellValue("LINE TYPE");
 
-								Cell catTypeCell = headerRow.createCell(4);
+								Cell operationCell = headerRow.createCell(4);
+								operationCell.setCellValue("OPERATION");
+
+								Cell catTypeCell = headerRow.createCell(5);
 								catTypeCell.setCellValue("STATUS");
 
-								Cell dispOrdNameLevel1 = headerRow.createCell(5);
+								Cell dispOrdNameLevel1 = headerRow.createCell(6);
 								dispOrdNameLevel1.setCellValue("DISP ORD LEVEL 1 NAME");
 
-								Cell dispOrdNameLevel2 = headerRow.createCell(6);
+								Cell dispOrdNameLevel2 = headerRow.createCell(7);
 								dispOrdNameLevel2.setCellValue("DISP ORD LEVEL 2 NAME");
 
-								Cell dispOrdNameLevel3 = headerRow.createCell(7);
+								Cell dispOrdNameLevel3 = headerRow.createCell(8);
 								dispOrdNameLevel3.setCellValue("DISP ORD LEVEL 3 NAME");
 
-								Cell dispOrdNameLevel4 = headerRow.createCell(8);
+								Cell dispOrdNameLevel4 = headerRow.createCell(9);
 								dispOrdNameLevel4.setCellValue("DISP ORD LEVEL 4 NAME");
 
-								Cell dispOrdNameLevel5 = headerRow.createCell(9);
+								Cell dispOrdNameLevel5 = headerRow.createCell(10);
 								dispOrdNameLevel5.setCellValue("DISP ORD LEVEL 5 NAME");
 
-								Cell dispOrdNameLevel6 = headerRow.createCell(10);
+								Cell dispOrdNameLevel6 = headerRow.createCell(11);
 								dispOrdNameLevel6.setCellValue("DISP ORD LEVEL 6 NAME");
 
-								Cell seqNoCell = headerRow.createCell(11);
+								Cell seqNoCell = headerRow.createCell(12);
 								seqNoCell.setCellValue("SEQUENCE NO");
 
-								Cell manualTypeCell = headerRow.createCell(12);
+								Cell manualTypeCell = headerRow.createCell(13);
 								manualTypeCell.setCellValue("MANUAL TYPE");
 
-								Cell titleCell = headerRow.createCell(13);
+								Cell titleCell = headerRow.createCell(14);
 								titleCell.setCellValue("TITLE");
 
-								Cell engineTypeCell = headerRow.createCell(14);
+								Cell engineTypeCell = headerRow.createCell(15);
 								engineTypeCell.setCellValue("ENGINE TYPE");
 
-								Cell missionTypeCell = headerRow.createCell(15);
+								Cell missionTypeCell = headerRow.createCell(16);
 								missionTypeCell.setCellValue("MISSION TYPE");
 
-								Cell axleTypeCell = headerRow.createCell(16);
+								Cell axleTypeCell = headerRow.createCell(17);
 								axleTypeCell.setCellValue("DRIVE AXLE TYPE");
 
-								Cell bodyTypeCell = headerRow.createCell(17);
+								Cell bodyTypeCell = headerRow.createCell(18);
 								bodyTypeCell.setCellValue("BODY TYPE");
 
-								Cell errorCodeCell = headerRow.createCell(18);
+								Cell errorCodeCell = headerRow.createCell(19);
 								errorCodeCell.setCellValue("ERROR CODE");
 
-								Cell errorMessageCell = headerRow.createCell(19);
+								Cell errorMessageCell = headerRow.createCell(20);
 								errorMessageCell.setCellValue("ERROR MESSAGE");
 								
 								int rowCount = 0;
@@ -2487,22 +2500,25 @@ public class PrintReportsUtil {
 									Cell cell1 = row.createCell(1);
 									Cell cell2 = row.createCell(2);
 									Cell cell3 = row.createCell(3);
-									Cell cell4 = row.createCell(4);
-									Cell cell6 = row.createCell(5);
-									Cell cell8 = row.createCell(6);
-									Cell cell10 = row.createCell(7);
-									Cell cell12 = row.createCell(8);
-									Cell cell14 = row.createCell(9);
-									Cell cell16 = row.createCell(10);
-									Cell cell17 = row.createCell(11);
-									Cell cell18 = row.createCell(12);
-									Cell cell19 = row.createCell(13);
-									Cell cell20 = row.createCell(14);
-									Cell cell21 = row.createCell(15);
-									Cell cell22 = row.createCell(16);
-									Cell cell23 = row.createCell(17);
-									Cell cell24 = row.createCell(18);
-									Cell cell25 = row.createCell(19);
+									Cell cellOperation = row.createCell(4);
+									// INSERT = a row of the file; DELETE = the rows of a document the file no longer lists were removed
+									cellOperation.setCellValue(null == details.getOperation() || "".equals(details.getOperation()) ? OPERATION_INSERT : details.getOperation());
+									Cell cell4 = row.createCell(5);
+									Cell cell6 = row.createCell(6);
+									Cell cell8 = row.createCell(7);
+									Cell cell10 = row.createCell(8);
+									Cell cell12 = row.createCell(9);
+									Cell cell14 = row.createCell(10);
+									Cell cell16 = row.createCell(11);
+									Cell cell17 = row.createCell(12);
+									Cell cell18 = row.createCell(13);
+									Cell cell19 = row.createCell(14);
+									Cell cell20 = row.createCell(15);
+									Cell cell21 = row.createCell(16);
+									Cell cell22 = row.createCell(17);
+									Cell cell23 = row.createCell(18);
+									Cell cell24 = row.createCell(19);
+									Cell cell25 = row.createCell(20);
 
 									cell0.setCellValue("");
 									cell1.setCellValue("");
@@ -2548,7 +2564,7 @@ public class PrintReportsUtil {
 									if(null!=details.getProcessingStatus() && !"".equals(details.getProcessingStatus()))
 									{
 										cell4.setCellValue(details.getProcessingStatus());
-										if(details.getProcessingStatus().trim().toLowerCase().equals("success"))
+										if(details.getProcessingStatus().trim().toLowerCase().equals("success") && !OPERATION_DELETE.equals(details.getOperation()))
 										{
 											// increment successCount
 											successCount++;
@@ -2787,6 +2803,12 @@ public class PrintReportsUtil {
 
 					// set totalCount
 					totalCount=  cdProcessingList.size();
+					// DELETE rows (CD data of unlisted documents removed) are not rows of the file - not counted, a failed delete is
+					for (CDProcessingDetails d : cdProcessingList) {
+						if (OPERATION_DELETE.equals(d.getOperation()) && "SUCCESS".equals(d.getProcessingStatus())) {
+							totalCount--;
+						}
+					}
 
 					ArrayList<List<CDProcessingDetails>> partitions = new ArrayList<List<CDProcessingDetails>>();
 					for (int i=0; i<cdProcessingList.size(); i += partitionSize) {
@@ -2837,52 +2859,55 @@ public class PrintReportsUtil {
 								Cell lineTypeCell = headerRow.createCell(3);
 								lineTypeCell.setCellValue("LINE TYPE");
 
-								Cell catTypeCell = headerRow.createCell(4);
+								Cell operationCell = headerRow.createCell(4);
+								operationCell.setCellValue("OPERATION");
+
+								Cell catTypeCell = headerRow.createCell(5);
 								catTypeCell.setCellValue("STATUS");
 
-								Cell dispOrdNameLevel1 = headerRow.createCell(5);
+								Cell dispOrdNameLevel1 = headerRow.createCell(6);
 								dispOrdNameLevel1.setCellValue("DISP ORD LEVEL 1 NAME");
 
-								Cell dispOrdNameLevel2 = headerRow.createCell(6);
+								Cell dispOrdNameLevel2 = headerRow.createCell(7);
 								dispOrdNameLevel2.setCellValue("DISP ORD LEVEL 2 NAME");
 
-								Cell dispOrdNameLevel3 = headerRow.createCell(7);
+								Cell dispOrdNameLevel3 = headerRow.createCell(8);
 								dispOrdNameLevel3.setCellValue("DISP ORD LEVEL 3 NAME");
 
-								Cell dispOrdNameLevel4 = headerRow.createCell(8);
+								Cell dispOrdNameLevel4 = headerRow.createCell(9);
 								dispOrdNameLevel4.setCellValue("DISP ORD LEVEL 4 NAME");
 
-								Cell dispOrdNameLevel5 = headerRow.createCell(9);
+								Cell dispOrdNameLevel5 = headerRow.createCell(10);
 								dispOrdNameLevel5.setCellValue("DISP ORD LEVEL 5 NAME");
 
-								Cell dispOrdNameLevel6 = headerRow.createCell(10);
+								Cell dispOrdNameLevel6 = headerRow.createCell(11);
 								dispOrdNameLevel6.setCellValue("DISP ORD LEVEL 6 NAME");
 
-								Cell seqNoCell = headerRow.createCell(11);
+								Cell seqNoCell = headerRow.createCell(12);
 								seqNoCell.setCellValue("SEQUENCE NO");
 
-								Cell manualTypeCell = headerRow.createCell(12);
+								Cell manualTypeCell = headerRow.createCell(13);
 								manualTypeCell.setCellValue("MANUAL TYPE");
 
-								Cell titleCell = headerRow.createCell(13);
+								Cell titleCell = headerRow.createCell(14);
 								titleCell.setCellValue("TITLE");
 
-								Cell engineTypeCell = headerRow.createCell(14);
+								Cell engineTypeCell = headerRow.createCell(15);
 								engineTypeCell.setCellValue("ENGINE TYPE");
 
-								Cell missionTypeCell = headerRow.createCell(15);
+								Cell missionTypeCell = headerRow.createCell(16);
 								missionTypeCell.setCellValue("MISSION TYPE");
 
-								Cell axleTypeCell = headerRow.createCell(16);
+								Cell axleTypeCell = headerRow.createCell(17);
 								axleTypeCell.setCellValue("DRIVE AXLE TYPE");
 
-								Cell bodyTypeCell = headerRow.createCell(17);
+								Cell bodyTypeCell = headerRow.createCell(18);
 								bodyTypeCell.setCellValue("BODY TYPE");
 
-								Cell errorCodeCell = headerRow.createCell(18);
+								Cell errorCodeCell = headerRow.createCell(19);
 								errorCodeCell.setCellValue("ERROR CODE");
 
-								Cell errorMessageCell = headerRow.createCell(19);
+								Cell errorMessageCell = headerRow.createCell(20);
 								errorMessageCell.setCellValue("ERROR MESSAGE");
 								
 								int rowCount = 0;
@@ -2898,22 +2923,25 @@ public class PrintReportsUtil {
 									Cell cell1 = row.createCell(1);
 									Cell cell2 = row.createCell(2);
 									Cell cell3 = row.createCell(3);
-									Cell cell4 = row.createCell(4);
-									Cell cell6 = row.createCell(5);
-									Cell cell8 = row.createCell(6);
-									Cell cell10 = row.createCell(7);
-									Cell cell12 = row.createCell(8);
-									Cell cell14 = row.createCell(9);
-									Cell cell16 = row.createCell(10);
-									Cell cell17 = row.createCell(11);
-									Cell cell18 = row.createCell(12);
-									Cell cell19 = row.createCell(13);
-									Cell cell20 = row.createCell(14);
-									Cell cell21 = row.createCell(15);
-									Cell cell22 = row.createCell(16);
-									Cell cell23 = row.createCell(17);
-									Cell cell24 = row.createCell(18);
-									Cell cell25 = row.createCell(19);
+									Cell cellOperation = row.createCell(4);
+									// INSERT = a row of the file; DELETE = the rows of a document the file no longer lists were removed
+									cellOperation.setCellValue(null == details.getOperation() || "".equals(details.getOperation()) ? OPERATION_INSERT : details.getOperation());
+									Cell cell4 = row.createCell(5);
+									Cell cell6 = row.createCell(6);
+									Cell cell8 = row.createCell(7);
+									Cell cell10 = row.createCell(8);
+									Cell cell12 = row.createCell(9);
+									Cell cell14 = row.createCell(10);
+									Cell cell16 = row.createCell(11);
+									Cell cell17 = row.createCell(12);
+									Cell cell18 = row.createCell(13);
+									Cell cell19 = row.createCell(14);
+									Cell cell20 = row.createCell(15);
+									Cell cell21 = row.createCell(16);
+									Cell cell22 = row.createCell(17);
+									Cell cell23 = row.createCell(18);
+									Cell cell24 = row.createCell(19);
+									Cell cell25 = row.createCell(20);
 
 									cell0.setCellValue("");
 									cell1.setCellValue("");
@@ -2959,7 +2987,7 @@ public class PrintReportsUtil {
 									if(null!=details.getProcessingStatus() && !"".equals(details.getProcessingStatus()))
 									{
 										cell4.setCellValue(details.getProcessingStatus());
-										if(details.getProcessingStatus().trim().toLowerCase().equals("success"))
+										if(details.getProcessingStatus().trim().toLowerCase().equals("success") && !OPERATION_DELETE.equals(details.getOperation()))
 										{
 											// increment successCount
 											successCount++;

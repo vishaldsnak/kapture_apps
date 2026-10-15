@@ -2,7 +2,6 @@ package com.mazda.gms3.dmt.autosync.dao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -103,108 +102,51 @@ public class MasterDataSyncTransactionDAO extends DBConnectionHelper{
 		}
 	}
 
-	public void updateProcessingCount(String scheduleId, String itemId, String status)
+	/*
+	 * ADDS processed / failed to the counts of the schedule and of the item - one UPDATE each, no read first.
+	 * Called by MasterDataSyncCountBuffer every few seconds (was 4 statements per category row).
+	 */
+	public void addProcessingCounts(long scheduleId, long itemId, int processed, int failed)
 	{
+		if(processed<=0 && failed<=0)
+		{
+			return;
+		}
 		Connection conn = null;
 		PreparedStatement stmt =null;
-		ResultSet rs = null;
 		try
 		{
 			conn = getConnection();
-			String sql = "";
-			if(status.equals(AutoSyncConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT AS_PROCESSED_COUNT AS COUNT FROM gms3_auto_sync_sch WHERE AS_SCHEDULE_ID="+scheduleId;
-			}
-			else
-			{
-				sql = "SELECT AS_FAILED_COUNT AS COUNT FROM gms3_auto_sync_sch WHERE AS_SCHEDULE_ID="+scheduleId;
-			}
-			stmt = conn.prepareStatement(sql);
-			rs= stmt.executeQuery();
-			int count=0;
-			if(rs.next())
-			{
-				count= rs.getInt("COUNT");
-			}
-			stmt.close();stmt=null;
-			rs.close();rs=null;
-			sql = null;
-			
-			// increment count by 1
-			count = count+1;
-			
-			// update count
-			if(status.equals(AutoSyncConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_auto_sync_sch  SET AS_PROCESSED_COUNT = ? WHERE AS_SCHEDULE_ID="+scheduleId;
-			}
-			else
-			{
-				sql = "UPDATE gms3_auto_sync_sch  SET AS_FAILED_COUNT = ? WHERE AS_SCHEDULE_ID="+scheduleId;
-			}
-			stmt  = conn.prepareStatement(sql);
-			stmt.setInt(1, count);
+			stmt = conn.prepareStatement("UPDATE gms3_auto_sync_sch SET AS_PROCESSED_COUNT = COALESCE(AS_PROCESSED_COUNT,0) + ?,"
+					+ " AS_FAILED_COUNT = COALESCE(AS_FAILED_COUNT,0) + ? WHERE AS_SCHEDULE_ID = ?");
+			stmt.setInt(1, processed);
+			stmt.setInt(2, failed);
+			stmt.setLong(3, scheduleId);
 			stmt.executeUpdate();
 			stmt.close();stmt=null;
-			sql = null;
-			
-			// NOW UPDATE ITEMS COUNT
-			if(status.equals(AutoSyncConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT AS_PROCESSED_COUNT AS COUNT FROM gms3_auto_sync_sch_items WHERE AS_ITEM_ID="+itemId;
-			}
-			else
-			{
-				sql = "SELECT AS_FAILED_COUNT AS COUNT FROM gms3_auto_sync_sch_items WHERE AS_ITEM_ID="+itemId;
-			}
-			stmt = conn.prepareStatement(sql);
-			rs= stmt.executeQuery();
-			int itemCount=0;
-			if(rs.next())
-			{
-				itemCount= rs.getInt("COUNT");
-			}
-			stmt.close();stmt=null;
-			rs.close();rs=null;
-			sql = null;
-			
-			// increment itemCount by 1
-			itemCount = itemCount+1;
-			
-			// update count
-			if(status.equals(AutoSyncConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_auto_sync_sch_items  SET AS_PROCESSED_COUNT = ? WHERE AS_ITEM_ID="+itemId;
-			}
-			else
-			{
-				sql = "UPDATE gms3_auto_sync_sch_items  SET AS_FAILED_COUNT = ? WHERE AS_ITEM_ID="+itemId;
-			}
-			stmt  = conn.prepareStatement(sql);
-			stmt.setInt(1, itemCount);
+			stmt = conn.prepareStatement("UPDATE gms3_auto_sync_sch_items SET AS_PROCESSED_COUNT = COALESCE(AS_PROCESSED_COUNT,0) + ?,"
+					+ " AS_FAILED_COUNT = COALESCE(AS_FAILED_COUNT,0) + ? WHERE AS_ITEM_ID = ?");
+			stmt.setInt(1, processed);
+			stmt.setInt(2, failed);
+			stmt.setLong(3, itemId);
 			stmt.executeUpdate();
-			stmt.close();stmt=null;
-			sql = null;
 		}
 		catch(Exception e)
 		{
-			Utilities.printStackTraceToLogs(MasterDataSyncTransactionDAO.class.getName(), "updateProcessingCount()", e);
+			Utilities.printStackTraceToLogs(MasterDataSyncTransactionDAO.class.getName(), "addProcessingCounts()", e);
 		}
 		finally
 		{
 			try
 			{
-				if(null!=conn)
-					conn.close();
 				if(null!=stmt)
 					stmt.close();
-				if(null!=rs)
-					rs.close();
+				if(null!=conn)
+					conn.close();
 			}
 			catch(Exception e)
 			{
-				Utilities.printStackTraceToLogs(MasterDataSyncTransactionDAO.class.getName(), "updateProcessingCount()", e);
+				Utilities.printStackTraceToLogs(MasterDataSyncTransactionDAO.class.getName(), "addProcessingCounts()", e);
 			}
 		}
 	}

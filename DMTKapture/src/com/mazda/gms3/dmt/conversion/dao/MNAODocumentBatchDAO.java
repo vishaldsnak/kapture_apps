@@ -184,6 +184,9 @@ public class MNAODocumentBatchDAO {
 				if (performAllOps) {
 					// cleanUpOldDataForDocument(): every detail of the documents goes first
 					deleteByDocumentIds(conn, t.displayOrder, list);
+					// the documents that had view content - UnlistedDisplayData reports the ones no longer listed (MNAO: no CD)
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, "gms3_vc_model_year_details", "VC_MY_LOCALE", "VC_MY_DOCUMENT_ID", list);
+					com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, "gms3_vc_vin_details", "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID", list);
 					deleteViewContent(conn, t, list);
 				}
 				updateDocumentRows(conn, t, list, rowIds);

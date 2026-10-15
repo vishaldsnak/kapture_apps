@@ -43,6 +43,8 @@ public class DisplayOrderDetails {
 	private String processingStatus = null;
 	private String errorCode = null;
 	private String errorMessage = null;
+	/** report OPERATION column: INSERT (row of the display order file) or DELETE (view content of an unlisted document removed) */
+	private String operation = null;
 	private String locale = null;
 	private String scheduleId = null;
 	private String itemId = null;
@@ -201,6 +203,14 @@ public class DisplayOrderDetails {
 
 	public String getErrorMessage() {
 		return errorMessage;
+	}
+
+	public String getOperation() {
+		return operation;
+	}
+
+	public void setOperation(String operation) {
+		this.operation = operation;
 	}
 
 	public void setErrorMessage(String errorMessage) {

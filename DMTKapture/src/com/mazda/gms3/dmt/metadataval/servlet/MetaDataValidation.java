@@ -737,94 +737,11 @@ public class MetaDataValidation extends HttpServlet {
 			{
 				String key = sessionBean.getLanguageCode().trim();
 				key = key.replace("-", "_");
-				if(mnaoLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1)
+				if((mcLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1) || 
+						(mmeLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1) || 
+						(mnaoLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1))
 				{
-					// MNAO MARKET
-					if(sessionBean.getMetaDataType().equals("LEFTMENU"))
-					{
-						// extension must be a text file
-						if(!extension.trim().toLowerCase().equals(ApplicationProperties.getProperty("extension.txt").trim().toLowerCase()))
-						{
-							logger.info("validateSupportedFileType() :: Extension is not TEXT. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.txt.file", fileName));
-							return false;
-						}
-						
-						// filename must be leftmenu.txt
-						if(!fileName.trim().toLowerCase().startsWith("leftmenu"))
-						{
-							logger.info("validateSupportedFileType() :: File Name does not start with leftmenu. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.txt.file", fileName));
-							return false;
-						}
-					}
-					else if(sessionBean.getMetaDataType().equals("VIN"))
-					{
-						// extension must be a ENT FILE
-						if(!extension.trim().toLowerCase().equals(ApplicationProperties.getProperty("extension.ent").trim().toLowerCase()))
-						{
-							logger.info("validateSupportedFileType() :: Extension is not ENT. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.ent.file", fileName));
-							return false;
-						}
-						
-						// filename must be vin.ent / vin1.ent
-						if(!fileName.trim().toLowerCase().startsWith("vin"))
-						{
-							logger.info("validateSupportedFileType() :: File Name does not start with vin. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.ent.file", fileName));
-							return false;
-						}
-					}
-					else if(sessionBean.getMetaDataType().equals("VINATTRIBUTE"))
-					{
-
-						// extension must be a ENT FILE
-						if(!extension.trim().toLowerCase().equals(ApplicationProperties.getProperty("extension.ent").trim().toLowerCase()))
-						{
-							logger.info("validateSupportedFileType() :: Extension is not ENT. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.ent.file", fileName));
-							return false;
-						}
-						
-						// filename must be vin_attribute.ent / vin_attribute1.ent
-						if(!fileName.trim().toLowerCase().startsWith("vin_attribute"))
-						{
-							logger.info("validateSupportedFileType() :: File Name does not start with vin_attribute. Throw Message - Uploaded file not supported."); 
-							if(null!=errorMessage && null!=errorMessage.toString() && !"".equals(errorMessage.toString()))
-							{
-								errorMessage.append("<MSG_TOKEN>");
-							}
-							errorMessage.append(msgProps.addMessage("error.valid.ent.file", fileName));
-							return false;
-						}
-					
-					}
-				}
-				else if((mcLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1) || 
-						(mmeLocales.trim().toLowerCase().indexOf(key.trim().toLowerCase()) > -1))
-				{
-					// MC OR MME MARKET
+					// MC, MME OR MNAO MARKET (MNAO: vin.txt, esicat.txt, d*.txt like MC / MME since the new MNAO layout)
 					// extension must be a text file
 					if(!extension.trim().toLowerCase().equals(ApplicationProperties.getProperty("extension.txt").trim().toLowerCase()))
 					{

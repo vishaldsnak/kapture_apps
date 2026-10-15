@@ -23,9 +23,6 @@ import com.mazda.gms3.dmt.mc.vo.ESICategoryDetails;
 import com.mazda.gms3.dmt.mc.vo.VinDetails;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
 import com.mazda.gms3.dmt.utils.Utilities;
-import com.mazda.gms3.dmt.vo.LeftMenuFileDetails;
-import com.mazda.gms3.dmt.vo.VINEntFileDetails;
-import com.mazda.gms3.dmt.vo.VinAttributeEntFileDetails;
 
 public class PrintReportsUtil {
 
@@ -153,8 +150,7 @@ public class PrintReportsUtil {
 		zos.closeEntry();
 		fis.close();
 	}
-	
-	
+
 	public void printMCMMEVinReport(String scheduleCode , ArrayList<VinDetails> vinList, String locale) {
 		if (logger.isInfoEnabled())
 			logger.info("printMCMMEVinReport :: Method Starts.");
@@ -242,7 +238,7 @@ public class PrintReportsUtil {
 					Cell vinRefKeyCell = headerRow.createCell(14);
 					vinRefKeyCell.setCellValue("VIN REF KEY");
 					Cell vinFoundInIMCell = headerRow.createCell(15);
-					vinFoundInIMCell.setCellValue("VIN EXISTS IN IM");
+					vinFoundInIMCell.setCellValue("VIN EXISTS IN KAPTURE");
 					Cell displayOrderCell = headerRow.createCell(16);
 					displayOrderCell.setCellValue("DISPLAY ORDER FILE");
 					Cell errorMessageCell = headerRow.createCell(17);
@@ -308,7 +304,6 @@ public class PrintReportsUtil {
 							cell7.setCellValue(details.getMaterialFolder());
 						}
 
-						
 						Cell cell8 = row.createCell(8);
 						Cell cell9 = row.createCell(9);
 						Cell cell10 = row.createCell(10);
@@ -446,7 +441,6 @@ public class PrintReportsUtil {
 			logger.info("printMCMMEVinReport :: Method Ends.");
 	}
 
-		
 	public void printDisplayOrderReport(String scheduleCode , ArrayList<DisplayOrderDetails> displayOrderList, String locale) {
 		if (logger.isInfoEnabled())
 			logger.info("printDisplayOrderReport :: Method Starts.");
@@ -503,11 +497,11 @@ public class PrintReportsUtil {
 					 * Add Header Row
 					 */
 					String headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,MODEL FOLDER,MANUAL TYPE FOLDER,FACELIFT FOLDER,MATERIAL FOLDER,PROCESSING FOLDER,"
-							+ "CONTENT FILE NAME,TITLE,DISP ORD CODE 1,DISP ORD NAME 1,DISP ORD CODE 2,DISP ORD NAME 2,DISP ORD CODE 3,DISP ORD NAME 3,"
-							+ "DISP ORD CODE 4,DISP ORD NAME 4,DISP ORD CODE 5,DISP ORD NAME 5,DISP ORD CODE 6,DISP ORD NAME 6,SEQUENCE NO,ERROR MESSAGE,"
+							+ "CONTENT FILE NAME,TITLE,DISP ORD NAME 1,DISP ORD NAME 2,DISP ORD NAME 3,"
+							+ "DISP ORD NAME 4,DISP ORD NAME 5,DISP ORD NAME 6,SEQUENCE NO,ERROR MESSAGE,"
 							+ "ENGINE TYPE,TRANSMISSION TYPE,"
-							+ "DRIVEAXLE TYPE,BODY TYPE,MDM-FAILED ENGINE TYPE,IM-FAILED ENGINE TYPE,MDM-FAILED TRANSMISSION TYPE,IM-FAILED TRANSMISSION TYPE,"
-							+ "MDM-FAILED DRIVEAXLE TYPE,IM-FAILED DRIVEAXLE TYPE,MDM-FAILED BODY TYPE,IM-FAILED BODY TYPE";
+							+ "DRIVEAXLE TYPE,BODY TYPE,MDM-FAILED ENGINE TYPE,KAPTURE-FAILED ENGINE TYPE,MDM-FAILED TRANSMISSION TYPE,KAPTURE-FAILED TRANSMISSION TYPE,"
+							+ "MDM-FAILED DRIVEAXLE TYPE,KAPTURE-FAILED DRIVEAXLE TYPE,MDM-FAILED BODY TYPE,KAPTURE-FAILED BODY TYPE";
 					String[] headerTokens=headers.split(",");
 					Row headerRow = mySheet.createRow(0);
 					Cell headerCell=null;
@@ -538,12 +532,12 @@ public class PrintReportsUtil {
 								details.getManualType()+"<TOK_SEPARATOR>";
 						dispData+=details.getFaceLiftFolderName()+"<TOK_SEPARATOR>"+details.getMaterialFolderName()+"<TOK_SEPARATOR>"+details.getProcessingFolderName()+
 								"<TOK_SEPARATOR>"+details.getFileName()+"<TOK_SEPARATOR>"+details.getTitle()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel1Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel1Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel2Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel2Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel3Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel3Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel4Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel4Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel5Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel5Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel6Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel6Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel1Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel2Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel3Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel4Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel5Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel6Name()+"<TOK_SEPARATOR>";
 						dispData+=details.getSequenceNo()+"<TOK_SEPARATOR>"+details.getErrorMessage()+"<TOK_SEPARATOR>";
 						dispData+=details.getEngineType()+"<TOK_SEPARATOR>"+details.getMissionType()+"<TOK_SEPARATOR>";
 						dispData+=details.getDriveAxleType()+"<TOK_SEPARATOR>"+details.getBodyType()+"<TOK_SEPARATOR>";
@@ -657,8 +651,8 @@ public class PrintReportsUtil {
 					 * Add Header Row
 					 */
 					String headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,MODEL FOLDER,MANUAL TYPE FOLDER,FACELIFT FOLDER,MATERIAL FOLDER,PROCESSING FOLDER,"
-							+ "CONTENT FILE NAME,TITLE,DISP ORD CODE 1,DISP ORD NAME 1,DISP ORD CODE 2,DISP ORD NAME 2,DISP ORD CODE 3,DISP ORD NAME 3,"
-							+ "DISP ORD CODE 4,DISP ORD NAME 4,DISP ORD CODE 5,DISP ORD NAME 5,DISP ORD CODE 6,DISP ORD NAME 6,SEQUENCE NO,ERROR MESSAGE,"
+							+ "CONTENT FILE NAME,TITLE,DISP ORD NAME 1,DISP ORD NAME 2,DISP ORD NAME 3,"
+							+ "DISP ORD NAME 4,DISP ORD NAME 5,DISP ORD NAME 6,SEQUENCE NO,ERROR MESSAGE,"
 							+ "ENGINE TYPE,TRANSMISSION TYPE,"
 							+ "DRIVEAXLE TYPE,BODY TYPE";
 					String[] headerTokens=headers.split(",");
@@ -691,12 +685,12 @@ public class PrintReportsUtil {
 								details.getManualType()+"<TOK_SEPARATOR>";
 						dispData+=details.getFaceLiftFolderName()+"<TOK_SEPARATOR>"+details.getMaterialFolderName()+"<TOK_SEPARATOR>"+details.getProcessingFolderName()+
 								"<TOK_SEPARATOR>"+details.getFileName()+"<TOK_SEPARATOR>"+details.getTitle()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel1Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel1Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel2Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel2Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel3Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel3Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel4Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel4Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel5Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel5Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getDisplayOrderLevel6Code()+"<TOK_SEPARATOR>"+details.getDisplayOrderLevel6Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel1Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel2Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel3Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel4Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel5Name()+"<TOK_SEPARATOR>";
+						dispData+=details.getDisplayOrderLevel6Name()+"<TOK_SEPARATOR>";
 						dispData+=details.getSequenceNo()+"<TOK_SEPARATOR>"+details.getErrorMessage()+"<TOK_SEPARATOR>";
 						dispData+=details.getEngineType()+"<TOK_SEPARATOR>"+details.getMissionType()+"<TOK_SEPARATOR>";
 						dispData+=details.getDriveAxleType()+"<TOK_SEPARATOR>"+details.getBodyType();
@@ -807,12 +801,12 @@ public class PrintReportsUtil {
 					 */
 					String headers="";
 					headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,FACELIFT FOLDER,MATERIAL FOLDER,PROCESSING FOLDER,"
-							+ "CONTENT FILE NAME,TITLE,LEVEL1-CODE,LEVEL1-NAME,LEVEL1-EXISTS_MDM,LEVEL1-REFKEY,LEVEL1-EXISTS_IM,";
-					headers+="LEVEL2-CODE,LEVEL2-NAME,LEVEL2-EXISTS_MDM,LEVEL2-REFKEY,LEVEL2-EXISTS_IM,";
-					headers+="LEVEL3-CODE,LEVEL3-NAME,LEVEL3-EXISTS_MDM,LEVEL3-REFKEY,LEVEL3-EXISTS_IM,";
-					if(metaDataType.equals("ESICATEGORY_WD"))
+							+ "CONTENT FILE NAME,TITLE,LEVEL1-CODE,LEVEL1-NAME,LEVEL1-EXISTS_MDM,LEVEL1-REFKEY,LEVEL1-EXISTS_KAPTURE,";
+					headers+="LEVEL2-CODE,LEVEL2-NAME,LEVEL2-EXISTS_MDM,LEVEL2-REFKEY,LEVEL2-EXISTS_KAPTURE,";
+					headers+="LEVEL3-CODE,LEVEL3-NAME,LEVEL3-EXISTS_MDM,LEVEL3-REFKEY,LEVEL3-EXISTS_KAPTURE,";
+					if(metaDataType.startsWith("ESICATEGORY_WD"))
 					{
-						headers+="STEERING TYPE,IM-FAILED_STEERING TYPE,";
+						headers+="STEERING TYPE,KAPTURE-FAILED_STEERING TYPE,";
 					}
 					headers+="ERROR MESSAGE";
 					String[] headerTokens=headers.split(",");
@@ -851,7 +845,7 @@ public class PrintReportsUtil {
 						dispData+=details.getCategoryLevel3Code()+"<TOK_SEPARATOR>"+details.getCategoryLevel3Name()+"<TOK_SEPARATOR>";
 						dispData+=details.getCode3ExistsInMDM()+"<TOK_SEPARATOR>"+details.getCode3RefKey()+"<TOK_SEPARATOR>"+details.getCode3ExistsInIM()+"<TOK_SEPARATOR>";
 						
-						if(metaDataType.equals("ESICATEGORY_WD"))
+						if(metaDataType.startsWith("ESICATEGORY_WD"))
 						{
 							dispData+=details.getSteeringTypeInfoText()+"<TOK_SEPARATOR>"+details.getFailedSteeringTypeInIM()+"<TOK_SEPARATOR>";
 						}
@@ -907,284 +901,65 @@ public class PrintReportsUtil {
 			logger.info("printESICategoryReport :: Method Ends.");
 	}
 
-	public void printLeftMenuReport(String scheduleCode , ArrayList<LeftMenuFileDetails> leftMenuList, String locale) {
-		if (logger.isInfoEnabled())
-			logger.info("printLeftMenuReport :: Method Starts.");
-		try {
-			if (null != leftMenuList && leftMenuList.size() > 0) 
-			{
-				if ( null != scheduleCode && !"".equals(scheduleCode)) 
-				{
-					/*
-					 * write the string Builder Text to a separate Log file
-					 * parallel to the other Logs Generation
-					 */
-					String path = ApplicationProperties.getProperty("metadata.validation.reports.physicalpath");
-
-					/*
-					 * Now check inside the reports directory does a directory
-					 * exists for wslId
-					 */
-					File reportDirectory = PathUtil.file(path);
-					if (!reportDirectory.exists() || !reportDirectory.isDirectory()) {
-						// create new directory
-						reportDirectory.mkdir();
-					}
-					reportDirectory = null;
-					
-					if(!path.endsWith("/"))
-					{
-						path = path+"/";
-					}
-					/*
-					 * Now check, whether the schedule code directory exists or
-					 * not
-					 */
-					path = path  + scheduleCode;
-					File scheduleDirectory = PathUtil.file(path);
-					if (!scheduleDirectory.exists()
-							|| !scheduleDirectory.isDirectory()) {
-						scheduleDirectory.mkdir();
-					}
-					scheduleDirectory = null;
-
-					/*
-					 * iterate Map and write the Excel File for each Index
-					 */
-					String fName = "/" + scheduleCode+".xlsx";
-					File myFile = PathUtil.file(path + fName);
-					fName = null;
-					// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
-					SXSSFWorkbook myWorkBook = new SXSSFWorkbook(100);
-
-					// Create a new sheet
-					Sheet mySheet = myWorkBook.createSheet("Details");
-					
-					/*
-					 * Add Header Row
-					 */
-					String headers="";
-					headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,CONTENT FILE NAME,VTOC FILE NAME,"
-							+ "TITLE,LEVEL1-CODE,LEVEL1-NAME,LEVEL1-EXISTS_MDM,LEVEL1-REFKEY,LEVEL1-EXISTS_IM,";
-					headers+="LEVEL2-CODE,LEVEL2-NAME,LEVEL2-EXISTS_MDM,LEVEL2-REFKEY,LEVEL2-EXISTS_IM,";
-					headers+="LEVEL3-CODE,LEVEL3-NAME,LEVEL3-EXISTS_MDM,LEVEL3-REFKEY,LEVEL3-EXISTS_IM,";
-					headers+="ERROR MESSAGE";
-					
-					String[] headerTokens=headers.split(",");
-					Row headerRow = mySheet.createRow(0);
-					Cell headerCell=null;
-					for(int a=0;a<headerTokens.length;a++)
-					{
-						headerCell = headerRow.createCell(a);
-						headerCell.setCellValue(headerTokens[a].toString().trim());
-					}
-					headerCell=null;
-					headers=null;
-					headerTokens=null;
-					
-					int rowCount = 0;
-					String[] dispToken=null;
-					String dispData=null;
-					Cell dataCell=null;
-					Row row=null;
-					LeftMenuFileDetails details=null;
-					for (int a = 0; a < leftMenuList.size(); a++) {
-						details = (LeftMenuFileDetails) leftMenuList.get(a);
-						// increment rowCount by 1
-						rowCount++;
-						// Create a new Row
-						row = mySheet.createRow(rowCount);
-						dispData=ApplicationProperties.getProperty("metadata.sch.key")+scheduleCode+"<TOK_SEPARATOR>"+details.getLeftMenuSourceFileName()+
-								"<TOK_SEPARATOR>"+details.getLeftMenuSourceFilePath()+"<TOK_SEPARATOR>";
-						dispData+=details.getProcessingStatus()+"<TOK_SEPARATOR>"+locale+"<TOK_SEPARATOR>";
-						dispData+=details.getFileName()+"<TOK_SEPARATOR>"+details.getVtocFileNameAttribute()+"<TOK_SEPARATOR>"+ details.getTitle()+"<TOK_SEPARATOR>";
-						dispData+=details.getCategoryCode()+"<TOK_SEPARATOR>"+details.getCategoryLevel1Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getCode1ExistsInMDM()+"<TOK_SEPARATOR>"+details.getCode1RefKey()+"<TOK_SEPARATOR>"+details.getCode1ExistsInIM()+"<TOK_SEPARATOR>";
-						dispData+=details.getSubCategoryCode()+"<TOK_SEPARATOR>"+details.getCategoryLevel2Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getCode2ExistsInMDM()+"<TOK_SEPARATOR>"+details.getCode2RefKey()+"<TOK_SEPARATOR>"+details.getCode2ExistsInIM()+"<TOK_SEPARATOR>";
-						dispData+=details.getSubSubCategoryCode()+"<TOK_SEPARATOR>"+details.getCategoryLevel3Name()+"<TOK_SEPARATOR>";
-						dispData+=details.getCode3ExistsInMDM()+"<TOK_SEPARATOR>"+details.getCode3RefKey()+"<TOK_SEPARATOR>"+details.getCode3ExistsInIM()+"<TOK_SEPARATOR>";
-						dispData+=details.getErrorMessage();
-						
-						dispToken = dispData.split("<TOK_SEPARATOR>");
-						if(null!=dispToken && dispToken.length>0)
-						{
-							for(int r=0;r<dispToken.length;r++)
-							{
-								dataCell = row.createCell(r);
-								dataCell.setCellValue("");
-								if(null!=dispToken[r] && !"".equals(dispToken[r]) && !"null".equals(dispToken[r].trim().toLowerCase()))
-								{
-									dataCell.setCellValue(dispToken[r].trim());
-								}
-								dataCell=null;
-							}
-						}
-						dataCell=null;
-						row = null;
-						details = null;
-						dispData=null;
-						dispToken=null;
-					}
-					dataCell=null;
-					row = null;
-					details = null;
-					dispData=null;
-					dispToken=null;
-					headerRow = null;
-					FileOutputStream os = PathUtil.fileOutputStream(myFile);
-					myWorkBook.write(os);
-					logger.info("LEFTMENU METADATA FAILURE REPORT XLSX file Finished ...");
-					os.flush();
-					os.close();
-
-					// set mySheet to null
-					mySheet = null;
-					// set myWorkBook to null
-					myWorkBook = null;
-					// set path to null
-					path = null;
-					// set myFile to null
-					myFile = null;
-				}
-			}
-		} catch (Exception e) {
-			Utilities.printStackTraceToLogs(PrintReportsUtil.class.getName(), "printLeftMenuReport()", e);
-		}
-		if (logger.isInfoEnabled())
-			logger.info("printLeftMenuReport :: Method Ends.");
-	}
-
-	public void printMNAOVinReport(String scheduleCode , ArrayList<VINEntFileDetails> vinList, String locale) {
+	/**
+	 * Failure report of an MNAO vin.txt: the VIN columns of the MC / MME report plus the model, the model year and its
+	 * category.
+	 */
+	public void printMNAOVinReport(String scheduleCode , ArrayList<VinDetails> vinList, String locale) {
 		if (logger.isInfoEnabled())
 			logger.info("printMNAOVinReport :: Method Starts.");
 		try {
-			if (null != vinList && vinList.size() > 0) 
+			if (null != vinList && vinList.size() > 0 && null != scheduleCode && !"".equals(scheduleCode))
 			{
-				if ( null != scheduleCode && !"".equals(scheduleCode)) 
-				{
-					/*
-					 * write the string Builder Text to a separate Log file
-					 * parallel to the other Logs Generation
-					 */
-					String path = ApplicationProperties.getProperty("metadata.validation.reports.physicalpath");
-
-					/*
-					 * Now check inside the reports directory does a directory
-					 * exists for wslId
-					 */
-					File reportDirectory = PathUtil.file(path);
-					if (!reportDirectory.exists() || !reportDirectory.isDirectory()) {
-						// create new directory
-						reportDirectory.mkdir();
-					}
-					reportDirectory = null;
-					
-					if(!path.endsWith("/"))
-					{
-						path = path+"/";
-					}
-					/*
-					 * Now check, whether the schedule code directory exists or
-					 * not
-					 */
-					path = path  + scheduleCode;
-					File scheduleDirectory = PathUtil.file(path);
-					if (!scheduleDirectory.exists()
-							|| !scheduleDirectory.isDirectory()) {
-						scheduleDirectory.mkdir();
-					}
-					scheduleDirectory = null;
-					
-					/*
-					 * iterate Map and write the Excel File for each Index
-					 */
-					String fName = "/" + scheduleCode+".xlsx";
-					File myFile = PathUtil.file(path + fName);
-					fName = null;
-					// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
-					SXSSFWorkbook myWorkBook = new SXSSFWorkbook(100);
-
-					// Create a new sheet
-					Sheet mySheet = myWorkBook.createSheet("Details");
-					
-					String headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,";
-					headers+="CARLINE CODE,WMI CODE,VDS CODE,VIS START RANGE,VIS END RANGE,VIN EXISTS IN MDM,";
-					headers+="VIN REF KEY,VIN EXISTS IN IM,MODEL YEAR,ERROR MESSAGE";
-					
-					String[] headerTokens=headers.split(",");
-					Row headerRow = mySheet.createRow(0);
-					Cell headerCell=null;
-					for(int a=0;a<headerTokens.length;a++)
-					{
-						headerCell = headerRow.createCell(a);
-						headerCell.setCellValue(headerTokens[a].toString().trim());
-					}
-					headerCell=null;
-					headers=null;
-					headerTokens=null;
-					
-					int rowCount = 0;
-					String[] dispToken=null;
-					String dispData=null;
-					Cell dataCell=null;
-					Row row=null;
-					VINEntFileDetails details=null;
-					for (int a = 0; a < vinList.size(); a++) {
-						details = (VINEntFileDetails) vinList.get(a);
-						// increment rowCount by 1
-						rowCount++;
-						// Create a new Row
-						row = mySheet.createRow(rowCount);
-						dispData=ApplicationProperties.getProperty("metadata.sch.key")+scheduleCode+"<TOK_SEPARATOR>"+details.getFileName()+
-								"<TOK_SEPARATOR>"+details.getFilePath()+"<TOK_SEPARATOR>";
-						dispData+=details.getProcessingStatus()+"<TOK_SEPARATOR>"+locale+"<TOK_SEPARATOR>";
-						dispData+=details.getVinCarline()+"<TOK_SEPARATOR>"+details.getVinWMI()+"<TOK_SEPARATOR>"+details.getVinVDS()+
-								"<TOK_SEPARATOR>"+details.getVinStartRange()+"<TOK_SEPARATOR>"+details.getVinEndRange()+"<TOK_SEPARATOR>";
-						dispData+=details.getVinFoundInMDM()+"<TOK_SEPARATOR>"+details.getVinRefKey()+"<TOK_SEPARATOR>";
-						dispData+=details.getVinFoundInIM()+"<TOK_SEPARATOR>"+details.getModelYear()+"<TOK_SEPARATOR>"+details.getErrorMessage();
-						
-						dispToken = dispData.split("<TOK_SEPARATOR>");
-						if(null!=dispToken && dispToken.length>0)
-						{
-							for(int r=0;r<dispToken.length;r++)
-							{
-								dataCell = row.createCell(r);
-								dataCell.setCellValue("");
-								if(null!=dispToken[r] && !"".equals(dispToken[r]) && !"null".equals(dispToken[r].trim().toLowerCase()))
-								{
-									dataCell.setCellValue(dispToken[r].trim());
-								}
-								dataCell=null;
-							}
-						}
-						dataCell=null;
-						row = null;
-						details = null;
-						dispData=null;
-						dispToken=null;
-					}
-					dataCell=null;
-					row = null;
-					details = null;
-					dispData=null;
-					dispToken=null;
-					headerRow = null;
-					FileOutputStream os = PathUtil.fileOutputStream(myFile);
-					myWorkBook.write(os);
-					logger.info("VIN METADATA FAILURE REPORT TEXT file Finished ...");
-					os.flush();
-					os.close();
-
-					// set mySheet to null
-					mySheet = null;
-					// set myWorkBook to null
-					myWorkBook = null;
-					// set path to null
-					path = null;
-					// set myFile to null
-					myFile = null;
+				String path = ApplicationProperties.getProperty("metadata.validation.reports.physicalpath");
+				File reportDirectory = PathUtil.file(path);
+				if (!reportDirectory.exists() || !reportDirectory.isDirectory()) {
+					reportDirectory.mkdir();
 				}
+				if(!path.endsWith("/"))
+				{
+					path = path+"/";
+				}
+				path = path + scheduleCode;
+				File scheduleDirectory = PathUtil.file(path);
+				if (!scheduleDirectory.exists() || !scheduleDirectory.isDirectory()) {
+					scheduleDirectory.mkdir();
+				}
+				File myFile = PathUtil.file(path + "/" + scheduleCode + ".xlsx");
+				// KEEP 100 ROWS IN MEMORY AND REST ON DISK
+				SXSSFWorkbook myWorkBook = new SXSSFWorkbook(100);
+				Sheet mySheet = myWorkBook.createSheet("Details");
+				String[] headers = { "SCHEDULE NAME", "FILE NAME", "FILE PATH", "PROCESSING STATUS", "LOCALE", "MANUAL TYPE",
+						"FACELIFT FOLDER", "MATERIAL FOLDER", "CARLINE CODE", "WMI CODE", "VDS CODE", "VIS START RANGE", "VIS END RANGE",
+						"VIN EXISTS IN MDM", "VIN REF KEY", "VIN EXISTS IN KAPTURE", "MODEL", "MODEL YEAR", "MODEL YEAR REF KEY",
+						"MODEL YEAR EXISTS IN KAPTURE", "DISPLAY ORDER FILE", "ERROR MESSAGE" };
+				Row headerRow = mySheet.createRow(0);
+				for (int c = 0; c < headers.length; c++) {
+					headerRow.createCell(c).setCellValue(headers[c]);
+				}
+				int rowCount = 0;
+				for (VinDetails details : vinList) {
+					rowCount++;
+					String[] values = { ApplicationProperties.getProperty("metadata.sch.key")+scheduleCode, details.getVinSourceFileName(),
+							details.getVinSorceFilePath(), details.getProcessingStatus(), locale, details.getManualType(), details.getFaceLiftFolder(),
+							details.getMaterialFolder(), details.getCarlineCode(), details.getWmiCode(), details.getVdsCode(), details.getVisStartRange(),
+							details.getVisEndRange(), details.getVinFoundInMDM(), details.getVinRefKey(), details.getVinFoundInIM(), details.getModelName(),
+							details.getModelYear(), details.getModelYearRefKey(), details.getModelYearFoundInKapture(),
+							details.getDisplayOrderTextFileName(), details.getErrorMessage() };
+					Row row = mySheet.createRow(rowCount);
+					for (int c = 0; c < values.length; c++) {
+						row.createCell(c).setCellValue(null == values[c] ? "" : values[c]);
+					}
+				}
+				FileOutputStream os = PathUtil.fileOutputStream(myFile);
+				try {
+					myWorkBook.write(os);
+					os.flush();
+				} finally {
+					os.close();
+					myWorkBook.dispose();
+				}
+				logger.info("MNAO VIN METADATA FAILURE REPORT XLSX file Finished ...");
 			}
 		} catch (Exception e) {
 			Utilities.printStackTraceToLogs(PrintReportsUtil.class.getName(), "printMNAOVinReport()", e);
@@ -1193,147 +968,4 @@ public class PrintReportsUtil {
 			logger.info("printMNAOVinReport :: Method Ends.");
 	}
 
-	public void printVinAttributeReport(String scheduleCode , ArrayList<VinAttributeEntFileDetails> vinAttributeList, String locale) {
-		if (logger.isInfoEnabled())
-			logger.info("printVinAttributeReport :: Method Starts.");
-		try {
-			if (null != vinAttributeList && vinAttributeList.size() > 0) 
-			{
-				if ( null != scheduleCode && !"".equals(scheduleCode)) 
-				{
-					/*
-					 * write the string Builder Text to a separate Log file
-					 * parallel to the other Logs Generation
-					 */
-					String path = ApplicationProperties.getProperty("metadata.validation.reports.physicalpath");
-
-					/*
-					 * Now check inside the reports directory does a directory
-					 * exists for wslId
-					 */
-					File reportDirectory = PathUtil.file(path);
-					if (!reportDirectory.exists() || !reportDirectory.isDirectory()) {
-						// create new directory
-						reportDirectory.mkdir();
-					}
-					reportDirectory = null;
-					
-					if(!path.endsWith("/"))
-					{
-						path = path+"/";
-					}
-					/*
-					 * Now check, whether the schedule code directory exists or
-					 * not
-					 */
-					path = path  + scheduleCode;
-					File scheduleDirectory = PathUtil.file(path);
-					if (!scheduleDirectory.exists()
-							|| !scheduleDirectory.isDirectory()) {
-						scheduleDirectory.mkdir();
-					}
-					scheduleDirectory = null;
-
-					/*
-					 * iterate Map and write the Excel File for each Index
-					 */
-					String fName = "/" + scheduleCode+".xlsx";
-					File myFile = PathUtil.file(path + fName);
-					fName = null;
-					// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
-					SXSSFWorkbook myWorkBook = new SXSSFWorkbook(100);
-
-					// Create a new sheet
-					Sheet mySheet = myWorkBook.createSheet("Details");
-					
-					/*
-					 * Add Header Row
-					 */
-					String headers="SCHEDULE NAME,FILE NAME,FILE PATH,PROCESSING STATUS,LOCALE,"
-							+ "ENGINE TYPE,TRANSMISSION TYPE,"
-							+ "DRIVEAXLE TYPE,BODY TYPE,ERROR MESSAGE";
-					
-					String[] headerTokens=headers.split(",");
-					Row headerRow = mySheet.createRow(0);
-					Cell headerCell=null;
-					for(int a=0;a<headerTokens.length;a++)
-					{
-						headerCell = headerRow.createCell(a);
-						headerCell.setCellValue(headerTokens[a].toString().trim());
-					}
-					headerCell=null;
-					headers=null;
-					headerTokens=null;
-					
-					int rowCount = 0;
-					String[] dispToken=null;
-					String dispData=null;
-					Cell dataCell=null;
-					Row row=null;
-					VinAttributeEntFileDetails details=null;
-					for (int a = 0; a < vinAttributeList.size(); a++) {
-						details = (VinAttributeEntFileDetails) vinAttributeList.get(a);
-						
-						// increment rowCount by 1
-						rowCount++;
-						// Create a new Row
-						row = mySheet.createRow(rowCount);
-						dispData=ApplicationProperties.getProperty("metadata.sch.key")+scheduleCode+"<TOK_SEPARATOR>"+details.getFileName()+
-								"<TOK_SEPARATOR>"+details.getFilePath()+"<TOK_SEPARATOR>";
-						dispData+=details.getProcessingStatus()+"<TOK_SEPARATOR>"+locale+"<TOK_SEPARATOR>";
-						dispData+=details.getVinEngineType()+"<TOK_SEPARATOR>"+details.getVinTransType()+"<TOK_SEPARATOR>";
-						dispData+=details.getVinAxleType()+"<TOK_SEPARATOR>"+details.getVinBodyType()+"<TOK_SEPARATOR>";
-						dispData+=details.getErrorMessage();
-						
-						
-						dispToken = dispData.split("<TOK_SEPARATOR>");
-						if(null!=dispToken && dispToken.length>0)
-						{
-							for(int r=0;r<dispToken.length;r++)
-							{
-								dataCell = row.createCell(r);
-								dataCell.setCellValue("");
-								if(null!=dispToken[r] && !"".equals(dispToken[r]) && !"null".equals(dispToken[r].trim().toLowerCase()))
-								{
-									dataCell.setCellValue(dispToken[r].trim());
-								}
-								dataCell=null;
-							}
-						}
-						dataCell=null;
-						row = null;
-						details = null;
-						dispData=null;
-						dispToken=null;
-					}
-					dataCell=null;
-					row = null;
-					details = null;
-					dispData=null;
-					dispToken=null;
-					headerRow = null;
-					FileOutputStream os = PathUtil.fileOutputStream(myFile);
-					myWorkBook.write(os);
-					logger.info("VIN ATTRIBUTE METADATA FAILURE REPORT TEXT file Finished ...");
-					os.flush();
-					os.close();
-
-					// set mySheet to null
-					mySheet = null;
-					// set myWorkBook to null
-					myWorkBook = null;
-					// set path to null
-					path = null;
-					// set myFile to null
-					myFile = null;
-				}
-			}
-		} catch (Exception e) {
-			Utilities.printStackTraceToLogs(PrintReportsUtil.class.getName(), "printVinAttributeReport()", e);
-		}
-		if (logger.isInfoEnabled())
-			logger.info("printVinAttributeReport :: Method Ends.");
-	}
-
-	
 }

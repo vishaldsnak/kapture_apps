@@ -1,23 +1,30 @@
 package com.mazda.gms3.dmt.automation.dao;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.mazda.gms3.dmt.automation.vo.AutomationConstants;
 import com.mazda.gms3.dmt.automation.vo.ExcelRowDetails;
 import com.mazda.gms3.dmt.automation.vo.ItemDetails;
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncConstants;
 import com.mazda.gms3.dmt.dao.ScheduleDAO;
+import com.mazda.gms3.dmt.kapture.KaptureLookupDAO;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
+import com.mazda.gms3.dmt.masterdata.MdmExcelLoader;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
 import com.mazda.gms3.dmt.utils.DBConnectionHelper;
 import com.mazda.gms3.dmt.utils.Utilities;
@@ -27,313 +34,329 @@ public class AutomationDAO extends DBConnectionHelper{
 
 	private static Logger logger = LogManager.getLogger(AutomationDAO.class);
 
-	public static ArrayList<ExcelRowDetails> validateExcelData(ArrayList<ExcelRowDetails> inputDataList)
+	/*
+	 * =====================================================================================================
+	 * CHECKS OF THE FACELIFT ROWS - KAPTURE (2026-10-11, InfoManager / OK_IM replaced)
+	 *  - locale in MDM (gms3_mdm_manual_language) and in Kapture (kapture.default.locales.table)
+	 *  - old / new VIN range in MDM (gms3_mdm_vin_detail, alternate locale as before) - its carline names are kept
+	 *  - old / new VIN category in Kapture: the reference key in the Kapture categories FOR THE LOCALE of the row,
+	 *    one query per locale for all rows (the document is updated in that locale, so the category must be there)
+	 *  - a NEW VIN range missing in MDM or Kapture is still accepted when the ALL_VIN file of the locale in the
+	 *    master data folder carries it (newVinInMasterDataFile): "Master Data with Facelift" loads it at the start
+	 *    of the update job; "Only Facelift" cannot be scheduled while it is missing in Kapture.
+	 * Every lookup is made once per distinct value. A lookup that FAILS throws - it is never taken as "not found".
+	 * =====================================================================================================
+	 */
+	public static ArrayList<ExcelRowDetails> validateExcelData(ArrayList<ExcelRowDetails> inputDataList, File masterDataFolder) throws Exception
 	{
-		Statement stmt = null;
-		ResultSet rs = null;
-		Connection conn= null;
+		if(null==inputDataList || inputDataList.isEmpty())
+		{
+			return inputDataList;
+		}
+		Connection conn = null;
 		try
 		{
-			if(null!=inputDataList && inputDataList.size()>0)
+			conn = getConnection();
+			Set<String> kaptureLocales = KaptureLookupDAO.getDefaultLocales();
+			Map<String, Boolean> mdmLocales = new HashMap<String, Boolean>();
+			Map<String, String> mdmVins = new HashMap<String, String>();
+			Map<String, List<String>> refKeysByLocale = new LinkedHashMap<String, List<String>>();
+			for(ExcelRowDetails data : inputDataList)
 			{
-				String sql="";
-				String mdmLocaleCode="";
-				String imLocaleCode="";
-				String localeToCheck="";
-				String modelName="";
-				conn = getConnection();
-				for(int a=0;a<inputDataList.size();a++)
+				String mdmLocale = data.getLocale().trim().replace("_", "-");
+				String kLocale = data.getLocale().trim().replace("-", "_");
+				Boolean inMdm = mdmLocales.get(mdmLocale.toLowerCase());
+				if(null==inMdm)
 				{
-					ExcelRowDetails data = (ExcelRowDetails)inputDataList.get(a);
-
-					mdmLocaleCode = data.getLocale();
-					imLocaleCode = data.getLocale();
-
-					// for MDM replace _ by -
-					mdmLocaleCode = mdmLocaleCode.replace("_", "-");
-					// for IM replace - by _
-					imLocaleCode = imLocaleCode.replace("-", "_");
-
-					// Locale Check - MDM
-					try
-					{
-						// check Locale in MDM
-						sql="SELECT MDM_ML_ID FROM gms3_mdm_manual_language WHERE TRIM(LOWER(MDM_ML_LANG_CODE))='"+mdmLocaleCode.trim().toLowerCase()+"' "
-								+ " AND MDM_ML_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"' ";
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
-						if(rs.next())
-						{
-							data.setLocaleExistsInMDM(true);
-						}
-						rs.close();rs=null;
-						stmt.close();stmt=null;
-						sql=null;
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-					// Locale Check - IM
-					try
-					{
-						sql="SELECT RECORDID FROM OK_IM.LOCALE WHERE TRIM(LOWER(LOCALECODE))='"+imLocaleCode.trim().toLowerCase()+"' and ACTIVE='Y'";
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
-						if(rs.next())
-						{
-							data.setLocaleExistsInIM(true);
-						}
-						rs.close();rs=null;
-						stmt.close();stmt=null;
-						sql=null;
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-					// OLD VIN IN MDM
-					try
-					{
-						localeToCheck = data.getLocale();
-						localeToCheck=  localeToCheck.replace("-", "_");
-						modelName = checkVINExistsInMDM(mdmLocaleCode, data.getOldCarlineCode(), data.getOldWmiCode(), data.getOldVdsCode(), data.getOldVisStartRange(), data.getOldVisEndRange(), conn);
-						if(null!=modelName && !"".equals(modelName))
-						{
-							if(ApplicationProperties.getProperty("mc.locales").trim().toLowerCase().indexOf(localeToCheck.trim().toLowerCase())>-1)
-							{
-								/*
-								 * FOR MC Model Name will be Regional Value (for display) for identifying impacted documents
-								 * and Eng Value will be different variable
-								 */
-								data.setOldModelName(modelName.substring(0,modelName.indexOf("<TOK_SEP>")));
-								data.setOldModelNameEngForMC(modelName.substring(modelName.indexOf("<TOK_SEP>")+9, modelName.length()));
-							}
-							else
-							{
-								/*
-								 * FOR MNAO & MME MODEL NAME WILL BE ENGLISH VALUE
-								 * AND REGIONAL VALUE WILL BE DIFFERENT VARIABLE
-								 */
-								// english value
-								data.setOldModelName(modelName.substring(modelName.indexOf("<TOK_SEP>")+9, modelName.length()));
-								// regional value
-								data.setOldModelNameRegForMNAOMME(modelName.substring(0,modelName.indexOf("<TOK_SEP>")));
-							}
-							
-						}
-						modelName =  null;
-						localeToCheck = null;
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-					if(null!=data.getOldModelName() && !"".equals(data.getOldModelName()))
-					{
-						data.setOldVinExistsinMDM(true);
-					}
-
-					// OLD VIN IN IM
-					try
-					{
-						data.setOldVinExistsinIM(checkVINExistsInIM(data.getOldRefKey(), conn));
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-
-					// NEW VIN IM MDM
-					try
-					{
-//						data.setNewModelName(checkVINExistsInMDM(mdmLocaleCode, data.getNewCarlineCode(), data.getNewWmiCode(), data.getNewVdsCode(), data.getNewVisStartRange(), data.getNewVisEndRange(), conn));
-						localeToCheck = data.getLocale();
-						localeToCheck=  localeToCheck.replace("-", "_");
-						modelName = checkVINExistsInMDM(mdmLocaleCode, data.getNewCarlineCode(), data.getNewWmiCode(), data.getNewVdsCode(), data.getNewVisStartRange(), data.getNewVisEndRange(), conn);
-						if(null!=modelName && !"".equals(modelName))
-						{
-							if(ApplicationProperties.getProperty("mc.locales").trim().toLowerCase().indexOf(localeToCheck.trim().toLowerCase())>-1)
-							{
-								/*
-								 * FOR MC Model Name will be Regional Value 
-								 * and Eng Value will be different variable
-								 */
-								data.setNewModelName(modelName.substring(0,modelName.indexOf("<TOK_SEP>")));
-								data.setNewModelNameEngForMC(modelName.substring(modelName.indexOf("<TOK_SEP>")+9, modelName.length()));
-							}
-							else
-							{
-								/*
-								 * FOR MNAO & MME MODEL NAME WILL BE ENGLISH VALUE
-								 * AND REGIONAL VALUE WILL BE DIFFERENT VARIABLE
-								 */
-								// english value
-								data.setNewModelName(modelName.substring(modelName.indexOf("<TOK_SEP>")+9, modelName.length()));
-								// regional value
-								data.setNewModelNameRegForMNAOMME(modelName.substring(0,modelName.indexOf("<TOK_SEP>")));
-							}
-						}
-						modelName =  null;
-						localeToCheck=  null;
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-					if(null!=data.getNewModelName() && !"".equals(data.getNewModelName()))
-					{
-						data.setNewVinExistsinMDM(true);
-					}
-
-					// NEW VIN IN IM
-					try
-					{
-						data.setNewVinExistsinIM(checkVINExistsInIM(data.getNewRefKey(), conn));
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
-					}
-
-					mdmLocaleCode = null;
-					imLocaleCode=null;
+					inMdm = Boolean.valueOf(localeExistsInMDM(mdmLocale, conn));
+					mdmLocales.put(mdmLocale.toLowerCase(), inMdm);
 				}
-				sql=null;
-				mdmLocaleCode = null;
-				imLocaleCode=null;
+				data.setLocaleExistsInMDM(inMdm.booleanValue());
+				data.setLocaleExistsInIM(kaptureLocales.contains(kLocale.toUpperCase()));
+
+				boolean mc = isLocaleOf("mc.locales", kLocale);
+				applyModelNames(data, true, mc, mdmVin(mdmVins, mdmLocale, data.getOldCarlineCode(), data.getOldWmiCode(), data.getOldVdsCode(),
+						data.getOldVisStartRange(), data.getOldVisEndRange(), conn));
+				applyModelNames(data, false, mc, mdmVin(mdmVins, mdmLocale, data.getNewCarlineCode(), data.getNewWmiCode(), data.getNewVdsCode(),
+						data.getNewVisStartRange(), data.getNewVisEndRange(), conn));
+				data.setOldVinExistsinMDM(null!=data.getOldModelName() && !"".equals(data.getOldModelName()));
+				data.setNewVinExistsinMDM(null!=data.getNewModelName() && !"".equals(data.getNewModelName()));
+
+				List<String> keys = refKeysByLocale.get(kLocale.toUpperCase());
+				if(null==keys)
+				{
+					keys = new ArrayList<String>();
+					refKeysByLocale.put(kLocale.toUpperCase(), keys);
+				}
+				keys.add(data.getOldRefKey());
+				keys.add(data.getNewRefKey());
 			}
-			else
+
+			// THE VIN CATEGORIES IN KAPTURE - one lookup per locale
+			Map<String, Set<String>> foundByLocale = new HashMap<String, Set<String>>();
+			for(Map.Entry<String, List<String>> e : refKeysByLocale.entrySet())
 			{
-				logger.info("validateExcelData ::  InputDataList as parameter is null. return null.");
+				foundByLocale.put(e.getKey(), KaptureLookupDAO.getCategories(new ArrayList<String>(new LinkedHashSet<String>(e.getValue())), e.getKey()).keySet());
 			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
+			Map<String, Map<String, String>> masterDataFileVins = new HashMap<String, Map<String, String>>();
+			for(ExcelRowDetails data : inputDataList)
+			{
+				String kLocale = data.getLocale().trim().replace("-", "_");
+				Set<String> found = foundByLocale.get(kLocale.toUpperCase());
+				data.setOldVinExistsinIM(found.contains(data.getOldRefKey().trim().toUpperCase()));
+				data.setNewVinExistsinIM(found.contains(data.getNewRefKey().trim().toUpperCase()));
+				if(data.isNewVinExistsinMDM() && data.isNewVinExistsinIM())
+				{
+					continue;
+				}
+				// NOT (FULLY) THERE YET - IS IT IN THE MASTER DATA FILE OF THE LOCALE?
+				String mdmLocale = data.getLocale().trim().replace("_", "-");
+				Map<String, String> fileVins = masterDataFileVins.get(mdmLocale.toLowerCase());
+				if(null==fileVins)
+				{
+					fileVins = new HashMap<String, String>();
+					for(String[] v : MdmExcelLoader.readAllVinRanges(masterDataFolder, mdmLocale))
+					{
+						fileVins.put(vinKey(v[1], v[2], v[3], v[4], v[5]), v[0]);
+					}
+					masterDataFileVins.put(mdmLocale.toLowerCase(), fileVins);
+				}
+				String model = fileVins.get(vinKey(data.getNewCarlineCode(), data.getNewWmiCode(), data.getNewVdsCode(), data.getNewVisStartRange(), data.getNewVisEndRange()));
+				if(null!=model)
+				{
+					data.setNewVinInMasterDataFile(true);
+					// the English name from the file until the update job reads both names from MDM after the load
+					if(null==data.getNewModelName() || "".equals(data.getNewModelName()))
+					{
+						if(isLocaleOf("mc.locales", kLocale))
+						{
+							data.setNewModelNameEngForMC(model);
+						}
+						else
+						{
+							data.setNewModelName(model);
+						}
+					}
+				}
+			}
+			logger.info("validateExcelData :: rows checked :: > "+inputDataList.size()+" :: MDM VIN lookups :: > "+mdmVins.size()
+					+" :: Kapture locales :: > "+refKeysByLocale.keySet());
 		}
 		finally
 		{
-			try
+			if(null!=conn)
 			{
-				if(null!=rs)
-					rs.close();
-				if(null!=stmt)
-					stmt.close();
-				if(null!=conn)
+				try
+				{
 					conn.close();
-				rs=null;
-				stmt=null;
-				conn = null;
-			}
-			catch(SQLException e)
-			{
-				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
+				}
+				catch(SQLException e)
+				{
+					Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "validateExcelData()", e);
+				}
 			}
 		}
 		return inputDataList;
 	}
 
-	public static ArrayList<String> getSubTypesList(String referenceKey) 
+	/**
+	 * The new VIN reference keys (upper case) of the rows that are in Kapture now for the row's locale - for the rows
+	 * that relied on the master data file when they were validated. One lookup per locale; a failed lookup throws.
+	 */
+	public static Set<String> newVinsInKapture(List<ExcelRowDetails> rows)
 	{
-		Statement stmt = null;
+		Map<String, List<String>> byLocale = new LinkedHashMap<String, List<String>>();
+		for(ExcelRowDetails data : rows)
+		{
+			String kLocale = data.getLocale().trim().replace("-", "_").toUpperCase();
+			List<String> keys = byLocale.get(kLocale);
+			if(null==keys)
+			{
+				keys = new ArrayList<String>();
+				byLocale.put(kLocale, keys);
+			}
+			keys.add(data.getNewRefKey());
+		}
+		Set<String> found = new HashSet<String>();
+		for(Map.Entry<String, List<String>> e : byLocale.entrySet())
+		{
+			for(String k : KaptureLookupDAO.getCategories(new ArrayList<String>(new LinkedHashSet<String>(e.getValue())), e.getKey()).keySet())
+			{
+				found.add(e.getKey()+"|"+k);
+			}
+		}
+		return found;
+	}
+
+	/** VIN range key of a row and of the ALL_VIN file - trimmed, upper case. */
+	private static String vinKey(String carline, String wmi, String vds, String visStart, String visEnd)
+	{
+		return (nz(carline)+"|"+nz(wmi)+"|"+nz(vds)+"|"+nz(visStart)+"|"+nz(visEnd)).toUpperCase();
+	}
+
+	private static String nz(String s)
+	{
+		return null==s ? "" : s.trim();
+	}
+
+	private static boolean localeExistsInMDM(String mdmLocale, Connection conn) throws SQLException
+	{
+		PreparedStatement pstmt = null;
 		ResultSet rs = null;
-		Connection conn= null;
-		ArrayList<String> childsList = null;
 		try
 		{
-			String objectId="";
-			conn = getConnection();
-			String sql="SELECT OBJECTID FROM OK_IM.TAG WHERE REFERENCEKEY='"+referenceKey.trim()+"'";
-			//			logger.info("getSubTypesList ::  getParentObjectId :: Sql :: > "+ sql);
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				objectId = rs.getString("OBJECTID");
-			}
-			stmt.close();stmt=null;
-			rs.close();rs=null;
-			sql=null;
-			if(null!=objectId && !"".equals(objectId))
-			{
-				// fetch all immediate childs
-				objectId = objectId.trim()+".";
-				sql = "SELECT REFERENCEKEY, OBJECTID FROM OK_IM.TAG WHERE OBJECTID LIKE '"+objectId+"%'";
-				//				logger.info("getSubTypesList ::  getChildRefKeys :: Sql :: > "+ sql);
-				stmt = conn.createStatement();
-				rs = stmt.executeQuery(sql);
-				String refKey="";
-				String childObjectId="";
-				while(rs.next())
-				{
-					refKey = rs.getString("REFERENCEKEY");
-					childObjectId = rs.getString("OBJECTID");
-					if(null!=childObjectId && !"".equals(childObjectId))
-					{
-						if(null!=childObjectId.split("\\.") && childObjectId.split("\\.").length==2)
-						{
-							if(null==childsList || childsList.size()<=0)
-							{
-								childsList = new ArrayList<String>();
-							}
-							// sub child add it
-							childsList.add(refKey);
-						}
-					}
-					refKey = null;
-					childObjectId = null;
-				}
-				refKey = null;
-				childObjectId = null;
-				sql=null;
-				stmt.close();stmt=null;
-				rs.close();rs=null;
+			pstmt = conn.prepareStatement("SELECT mdm_ml_id FROM gms3_mdm_manual_language WHERE TRIM(LOWER(mdm_ml_lang_code))=? AND mdm_ml_flag=?");
+			pstmt.setString(1, mdmLocale.trim().toLowerCase());
+			pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
+			rs = pstmt.executeQuery();
+			return rs.next();
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+		}
+	}
 
-				if(null!=childsList && childsList.size()>0)
-				{
-					logger.info("getSubTypesList :: Total Childs found for {"+referenceKey+"} are :: >"+ childsList.size());
-				}
-				else
-				{
-					logger.info("getSubTypesList :: No Childs found for {"+referenceKey+"}.");
-				}
+	/** checkVINExistsInMDM, once per distinct VIN range. */
+	private static String mdmVin(Map<String, String> cache, String mdmLocale, String carline, String wmi, String vds, String visStart, String visEnd, Connection conn)
+	{
+		String key = mdmLocale.toUpperCase()+"|"+vinKey(carline, wmi, vds, visStart, visEnd);
+		if(!cache.containsKey(key))
+		{
+			cache.put(key, checkVINExistsInMDM(mdmLocale, carline, wmi, vds, visStart, visEnd, conn));
+		}
+		return cache.get(key);
+	}
+
+	/**
+	 * MDM carline names ("regional<TOK_SEP>english") onto the row, as before: MC keeps the REGIONAL name as the model
+	 * name and the English one apart; MNAO / MME keep the ENGLISH name as the model name and the regional one apart.
+	 */
+	private static void applyModelNames(ExcelRowDetails data, boolean old, boolean mc, String names)
+	{
+		if(null==names || "".equals(names) || names.indexOf("<TOK_SEP>")<0)
+		{
+			return;
+		}
+		String regional = names.substring(0, names.indexOf("<TOK_SEP>"));
+		String english = names.substring(names.indexOf("<TOK_SEP>")+9);
+		if(old)
+		{
+			if(mc)
+			{
+				data.setOldModelName(regional);
+				data.setOldModelNameEngForMC(english);
 			}
 			else
 			{
-				logger.info("getSubTypesList ::  Failed to fetch Object Id for Parent Reference Key :: > "+ referenceKey);
+				data.setOldModelName(english);
+				data.setOldModelNameRegForMNAOMME(regional);
 			}
-			objectId = null;
+		}
+		else
+		{
+			if(mc)
+			{
+				data.setNewModelName(regional);
+				data.setNewModelNameEngForMC(english);
+			}
+			else
+			{
+				data.setNewModelName(english);
+				data.setNewModelNameRegForMNAOMME(regional);
+			}
+		}
+	}
+
+	/**
+	 * Reads the NEW VIN carline names from MDM again - after "Master Data with Facelift" has loaded them. A row whose
+	 * VIN range is still not in MDM keeps what it has.
+	 */
+	public static void refreshNewModelNames(List<ExcelRowDetails> rows)
+	{
+		Connection conn = null;
+		try
+		{
+			conn = getConnection();
+			Map<String, String> cache = new HashMap<String, String>();
+			for(ExcelRowDetails data : rows)
+			{
+				boolean mc = isLocaleOf("mc.locales", data.getLocale());
+				String names = mdmVin(cache, data.getLocale().trim().replace("_", "-"), data.getNewCarlineCode(), data.getNewWmiCode(),
+						data.getNewVdsCode(), data.getNewVisStartRange(), data.getNewVisEndRange(), conn);
+				if(null!=names && !"".equals(names))
+				{
+					applyModelNames(data, false, mc, names);
+					data.setNewVinExistsinMDM(true);
+				}
+			}
 		}
 		catch(Exception e)
 		{
-			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getSubTypesList()", e);
+			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "refreshNewModelNames()", e);
 		}
 		finally
 		{
 			try
 			{
-				if(null!=rs)
-					rs.close();
-				if(null!=stmt)
-					stmt.close();
 				if(null!=conn)
 					conn.close();
-				rs=null;
-				stmt=null;
-				conn = null;
 			}
 			catch(SQLException e)
 			{
-				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getSubTypesList()", e);
+				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "refreshNewModelNames()", e);
 			}
 		}
-		return childsList;
+	}
+
+	/** true when the locale (either form) is one of the comma separated locales of the property (mnao.locales ...). */
+	public static boolean isLocaleOf(String property, String locale)
+	{
+		if(null==locale)
+		{
+			return false;
+		}
+		String wanted = locale.trim().replace("-", "_");
+		for(String l : ApplicationProperties.getProperty(property).split(","))
+		{
+			if(l.trim().equalsIgnoreCase(wanted))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** MNAO / MC / MME of a locale - MME for any locale that is neither MNAO nor MC, as the legacy table choice. */
+	public static String marketOf(String locale)
+	{
+		if(isLocaleOf("mnao.locales", locale))
+		{
+			return "MNAO";
+		}
+		if(isLocaleOf("mc.locales", locale))
+		{
+			return "MC";
+		}
+		return "MME";
+	}
+
+	/** The view content VIN table of a locale - MME has one table per locale, in lower case. */
+	public static String viewContentTable(String locale)
+	{
+		String market = marketOf(locale);
+		if("MNAO".equals(market))
+		{
+			return "gms3_vc_vin_details";
+		}
+		if("MC".equals(market))
+		{
+			return "gms3_vc_japan_vin_details";
+		}
+		return "gms3_vc_mme_vin_dtl_"+locale.trim().replace("-", "_").toLowerCase();
 	}
 
 	public static ArrayList<ItemDetails> getImpactedDocumentsListModelWise(ArrayList<ItemDetails> itemsList)
@@ -537,428 +560,104 @@ public class AutomationDAO extends DBConnectionHelper{
 		return finalItemsList;
 	}
 
-	private static ArrayList<Map<String, Object>> getImpactedDocumentsData_OLD(ArrayList<ExcelRowDetails> applicableVINList, String documentPrefix, String locale, Connection conn)
-	{
-		ArrayList<Map<String, Object>> impactedDocumentsList = null;
-		Statement stmt=null;
-		ResultSet rs = null;
-		try
-		{
-			impactedDocumentsList = new ArrayList<Map<String,Object>>();
-			ExcelRowDetails data = new ExcelRowDetails();
-			String sql="";
-			Map<String, Object> documentMap = null;
-			ArrayList<ExcelRowDetails> documentsVINList = null;
-			ExcelRowDetails existData = new ExcelRowDetails();
-			for(int a=0;a<applicableVINList.size();a++)
-			{
-				data = (ExcelRowDetails)applicableVINList.get(a);
-				if(null!=data.getOldRefKey() && !"".equals(data.getOldRefKey()))
-				{
-					sql="SELECT DISTINCT A.DOCUMENTID FROM OK_IM.CONTENTTEXT A, OK_IM.CONTENTTEXTCATEGORY B, "
-							+ " OK_IM.TAG C WHERE A.RECORDID = B.CONTENTTEXTID AND B.TAGID=C.RECORDID "
-							+ " AND C.REFERENCEKEY='"+data.getOldRefKey()+"' AND A.LOCALEID='"+locale+"' AND A.LATESTVERSION='Y' "
-							+ " AND A.DOCUMENTID LIKE '"+documentPrefix+"%'";
-					logger.info("getImpactedDocumentsData :: Sql :: >"+ sql);
-					stmt = conn.createStatement();
-					rs = stmt.executeQuery(sql);
-					while(rs.next())
-					{
-						if(null!=rs.getString("DOCUMENTID") && !"".equals(rs.getString("DOCUMENTID")))
-						{
-							boolean add = true;
-							if(null!=impactedDocumentsList && impactedDocumentsList.size()>0)
-							{
-								documentMap = new HashMap<String, Object>();
-								for(int y=0;y<impactedDocumentsList.size();y++)
-								{
-									documentMap = (Map<String, Object>)impactedDocumentsList.get(y);
-									if(null!=documentMap && null!=documentMap.get(AutomationConstants.DOCUMENTID))
-									{
-										if(String.valueOf(documentMap.get(AutomationConstants.DOCUMENTID)).trim().equals(rs.getString("DOCUMENTID").trim()))
-										{
-											// already exists
-											add = false;
-
-											/*
-											 * CHECK HERE, IF THE VIN IS ADDED WITH  THE DOCUMENT OR NOT
-											 * IF YES - SKIP IT
-											 * IF NO  - ADD TO VINS LIST OF DOCUMENT
-											 */
-											boolean addVin=true;
-											if(null!=documentMap.get(AutomationConstants.VIN_LIST))
-											{
-												documentsVINList = (ArrayList<ExcelRowDetails>)documentMap.get(AutomationConstants.VIN_LIST);
-												if(null!=documentsVINList && documentsVINList.size()>0)
-												{
-													existData = new ExcelRowDetails();
-													for(int hg=0;hg<documentsVINList.size();hg++)
-													{
-														existData = (ExcelRowDetails)documentsVINList.get(hg);
-														if(null!=existData.getOldRefKey() && !"".equals(existData.getOldRefKey()))
-														{
-															if(existData.getOldRefKey().trim().toLowerCase().equals(data.getOldRefKey().trim().toLowerCase()))
-															{
-																// VIN IS ALREADY ADDED TO DOCUMENT - DO NOT ADD
-																addVin = false;
-																break;
-															}
-														}
-													}
-												}
-											}
-
-											if(addVin==true)
-											{
-												if(null==documentsVINList || documentsVINList.size()<=0)
-												{
-													documentsVINList = new ArrayList<ExcelRowDetails>();
-												}
-												documentsVINList.add(data);
-												// set in documentMap
-												documentMap.put(AutomationConstants.VIN_LIST, documentsVINList);
-											}
-											documentsVINList = null;
-
-											break;
-										}
-									}
-									documentMap = null;
-								}
-								documentMap = null;
-							}
-
-							if(add == true)
-							{
-								documentMap = new HashMap<String, Object>();
-								documentMap.put(AutomationConstants.DOCUMENTID, rs.getString("DOCUMENTID"));
-
-								/*
-								 * HERE ADD THE VIN WITH THE DOCUMENT ID
-								 * SO THAT WHEN REPORT IS PRINTED OR DOCUMENT NEEDS TO BE IDENTIFIED
-								 * IT CONTAINS APPLICABLE VINS FOR IT
-								 */
-								documentsVINList = new ArrayList<ExcelRowDetails>();
-								documentsVINList.add(data);
-								documentMap.put(AutomationConstants.VIN_LIST, documentsVINList);
-								impactedDocumentsList.add(documentMap);
-								documentMap = null;
-								documentsVINList = null;
-							}
-						}
-					}
-					rs.close();rs=null;
-					stmt.close();stmt=null;
-					sql=null;
-				}
-				data = null;
-			}
-			sql = null;
-			documentMap = null;
-			rs = null;
-			stmt =null;
-
-			if(null!=impactedDocumentsList && impactedDocumentsList.size()>0)
-			{
-				logger.info("getImpactedDocumentsData :: Total Impacted Documents Found are :: >"+ impactedDocumentsList.size());
-			}
-			else
-			{
-				logger.info("getImpactedDocumentsData :: No Impacted Documents Found.");
-			}
-
-			/*
-			 * FOR ALL THE IDENTIFIED IMPACTED DOCUMENTS LIST FOR CHANNEL TYPE IF SM / SI 
-			 * IDENTIFY DOCUMENT TYPES AS WELL
-			 */
-			if(null!=impactedDocumentsList && impactedDocumentsList.size()>0 && (documentPrefix.equals("SM") || documentPrefix.equals("SI")))
-			{
-				logger.info("getImpactedDocumentsData :: Proceed for fetching Document Types for "+documentPrefix+" Documents.");
-				String refKey = "";
-				String objectId="";
-				if(documentPrefix.equals("SM"))
-				{
-					refKey = AutomationConstants.CHANNEL_REFKEY_SERVICE_MANUAL_TYPE;
-				}
-				else if(documentPrefix.equals("SI"))
-				{
-					refKey = AutomationConstants.CHANNEL_REFKEY_SERVICE_INFORMATION_TYPE;
-				}
-				else if(documentPrefix.equals("OSM"))
-				{
-					refKey = AutomationConstants.CHANNEL_REFKEY_OTHER_MANUAL_TYPE;
-				}
-
-				// getObjectId for chanelRefKey and for each document identify the firstLevel Type
-				sql="SELECT OBJECTID FROM OK_IM.TAG WHERE REFERENCEKEY='"+refKey+"'";
-				stmt = conn.createStatement();
-				rs = stmt.executeQuery(sql);
-				if(rs.next())
-				{
-					objectId = rs.getString("OBJECTID");
-				}
-				rs.close();rs=null;
-				stmt.close();stmt=null;
-				sql = null;
-
-				if(null!=objectId && !"".equals(objectId))
-				{
-					documentMap = new HashMap<String, Object>();
-					String tempObjectId=null;
-					String tempRefKey = null;
-					for(int a=0;a<impactedDocumentsList.size();a++)
-					{
-						documentMap = (Map<String, Object>)impactedDocumentsList.get(a);
-						if(null!=documentMap && null!=documentMap.get(AutomationConstants.DOCUMENTID) && !"".equals(documentMap.get(AutomationConstants.DOCUMENTID)))
-						{
-							sql="SELECT A.REFERENCEKEY, A.OBJECTID FROM OK_IM.TAG A, OK_IM.CONTENTTEXTCATEGORY B, OK_IM.CONTENTTEXT C WHERE "
-									+ " A.RECORDID = B.TAGID AND B.CONTENTTEXTID = C.RECORDID AND C.LOCALEID='"+locale+"' AND C.LATESTVERSION='Y' AND "
-									+ " C.DOCUMENTID='"+documentMap.get(AutomationConstants.DOCUMENTID)+"' "
-									+ " AND A.OBJECTID LIKE '"+objectId+".%'";
-							//							logger.info("---------------- getDocumentType :: Sql :: > "+ sql);
-							stmt = conn.createStatement();
-							rs = stmt.executeQuery(sql);
-							if(rs.next())
-							{
-								tempObjectId = rs.getString("OBJECTID");
-								tempRefKey = rs.getString("REFERENCEKEY");
-							}
-							stmt.close();stmt=null;
-							rs.close();rs=null;
-							sql = null;
-
-							// split objectId in array and check if count is 2, then map identified refKey, if 3 - fetch its parent refKey
-							if(null!=tempObjectId && !"".equals(tempObjectId) && null!=tempRefKey && !"".equals(tempRefKey))
-							{
-								if(null!=tempObjectId.split("\\.") && tempObjectId.split("\\.").length==2)
-								{
-									documentMap.put(AutomationConstants.REFERENCEKEY, tempRefKey);
-								}
-								else if(null!=tempObjectId.split("\\.") && tempObjectId.split("\\.").length==3)
-								{
-									// fetch parent refKey
-									sql="SELECT REFERENCEKEY FROM OK_IM.TAG WHERE OBJECTID='"+tempObjectId.split("\\.")[0]+"."+tempObjectId.split("\\.")[1]+"'";
-									//									logger.info("---------------- getParentDocumentType :: Sql :: > "+ sql);
-									stmt = conn.createStatement();
-									rs = stmt.executeQuery(sql);
-									if(rs.next())
-									{
-										if(null!=rs.getString("REFERENCEKEY") && !"".equals(rs.getString("REFERENCEKEY")))
-										{
-											documentMap.put(AutomationConstants.REFERENCEKEY, rs.getString("REFERENCEKEY"));
-										}
-									}
-									rs.close();rs=null;
-									stmt.close();stmt=null;
-									sql = null;
-								}
-							}
-							tempObjectId = null;
-							tempRefKey = null;
-						}
-					}
-
-					documentMap = null;
-				}
-				else
-				{
-					logger.info("getImpactedDocumentsData :: Failed to Identify Object Id for REFKEY :: >"+ refKey);
-				}
-				objectId = null;
-				refKey = null;
-
-			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getImpactedDocumentsData()", e);
-		}
-		return impactedDocumentsList;
-	}
-	
+	/**
+	 * The documents of the channel (document id prefix) mapped to any of the OLD VIN ranges in the view content table of
+	 * the locale - MNAO on WMI / VDS / VIS, MC / MME also on the carline code (model name left out since 2022-11-11).
+	 * One document map per document, with the VINs it carries (VIN_LIST) and, for SM / OSM / SI, its document type.
+	 */
+	@SuppressWarnings("unchecked")
 	private static ArrayList<Map<String, Object>> getImpactedDocumentsData(ArrayList<ExcelRowDetails> applicableVINList, String documentPrefix, String locale, Connection conn)
 	{
-		ArrayList<Map<String, Object>> impactedDocumentsList = null;
-		Statement stmt=null;
+		Map<String, Map<String, Object>> byDocument = new LinkedHashMap<String, Map<String, Object>>();
+		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try
 		{
-			impactedDocumentsList = new ArrayList<Map<String,Object>>();
-			ExcelRowDetails data = new ExcelRowDetails();
-			String sql="";
-			Map<String, Object> documentMap = null;
-			ArrayList<ExcelRowDetails> documentsVINList = null;
-			ExcelRowDetails existData = new ExcelRowDetails();
-			for(int a=0;a<applicableVINList.size();a++)
+			boolean mnao = isLocaleOf("mnao.locales", locale);
+			String sql = "SELECT DISTINCT vc_vin_document_id, vc_vin_document_type FROM "+viewContentTable(locale)
+					+" WHERE vc_vin_locale=? AND vc_vin_wmi_code=? AND vc_vin_vds_code=? AND vc_vin_vis_start_range=? AND vc_vin_vis_end_range=?"
+					+(mnao ? "" : " AND vc_vin_carline_code=?")+" AND vc_vin_document_id LIKE ?";
+			pstmt = conn.prepareStatement(sql);
+			for(ExcelRowDetails data : applicableVINList)
 			{
-				data = (ExcelRowDetails)applicableVINList.get(a);
-				if(null!=data.getOldRefKey() && !"".equals(data.getOldRefKey()))
+				if(null==data.getOldRefKey() || "".equals(data.getOldRefKey()))
 				{
-					try
+					continue;
+				}
+				int p = 1;
+				pstmt.setString(p++, locale);
+				pstmt.setString(p++, data.getOldWmiCode());
+				pstmt.setString(p++, data.getOldVdsCode());
+				pstmt.setString(p++, data.getOldVisStartRange());
+				pstmt.setString(p++, data.getOldVisEndRange());
+				if(!mnao)
+				{
+					pstmt.setString(p++, data.getOldCarlineCode());
+				}
+				pstmt.setString(p, documentPrefix+"%");
+				rs = pstmt.executeQuery();
+				while(rs.next())
+				{
+					String documentId = rs.getString(1);
+					if(null==documentId || "".equals(documentId.trim()))
 					{
-						if(ApplicationProperties.getProperty("mnao.locales").trim().toLowerCase().indexOf(locale.trim().toLowerCase())>-1)
-						{
-							// MNAO LOCALE
-							sql="SELECT DISTINCT VC_VIN_DOCUMENT_ID, VC_VIN_DOCUMENT_TYPE FROM gms3_vc_vin_details WHERE VC_VIN_LOCALE='"+locale+"' AND "
-									+ " VC_VIN_WMI_CODE='"+data.getOldWmiCode()+"' AND VC_VIN_VDS_CODE='"+data.getOldVdsCode()+"' "
-									+ " AND VC_VIN_VIS_START_RANGE='"+data.getOldVisStartRange()+"' AND VC_VIN_VIS_END_RANGE='"+data.getOldVisEndRange()+"' AND VC_VIN_DOCUMENT_ID LIKE '"+documentPrefix+"%'";
-						}
-						else if(ApplicationProperties.getProperty("mc.locales").trim().toLowerCase().indexOf(locale.trim().toLowerCase())>-1)
-						{
-							// MC LOCALE
-//							sql="SELECT DISTINCT VC_VIN_DOCUMENT_ID, VC_VIN_DOCUMENT_TYPE FROM gms3_vc_japan_vin_details WHERE VC_VIN_LOCALE='"+locale+"' AND "
-//									+ " VC_VIN_WMI_CODE='"+data.getOldWmiCode()+"' AND VC_VIN_VDS_CODE='"+data.getOldVdsCode()+"' "
-//									+ " AND VC_VIN_VIS_START_RANGE='"+data.getOldVisStartRange()+"' AND VC_VIN_VIS_END_RANGE='"+data.getOldVisEndRange()+"' AND "
-//									+ " VC_VIN_CARLINE_CODE='"+data.getOldCarlineCode()+"' AND VC_VIN_MODEL='"+data.getOldModelNameEngForMC()+"' AND VC_VIN_DOCUMENT_ID LIKE '"+documentPrefix+"%'";
-							// REMOVE MODEL NAME FROM WHERE CLAUSE - 11 NOVEMBER 2022
-							sql="SELECT DISTINCT VC_VIN_DOCUMENT_ID, VC_VIN_DOCUMENT_TYPE FROM gms3_vc_japan_vin_details WHERE VC_VIN_LOCALE='"+locale+"' AND "
-									+ " VC_VIN_WMI_CODE='"+data.getOldWmiCode()+"' AND VC_VIN_VDS_CODE='"+data.getOldVdsCode()+"' "
-									+ " AND VC_VIN_VIS_START_RANGE='"+data.getOldVisStartRange()+"' AND VC_VIN_VIS_END_RANGE='"+data.getOldVisEndRange()+"' AND "
-									+ " VC_VIN_CARLINE_CODE='"+data.getOldCarlineCode()+"' AND VC_VIN_DOCUMENT_ID LIKE '"+documentPrefix+"%'";
-							
-						}
-						else
-						{
-							// MME LOCALE
-//							sql="SELECT DISTINCT VC_VIN_DOCUMENT_ID, VC_VIN_DOCUMENT_TYPE FROM GMS3_VC_MME_VIN_DTL_"+locale.trim().toUpperCase()+" WHERE VC_VIN_LOCALE='"+locale+"' AND "
-//									+ " VC_VIN_WMI_CODE='"+data.getOldWmiCode()+"' AND VC_VIN_VDS_CODE='"+data.getOldVdsCode()+"' "
-//									+ " AND VC_VIN_VIS_START_RANGE='"+data.getOldVisStartRange()+"' AND VC_VIN_VIS_END_RANGE='"+data.getOldVisEndRange()+"' AND "
-//									+ " VC_VIN_CARLINE_CODE='"+data.getOldCarlineCode()+"' AND VC_VIN_MODEL='"+data.getOldModelName()+"' AND VC_VIN_DOCUMENT_ID LIKE '"+documentPrefix+"%'";
-							// REMOVE MODEL NAME FROM WHERE CLAUSE - 11 NOVEMBER 2022
-							sql="SELECT DISTINCT VC_VIN_DOCUMENT_ID, VC_VIN_DOCUMENT_TYPE FROM GMS3_VC_MME_VIN_DTL_"+locale.trim().toUpperCase()+" WHERE VC_VIN_LOCALE='"+locale+"' AND "
-									+ " VC_VIN_WMI_CODE='"+data.getOldWmiCode()+"' AND VC_VIN_VDS_CODE='"+data.getOldVdsCode()+"' "
-									+ " AND VC_VIN_VIS_START_RANGE='"+data.getOldVisStartRange()+"' AND VC_VIN_VIS_END_RANGE='"+data.getOldVisEndRange()+"' AND "
-									+ " VC_VIN_CARLINE_CODE='"+data.getOldCarlineCode()+"' AND VC_VIN_DOCUMENT_ID LIKE '"+documentPrefix+"%'";
-						}
-						logger.info("getImpactedDocumentsData :: Sql :: >"+ sql);
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
-						while(rs.next())
-						{
-							if(null!=rs.getString("VC_VIN_DOCUMENT_ID") && !"".equals(rs.getString("VC_VIN_DOCUMENT_ID")))
-							{
-//								if(rs.getString("VC_VIN_DOCUMENT_ID").startsWith(documentPrefix))
-								{
-									boolean add = true;
-									if(null!=impactedDocumentsList && impactedDocumentsList.size()>0)
-									{
-										documentMap = new HashMap<String, Object>();
-										for(int y=0;y<impactedDocumentsList.size();y++)
-										{
-											documentMap = (Map<String, Object>)impactedDocumentsList.get(y);
-											if(null!=documentMap && null!=documentMap.get(AutomationConstants.DOCUMENTID))
-											{
-												if(String.valueOf(documentMap.get(AutomationConstants.DOCUMENTID)).trim().equals(rs.getString("VC_VIN_DOCUMENT_ID").trim()))
-												{
-													// already exists
-													add = false;
-
-													/*
-													 * CHECK HERE, IF THE VIN IS ADDED WITH  THE DOCUMENT OR NOT
-													 * IF YES - SKIP IT
-													 * IF NO  - ADD TO VINS LIST OF DOCUMENT
-													 */
-													boolean addVin=true;
-													if(null!=documentMap.get(AutomationConstants.VIN_LIST))
-													{
-														documentsVINList = (ArrayList<ExcelRowDetails>)documentMap.get(AutomationConstants.VIN_LIST);
-														if(null!=documentsVINList && documentsVINList.size()>0)
-														{
-															existData = new ExcelRowDetails();
-															for(int hg=0;hg<documentsVINList.size();hg++)
-															{
-																existData = (ExcelRowDetails)documentsVINList.get(hg);
-																if(null!=existData.getOldRefKey() && !"".equals(existData.getOldRefKey()))
-																{
-																	if(existData.getOldRefKey().trim().toLowerCase().equals(data.getOldRefKey().trim().toLowerCase()))
-																	{
-																		// VIN IS ALREADY ADDED TO DOCUMENT - DO NOT ADD
-																		addVin = false;
-																		break;
-																	}
-																}
-															}
-														}
-													}
-
-													if(addVin==true)
-													{
-														if(null==documentsVINList || documentsVINList.size()<=0)
-														{
-															documentsVINList = new ArrayList<ExcelRowDetails>();
-														}
-														documentsVINList.add(data);
-														// set in documentMap
-														documentMap.put(AutomationConstants.VIN_LIST, documentsVINList);
-													}
-													documentsVINList = null;
-
-													break;
-												}
-											}
-											documentMap = null;
-										}
-										documentMap = null;
-									}
-									
-									if(add == true)
-									{
-										documentMap = new HashMap<String, Object>();
-										documentMap.put(AutomationConstants.DOCUMENTID, rs.getString("VC_VIN_DOCUMENT_ID"));
-										// add document type as well - do this only for SM / OSM / SI
-										if(documentPrefix.equals("SM") || documentPrefix.equals("OSM") || documentPrefix.equals("SI"))
-										{
-											documentMap.put(AutomationConstants.REFERENCEKEY, rs.getString("VC_VIN_DOCUMENT_TYPE"));
-										}
-
-										/*
-										 * HERE ADD THE VIN WITH THE DOCUMENT ID
-										 * SO THAT WHEN REPORT IS PRINTED OR DOCUMENT NEEDS TO BE IDENTIFIED
-										 * IT CONTAINS APPLICABLE VINS FOR IT
-										 */
-										documentsVINList = new ArrayList<ExcelRowDetails>();
-										documentsVINList.add(data);
-										documentMap.put(AutomationConstants.VIN_LIST, documentsVINList);
-										impactedDocumentsList.add(documentMap);
-										documentMap = null;
-										documentsVINList = null;
-									}
-								}
-							}
-						}
-						rs.close();rs=null;
-						stmt.close();stmt = null;
-						sql = null;
+						continue;
 					}
-					catch(Exception e)
+					Map<String, Object> documentMap = byDocument.get(documentId.trim());
+					if(null==documentMap)
 					{
-						Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getImpactedDocumentsData()", e);
+						documentMap = new HashMap<String, Object>();
+						documentMap.put(AutomationConstants.DOCUMENTID, documentId);
+						// the document type - only for SM / OSM / SI
+						if(documentPrefix.equals("SM") || documentPrefix.equals("OSM") || documentPrefix.equals("SI"))
+						{
+							documentMap.put(AutomationConstants.REFERENCEKEY, rs.getString(2));
+						}
+						documentMap.put(AutomationConstants.VIN_LIST, new ArrayList<ExcelRowDetails>());
+						byDocument.put(documentId.trim(), documentMap);
+					}
+					// THE VINS OF THE DOCUMENT - for the reports and the update
+					ArrayList<ExcelRowDetails> vins = (ArrayList<ExcelRowDetails>)documentMap.get(AutomationConstants.VIN_LIST);
+					boolean addVin = true;
+					for(ExcelRowDetails existData : vins)
+					{
+						if(existData.getOldRefKey().trim().equalsIgnoreCase(data.getOldRefKey().trim()))
+						{
+							addVin = false;
+							break;
+						}
+					}
+					if(addVin)
+					{
+						vins.add(data);
 					}
 				}
-				data = null;
+				rs.close();
+				rs = null;
 			}
-			sql = null;
-			documentMap = null;
-			rs = null;
-			stmt =null;
-
-			if(null!=impactedDocumentsList && impactedDocumentsList.size()>0)
-			{
-				logger.info("getImpactedDocumentsData :: Total Impacted Documents Found are :: >"+ impactedDocumentsList.size());
-			}
-			else
-			{
-				logger.info("getImpactedDocumentsData :: No Impacted Documents Found.");
-			}
+			logger.info("getImpactedDocumentsData :: "+locale+" "+documentPrefix+" :: impacted documents :: > "+byDocument.size());
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getImpactedDocumentsData()", e);
 		}
-		return impactedDocumentsList;
+		finally
+		{
+			try
+			{
+				if(null!=rs)
+					rs.close();
+				if(null!=pstmt)
+					pstmt.close();
+			}
+			catch(SQLException e)
+			{
+				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "getImpactedDocumentsData()", e);
+			}
+		}
+		return new ArrayList<Map<String, Object>>(byDocument.values());
 	}
 
-	
 	private static String checkVINExistsInMDM(String localeCode,String carlineCode,String wmiCode,String vdsCode, String visStartRange, String visEndRange, Connection conn)
 	{
 		String carlineName=null;
@@ -1067,48 +766,6 @@ public class AutomationDAO extends DBConnectionHelper{
 		return carlineName;
 	}	
 
-	private static boolean checkVINExistsInIM(String refKey, Connection conn)
-	{
-		boolean bool = false;
-		Statement stmt=null;
-		ResultSet rs = null;
-		try
-		{
-			String sql="";
-			sql= "SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY='"+refKey+"'";
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-				{
-					// VIN REFKEY EXISTS IN IM.
-					bool = true;
-				}
-			}
-			sql = null;
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "checkVINExistsInIM()", e);
-			bool = false;
-		}
-		finally
-		{
-			try {
-				if(null!=rs)
-					rs.close();
-				if(null!=stmt)
-					stmt.close();
-			} catch (SQLException e) {
-				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "checkVINExistsInIM()", e);
-			}
-			stmt=null;
-			rs=null;
-		}
-		return bool;
-	}
-
 	public static ArrayList<ExcelRowDetails> processVinManualTypeMapping(ArrayList<ExcelRowDetails> inputDataList)
 	{
 		Connection conn = null;
@@ -1134,7 +791,7 @@ public class AutomationDAO extends DBConnectionHelper{
 					 * APPLICABLE ONLY FOR MME LOCLAES
 					 * 25TH JULY 2019
 					 */
-					if(ApplicationProperties.getProperty("mme.locales").trim().toLowerCase().indexOf(vinDetails.getLocale().replace("-", "_").trim().toLowerCase())>-1)
+					if(isLocaleOf("mme.locales", vinDetails.getLocale()))
 					{
 						// as it is MME - Use Default Variable for Model Name
 						// FETCH OLD VIN DATA
@@ -1150,6 +807,13 @@ public class AutomationDAO extends DBConnectionHelper{
 						 * 	UPDATE PROCESSING STATUS OF THE ROW AS SUCCESS.
 						 * 	SET REMARKS - ROWS FOR BOTH VINS DLEETED AS NO MANUAL TYPE MAPPINGS FOUND FOR BOTH OLD & NEW VIN.
 						 */
+						vinDetails.setProcessingStatus(null);
+						if(null==oldDetails || null==newDetails)
+						{
+							// the manual types could not be read - nothing is changed for this VIN, the row FAILS
+							vinDetails.setProcessingStatus(AutomationConstants.STATUS_FAILURE);
+							vinDetails.setRemarks("Failed to read the manual types of the "+(null==oldDetails ? "Old" : "New")+" VIN from the view content table.");
+						}
 						if(null!=oldDetails && null!=newDetails)
 						{
 							if(null!=oldDetails.getManualTypesList() && oldDetails.getManualTypesList().size()>0)
@@ -1203,7 +867,7 @@ public class AutomationDAO extends DBConnectionHelper{
 	private static VinMLMappingDetails retrieveManualTypeData(String locale,String carlineCode,String wmiCode,String vdsCode,String visStart,String visEnd,String modelName, Connection conn)
 	{
 		VinMLMappingDetails matrixData=new VinMLMappingDetails();
-		Statement stmt = null;
+		PreparedStatement stmt = null;
 		ResultSet  rs = null;
 		try
 		{
@@ -1215,14 +879,17 @@ public class AutomationDAO extends DBConnectionHelper{
 			matrixData.setVisEndRange(visEnd.trim());
 
 			ArrayList<String> manualTypeList = new ArrayList<String>();
-			String tableName = "GMS3_VC_MME_VIN_DTL_"+locale.trim().toUpperCase();
-			String sql="SELECT DISTINCT VC_VIN_DOCUMENT_TYPE FROM "+ tableName+" WHERE VC_VIN_CARLINE_CODE='"+matrixData.getCarlineCode()+"' "
-					+ " AND VC_VIN_WMI_CODE='"+matrixData.getWmiCode()+"' AND  VC_VIN_VDS_CODE='"+matrixData.getVdsCode()+"' "
-					+ " AND VC_VIN_VIS_START_RANGE='"+matrixData.getVisStartRange()+"' "
-					+ " AND VC_VIN_VIS_END_RANGE='"+matrixData.getVisEndRange()+"' AND VC_VIN_MODEL='"+modelName.trim()+"'";
-			logger.info("retrieveManualTypeData :: SQL :: > "+ sql);
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
+			String tableName = viewContentTable(locale);
+			String sql="SELECT DISTINCT vc_vin_document_type FROM "+ tableName+" WHERE vc_vin_carline_code=? AND vc_vin_wmi_code=? AND vc_vin_vds_code=?"
+					+ " AND vc_vin_vis_start_range=? AND vc_vin_vis_end_range=? AND vc_vin_model=?";
+			stmt = conn.prepareStatement(sql);
+			stmt.setString(1, matrixData.getCarlineCode());
+			stmt.setString(2, matrixData.getWmiCode());
+			stmt.setString(3, matrixData.getVdsCode());
+			stmt.setString(4, matrixData.getVisStartRange());
+			stmt.setString(5, matrixData.getVisEndRange());
+			stmt.setString(6, modelName.trim());
+			rs = stmt.executeQuery();
 			while(rs.next())
 			{
 				if(null!=rs.getString("VC_VIN_DOCUMENT_TYPE"))
@@ -1329,7 +996,9 @@ public class AutomationDAO extends DBConnectionHelper{
 		}
 		catch(Exception e)
 		{
-			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "processVinManualTypeMapping()", e);
+			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "retrieveManualTypeData()", e);
+			// NOT READ IS NOT "NO MANUAL TYPE" - the caller would delete the mapping
+			matrixData = null;
 		}
 		finally
 		{
@@ -1373,8 +1042,11 @@ public class AutomationDAO extends DBConnectionHelper{
 			pstmt.close();pstmt=null;
 			sql=null;
 
-			// SET STATUS AS SUCCESS
-			vinDetails.setProcessingStatus(AutomationConstants.STATUS_SUCCESS);
+			// SET STATUS AS SUCCESS - unless the other VIN of the row failed already
+			if(!AutomationConstants.STATUS_FAILURE.equals(vinDetails.getProcessingStatus()))
+			{
+				vinDetails.setProcessingStatus(AutomationConstants.STATUS_SUCCESS);
+			}
 		}
 		catch(Exception  e)
 		{
@@ -1401,7 +1073,6 @@ public class AutomationDAO extends DBConnectionHelper{
 
 	private static ExcelRowDetails saveVINManualTypeMapping(ExcelRowDetails vinDetails, VinMLMappingDetails mappingDetails, String type, Connection conn)
 	{
-		Statement stmt = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try
@@ -1477,6 +1148,13 @@ public class AutomationDAO extends DBConnectionHelper{
 
 
 
+				if(null==COLUMN_NAME || "".equals(COLUMN_NAME))
+				{
+					// a manual type without a mapping column - nothing to write for it (was an invalid UPDATE before)
+					logger.info("saveVINManualTypeMapping :: manual type {"+manualType+"} has no VIN manual type mapping column - skipped.");
+					manualType = null;
+					continue;
+				}
 				// CHECK WHETHER TO UPDATE OR INSERT
 				sql="SELECT VIN_ML_ID FROM gms3_mdm_vin_ml_mapping WHERE TRIM(LOWER(VIN_ML_LOCALE))=? AND VIN_ML_CARLINE_CODE=? AND VIN_ML_WMI_CODE=? "
 						+ " AND VIN_ML_VDS_CODE=? AND VIN_ML_VIS_START=? AND VIN_ML_VIS_END=? AND VIN_ML_STATUS='A'";
@@ -1503,10 +1181,12 @@ public class AutomationDAO extends DBConnectionHelper{
 					 * 4TH AUGUST 2019
 					 */
 					// vin already exists for the locale - simply update the new Manual Type Mapping
-					sql="UPDATE gms3_mdm_vin_ml_mapping SET "+COLUMN_NAME+" = '"+mappingDetails.getLocaleCode()+"' WHERE VIN_ML_ID="+ autoCode;
-					stmt = conn.createStatement();
-					stmt.executeUpdate(sql);
-					stmt.close();stmt=null;
+					sql="UPDATE gms3_mdm_vin_ml_mapping SET "+COLUMN_NAME+" = ? WHERE VIN_ML_ID = ?";
+					pstmt = conn.prepareStatement(sql);
+					pstmt.setString(1, mappingDetails.getLocaleCode());
+					pstmt.setLong(2, autoCode);
+					pstmt.executeUpdate();
+					pstmt.close();pstmt=null;
 					sql = null;
 				}
 				else
@@ -1535,8 +1215,11 @@ public class AutomationDAO extends DBConnectionHelper{
 				autoCode= 0 ;
 			}
 
-			// SET STATUS AS SUCCESS
-			vinDetails.setProcessingStatus(AutomationConstants.STATUS_SUCCESS);
+			// SET STATUS AS SUCCESS - unless the other VIN of the row failed already
+			if(!AutomationConstants.STATUS_FAILURE.equals(vinDetails.getProcessingStatus()))
+			{
+				vinDetails.setProcessingStatus(AutomationConstants.STATUS_SUCCESS);
+			}
 
 		}
 		catch(Exception e)
@@ -1550,18 +1233,136 @@ public class AutomationDAO extends DBConnectionHelper{
 		finally
 		{
 			try {
-				if(null!=stmt)
-					stmt.close();
 				if(null!=rs)
 					rs.close();
+				if(null!=pstmt)
+					pstmt.close();
 			} catch (SQLException e) {
 				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "saveVINManualTypeMapping()", e);
 			}
-			stmt=null;
+			pstmt=null;
 			rs = null;
 			type=null;
 			mappingDetails = null;
 		}
 		return vinDetails;
+	}
+
+	/* =====================================================================================================
+	 * OLD VIN RANGES INACTIVE IN MDM (2026-10-12) - after a SUCCESSFUL update job
+	 * =====================================================================================================
+	 */
+	public static final String OLD_VIN_DEACTIVATED = "DEACTIVATED";
+	public static final String OLD_VIN_NO_CHANGE = "NO CHANGE";
+	public static final String OLD_VIN_KEPT = "KEPT";
+	public static final String OLD_VIN_FAILED = "FAILED";
+
+	/**
+	 * The OLD VIN ranges of a job that succeeded are made inactive in MDM, as a D row of a master data file does:
+	 * mdm_vin_flag = flag.value.delete, mdm_sync_status cleared. The row is the one validation found - locale (through
+	 * the alternate locale mapping, as at validation) + carline + WMI + VDS + VIS start / end, ACTIVE rows only. One
+	 * UPDATE per distinct range. Nothing changes in Kapture (the old VIN category stays). A range that is also the NEW
+	 * range of a row of the same job stays active.
+	 *
+	 * @return one line per distinct old range: { locale, MDM locale, carline, WMI, VDS, VIS start, VIS end, ref key,
+	 *         action (DEACTIVATED / NO CHANGE / KEPT / FAILED), rows updated, remarks }
+	 */
+	public static List<String[]> deactivateOldVins(List<ExcelRowDetails> rows)
+	{
+		List<String[]> out = new ArrayList<String[]>();
+		if(null==rows || rows.isEmpty())
+		{
+			return out;
+		}
+		// THE NEW RANGES OF THE JOB - never deactivated
+		Set<String> newRanges = new HashSet<String>();
+		for(ExcelRowDetails r : rows)
+		{
+			newRanges.add(nz(r.getLocale()).replace("_", "-").toUpperCase()+"|"+vinKey(r.getNewCarlineCode(), r.getNewWmiCode(), r.getNewVdsCode(),
+					r.getNewVisStartRange(), r.getNewVisEndRange()));
+		}
+		Set<String> done = new HashSet<String>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try
+		{
+			conn = getConnection();
+			Timestamp now = new Timestamp(System.currentTimeMillis());
+			for(ExcelRowDetails r : rows)
+			{
+				String locale = nz(r.getLocale()).replace("_", "-");
+				String key = locale.toUpperCase()+"|"+vinKey(r.getOldCarlineCode(), r.getOldWmiCode(), r.getOldVdsCode(), r.getOldVisStartRange(), r.getOldVisEndRange());
+				if(!done.add(key))
+				{
+					continue;
+				}
+				String[] line = new String[] { locale, "", nz(r.getOldCarlineCode()), nz(r.getOldWmiCode()), nz(r.getOldVdsCode()),
+						nz(r.getOldVisStartRange()), nz(r.getOldVisEndRange()), nz(r.getOldRefKey()), "", "0", "" };
+				out.add(line);
+				if(newRanges.contains(key))
+				{
+					line[8] = OLD_VIN_KEPT;
+					line[10] = "The range is also a NEW VIN range of this job.";
+					continue;
+				}
+				try
+				{
+					String mdmLocale = ScheduleDAO.getAlternateLocale(locale, isLocaleOf("mnao.locales", locale)
+							? AutoSyncConstants.ITEM_KEY_VIN_RANGE : AutoSyncConstants.ITEM_KEY_CARLINE, conn);
+					if(null==mdmLocale || "".equals(mdmLocale.trim()))
+					{
+						throw new IllegalStateException("No MDM locale for "+locale+" (gms3_mdm_alt_lang_mapping).");
+					}
+					line[1] = mdmLocale.trim();
+					pstmt = conn.prepareStatement("UPDATE gms3_mdm_vin_detail SET mdm_vin_flag=?, mdm_sync_status=NULL, mdm_vin_updated_tmstp=?"
+							+ " WHERE mdm_vin_flag=? AND TRIM(LOWER(mdm_ml_lang_code))=? AND TRIM(LOWER(mdm_crln_code))=?"
+							+ " AND TRIM(LOWER(mdm_vin_wmi_code))=? AND TRIM(LOWER(mdm_vin_vds_code))=?"
+							+ " AND TRIM(LOWER(mdm_vin_vis_start_range))=? AND TRIM(LOWER(mdm_vin_vis_end_range))=?");
+					int p = 1;
+					pstmt.setString(p++, ApplicationProperties.getProperty("flag.value.delete"));
+					pstmt.setTimestamp(p++, now);
+					pstmt.setString(p++, ApplicationProperties.getProperty("flag.value.active"));
+					pstmt.setString(p++, mdmLocale.trim().toLowerCase());
+					pstmt.setString(p++, line[2].toLowerCase());
+					pstmt.setString(p++, line[3].toLowerCase());
+					pstmt.setString(p++, line[4].toLowerCase());
+					pstmt.setString(p++, line[5].toLowerCase());
+					pstmt.setString(p++, line[6].toLowerCase());
+					int n = pstmt.executeUpdate();
+					pstmt.close();pstmt = null;
+					line[9] = String.valueOf(n);
+					line[8] = n>0 ? OLD_VIN_DEACTIVATED : OLD_VIN_NO_CHANGE;
+					line[10] = n>0 ? "" : "No active row in MDM.";
+					logger.info("deactivateOldVins :: "+locale+" (MDM "+mdmLocale.trim()+") "+line[7]+" :: "+line[8]+" :: rows :: > "+n);
+				}
+				catch(Exception e)
+				{
+					Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "deactivateOldVins()", e);
+					line[8] = OLD_VIN_FAILED;
+					line[10] = null==e.getMessage() ? e.toString() : e.getMessage();
+				}
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "deactivateOldVins()", e);
+			out.add(new String[] { "-", "-", "-", "-", "-", "-", "-", "-", OLD_VIN_FAILED, "0",
+					"Old VIN ranges not made inactive: "+(null==e.getMessage() ? e.toString() : e.getMessage()) });
+		}
+		finally
+		{
+			try
+			{
+				if(null!=pstmt)
+					pstmt.close();
+				if(null!=conn)
+					conn.close();
+			}
+			catch(SQLException e)
+			{
+				Utilities.printStackTraceToLogs(AutomationDAO.class.getName(), "deactivateOldVins()", e);
+			}
+		}
+		return out;
 	}
 }

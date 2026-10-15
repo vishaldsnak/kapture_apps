@@ -170,6 +170,93 @@ public class MdmExcelLoader {
 		return true;
 	}
 
+	/** true when the folder holds at least one master data file of the locale. */
+	public static boolean hasFiles(File masterDataFolder, String locale) {
+		File[] files = null == masterDataFolder ? null : masterDataFolder.listFiles();
+		if (null != files) {
+			for (int i = 0; i < files.length; i++) {
+				Matcher m = FILE_NAME.matcher(files[i].getName());
+				if (files[i].isFile() && m.matches() && m.group(2).equalsIgnoreCase(locale.trim().replace("_", "-"))) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * READ ONLY - the VIN ranges of the locale's ALL_VIN file that a load would add or update (rows marked D left
+	 * out), each as { MODEL, CARLINE CODE, WMI, VDS, VIS START, VIS END }, trimmed. Nothing is written. Used by the
+	 * IPM Facelift VIN Update to accept a new VIN range that "Master Data with Facelift" loads at the start of the job.
+	 *
+	 * @return empty when the folder holds no ALL_VIN file for the locale
+	 * @throws Exception when the file is there but cannot be read - the caller must not take that as "no range"
+	 */
+	public static List<String[]> readAllVinRanges(File masterDataFolder, String locale) throws Exception {
+		List<String[]> out = new ArrayList<String[]>();
+		File[] files = null == masterDataFolder ? null : masterDataFolder.listFiles();
+		if (null == files) {
+			return out;
+		}
+		String wanted = locale.trim().replace("_", "-");
+		for (int i = 0; i < files.length; i++) {
+			Matcher m = FILE_NAME.matcher(files[i].getName());
+			if (!files[i].isFile() || !m.matches() || !m.group(2).equalsIgnoreCase(wanted)
+					|| !TYPE_ALL_VIN.equalsIgnoreCase(m.group(3).trim())) {
+				continue;
+			}
+			InputStream in = null;
+			Workbook workbook = null;
+			try {
+				in = PathUtil.fileInputStream(files[i]);
+				workbook = WorkbookFactory.create(in);
+				Sheet sheet = workbook.getSheet(ApplicationProperties.getProperty("masterdata.sheet.name").trim());
+				if (null == sheet) {
+					throw new IllegalStateException("Sheet '" + ApplicationProperties.getProperty("masterdata.sheet.name").trim()
+							+ "' not found in " + files[i].getName());
+				}
+				DataFormatter formatter = new DataFormatter();
+				int dataColumns = DATA_COLUMNS[TYPES.length - 1];
+				for (int r = 1; r <= sheet.getLastRowNum(); r++) {
+					Row row = sheet.getRow(r);
+					if (null == row) {
+						continue;
+					}
+					String ind = cell(formatter, row, dataColumns).toUpperCase();
+					if ("D".equals(ind) || "DELETE".equals(ind)) {
+						continue;
+					}
+					String[] v = new String[6];
+					boolean empty = true;
+					for (int c = 0; c < 2; c++) {
+						v[c] = cell(formatter, row, c);
+					}
+					for (int c = 3; c < 7; c++) {
+						v[c - 1] = cell(formatter, row, c);
+					}
+					for (int c = 0; c < v.length; c++) {
+						empty = empty && "".equals(v[c]);
+					}
+					if (!empty) {
+						out.add(v);
+					}
+				}
+			} finally {
+				try {
+					if (null != workbook) {
+						workbook.close();
+					}
+					if (null != in) {
+						in.close();
+					}
+				} catch (Exception e) {
+					Utilities.printStackTraceToLogs(MdmExcelLoader.class.getName(), "readAllVinRanges()", e);
+				}
+			}
+		}
+		return out;
+	}
+
 	public long getManualLanguageId() {
 		return mlId;
 	}

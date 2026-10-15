@@ -1,12 +1,14 @@
 package com.mazda.gms3.dmt.automation.utils;
 
 import com.mazda.gms3.dmt.utils.PathUtil;
+import com.mazda.gms3.dmt.automation.dao.AutomationDAO;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -326,6 +328,9 @@ public class PrintReportsUtils {
 				logger.info("Writing on OTHER CHANNEL REPORT XLSX file Finished ...");
 				os.flush();
 				os.close();
+				// the temporary files SXSSF keeps on disk (java.io.tmpdir) are removed
+				myWorkBook.dispose();
+				myWorkBook.close();
 
 				// set mySheet to null
 				mySheet = null;
@@ -512,6 +517,9 @@ public class PrintReportsUtils {
 				logger.info("Writing on SM / WD CHANNEL REPORT XLSX file Finished ...");
 				os.flush();
 				os.close();
+				// the temporary files SXSSF keeps on disk (java.io.tmpdir) are removed
+				myWorkBook.dispose();
+				myWorkBook.close();
 
 				// set mySheet to null
 				mySheet = null;
@@ -675,6 +683,9 @@ public class PrintReportsUtils {
 				logger.info("Writing on SM / WD CHANNEL ERROR REPORT XLSX file Finished ...");
 				os.flush();
 				os.close();
+				// the temporary files SXSSF keeps on disk (java.io.tmpdir) are removed
+				myWorkBook.dispose();
+				myWorkBook.close();
 
 				// set mySheet to null
 				mySheet = null;
@@ -784,7 +795,8 @@ public class PrintReportsUtils {
 				for(int a=0;a<inputDataList.size();a++)
 				{
 					vinDetails = (ExcelRowDetails)inputDataList.get(a);
-					if(ApplicationProperties.getProperty("mme.locales").trim().toLowerCase().indexOf(vinDetails.getLocale().replace("-", "_").trim().toLowerCase())>-1)
+					// exact locale match (a substring match could take a locale for another)
+					if(AutomationDAO.isLocaleOf("mme.locales", vinDetails.getLocale()))
 					{
 						oldies= new VinMLMappingDetails();
 						current=  new VinMLMappingDetails();
@@ -849,6 +861,9 @@ public class PrintReportsUtils {
 				logger.info("Writing on VIN MANUAL TYPE MAPPING REPORT XLSX file Finished ...");
 				os.flush();
 				os.close();
+				// the temporary files SXSSF keeps on disk (java.io.tmpdir) are removed
+				myWorkBook.dispose();
+				myWorkBook.close();
 
 				// set mySheet to null
 				mySheet = null;
@@ -865,6 +880,78 @@ public class PrintReportsUtils {
 			Utilities.printStackTraceToLogs(PrintReportsUtils.class.getName(), "printVINManualMappingReport()", e);
 		}
 	
+	}
+
+
+	/**
+	 * OLD_VIN_DEACTIVATION_REPORT.xlsx - the old VIN ranges of a successful job and what happened to their MDM row
+	 * (AutomationDAO.deactivateOldVins). Not written when there is no line.
+	 */
+	public void printOldVinDeactivationReport(String scheduleCode, List<String[]> lines)
+	{
+		if(null==scheduleCode || "".equals(scheduleCode) || null==lines || lines.isEmpty())
+		{
+			return;
+		}
+		SXSSFWorkbook myWorkBook = null;
+		FileOutputStream os = null;
+		try
+		{
+			String path = ApplicationProperties.getProperty("REPORTS_DIRECTORY");
+			File directory = PathUtil.file(path);
+			if (!directory.exists() || !directory.isDirectory()) {
+				directory.mkdir();
+			}
+			path = path + "/" + scheduleCode;
+			directory = PathUtil.file(path);
+			if (!directory.exists() || !directory.isDirectory()) {
+				directory.mkdir();
+			}
+			myWorkBook = new SXSSFWorkbook(100);
+			Sheet mySheet = myWorkBook.createSheet("Details");
+			String[] headers = { "LOCALE", "MDM LOCALE", "OLD CARLINE", "OLD WMI", "OLD VDS", "OLD VIS START", "OLD VIS END", "OLD VIN REF KEY",
+					"ACTION", "MDM ROWS UPDATED", "REMARKS" };
+			Row row = mySheet.createRow(0);
+			for(int c=0;c<headers.length;c++)
+			{
+				row.createCell(c).setCellValue(headers[c]);
+			}
+			int r = 1;
+			for(String[] line : lines)
+			{
+				row = mySheet.createRow(r++);
+				for(int c=0;c<line.length && c<headers.length;c++)
+				{
+					row.createCell(c).setCellValue(null==line[c] ? "" : line[c]);
+				}
+			}
+			os = PathUtil.fileOutputStream(PathUtil.file(path + "/OLD_VIN_DEACTIVATION_REPORT.xlsx"));
+			myWorkBook.write(os);
+			os.flush();
+			logger.info("printOldVinDeactivationReport :: OLD_VIN_DEACTIVATION_REPORT.xlsx written :: rows :: > "+lines.size());
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(PrintReportsUtils.class.getName(), "printOldVinDeactivationReport()", e);
+		}
+		finally
+		{
+			try
+			{
+				if(null!=os)
+					os.close();
+				if(null!=myWorkBook)
+				{
+					// the temporary files SXSSF keeps on disk (java.io.tmpdir) are removed
+					myWorkBook.dispose();
+					myWorkBook.close();
+				}
+			}
+			catch(IOException e)
+			{
+				Utilities.printStackTraceToLogs(PrintReportsUtils.class.getName(), "printOldVinDeactivationReport()", e);
+			}
+		}
 	}
 
 }

@@ -2297,9 +2297,11 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 							}
 							
 							/*
-							 * NOW ITERATE AND VERIFY IF THE MODEL EXISTS - THEN DO NOT ADD ELSE ADD TO VIN MASTER LIST 
+							 * NOW ITERATE AND VERIFY IF THE MODEL EXISTS - THEN DO NOT ADD ELSE ADD TO VIN MASTER LIST
+							 * The new en_CA rows are collected in finalENCaModelsList and added to vinMasterList only
+							 * after the check, so they are compared with the en_US rows only (same fix as legacy PROD).
 							 */
-							
+							List<VINEntFileDetails> finalENCaModelsList = new ArrayList<VINEntFileDetails>();
 							if(null!=tempCAModelsList && tempCAModelsList.size()>0)
 							{
 								VINEntFileDetails tDetails = null;
@@ -2328,12 +2330,12 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 														null!=checkDetails.getVinStartRange() && !"".equals(checkDetails.getVinStartRange()) && 
 														null!=checkDetails.getVinEndRange() && !"".equals(checkDetails.getVinEndRange()))
 												{
-													if(tDetails.getModelCode().equals(checkDetails.getModelCode()) && 
-															tDetails.getVinWMI().equals(checkDetails.getVinWMI()) &&	
-															tDetails.getVinVDS().equals(checkDetails.getVinVDS()) && 
-															tDetails.getVinCarline().equals(checkDetails.getVinCarline()) &&
-															tDetails.getVinStartRange().equals(checkDetails.getVinStartRange()) &&
-															tDetails.getVinEndRange().equals(checkDetails.getVinEndRange()))
+													if(tDetails.getModelCode().trim().toLowerCase().equals(checkDetails.getModelCode().trim().toLowerCase()) &&
+															tDetails.getVinWMI().trim().toLowerCase().equals(checkDetails.getVinWMI().trim().toLowerCase()) &&
+															tDetails.getVinVDS().trim().toLowerCase().equals(checkDetails.getVinVDS().trim().toLowerCase()) &&
+															tDetails.getVinCarline().trim().toLowerCase().equals(checkDetails.getVinCarline().trim().toLowerCase()) &&
+															tDetails.getVinStartRange().trim().toLowerCase().equals(checkDetails.getVinStartRange().trim().toLowerCase()) &&
+															tDetails.getVinEndRange().trim().toLowerCase().equals(checkDetails.getVinEndRange().trim().toLowerCase()))
 													{
 														addToVINMaster = false;
 														break;
@@ -2355,11 +2357,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 											newTDetails.setVinStartRange(tDetails.getVinStartRange());
 											newTDetails.setVinEndRange(tDetails.getVinEndRange());
 											newTDetails.setLangCodeForYearRange(tDetails.getLangCodeForYearRange());
-											if(null==vinMasterList || vinMasterList.size()<=0)
-											{
-												vinMasterList = new ArrayList<VINEntFileDetails>();
-											}
-											vinMasterList.add(newTDetails);
+											finalENCaModelsList.add(newTDetails);
 											newTDetails = null;
 										}
 									}
@@ -2369,6 +2367,16 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 								checkDetails = null;
 							}
 							tempCAModelsList = null;
+
+							if(null!=finalENCaModelsList && finalENCaModelsList.size()>0)
+							{
+								if(null==vinMasterList || vinMasterList.size()<=0)
+								{
+									vinMasterList = new ArrayList<VINEntFileDetails>();
+								}
+								vinMasterList.addAll(finalENCaModelsList);
+							}
+							finalENCaModelsList = null;
 						}
 					}
 					checkLocForENCA = null;
@@ -2976,7 +2984,6 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 		String vcLocale = locale.replace("-", "_").trim();
 		String tableName = "gms3_dmt_"+vcLocale.toLowerCase()+"_imdoc";
 		String catTableName = "gms3_dmt_"+vcLocale.toLowerCase()+"_cat";
-		String draft = ApplicationProperties.getProperty("view.content.status.draft");
 		int chunk = Integer.parseInt(com.mazda.gms3.dmt.kapture.KaptureApiClient.require("db.write.batch.size"));
 		Connection conn = null;
 		PreparedStatement pstmt = null;
@@ -3036,7 +3043,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 			{
 				List<String> part = paths.subList(from, Math.min(from+chunk, paths.size()));
 				pstmt = conn.prepareStatement("SELECT DC_IM_DOC_ID, DC_SOURCE_NETWORK_LOC, DC_IM_DOC_TITLE, DC_IM_DOC_CAT_TYPE, DC_IM_DOC_SUBCAT_TYPE,"
-						+ " DC_IM_DOC_SUBSUBCAT_TYPE, DC_CREATED_TMSTP, DC_UPDATED_TMSTP FROM "+tableName
+						+ " DC_IM_DOC_SUBSUBCAT_TYPE, DC_CREATED_TMSTP, DC_UPDATED_TMSTP, DC_IM_DOC_STATUS FROM "+tableName
 						+ " WHERE DC_IM_DOC_FLAG = ? AND TRIM(LOWER(DC_SOURCE_NETWORK_LOC)) IN ("+marks(part.size())+")");
 				int i=1;
 				pstmt.setString(i++, ApplicationProperties.getProperty("flag.value.active"));
@@ -3058,6 +3065,8 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 						cd.setSubSubCategoryCode(rs.getString("DC_IM_DOC_SUBSUBCAT_TYPE"));
 						cd.setDocumentCreatedTime(rs.getTimestamp("DC_CREATED_TMSTP"));
 						cd.setDocumentModifiedTime(rs.getTimestamp("DC_UPDATED_TMSTP"));
+						// its published flag (MNAO: DC_IM_DOC_STATUS) - decides the status of its view content rows (ViewContentStatus)
+						cd.setImDocStatus(rs.getString("DC_IM_DOC_STATUS"));
 					}
 				}
 				rs.close();rs=null;
@@ -3218,8 +3227,10 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 						pstmt.close();pstmt=null;
 					}
 				}
-				insertViewContentRows(conn, "gms3_vc_model_year_details", "VC_MY_", myRows, false, draft, chunk);
-				insertViewContentRows(conn, "gms3_vc_vin_details", "VC_VIN_", vinRows, true, draft, chunk);
+				// VC_CONTENT_STATUS per document: Draft when this job converted it, Published when already published (ViewContentStatus)
+				java.util.Map<String, String> contentStatus = com.mazda.gms3.dmt.conversion.utils.ViewContentStatus.byDocument(written);
+				insertViewContentRows(conn, "gms3_vc_model_year_details", "VC_MY_", myRows, false, contentStatus, chunk);
+				insertViewContentRows(conn, "gms3_vc_vin_details", "VC_VIN_", vinRows, true, contentStatus, chunk);
 				conn.commit();
 				for(ContentDetails cd : written)
 				{
@@ -3351,7 +3362,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 
 	/** Batched INSERT of view content rows (INSERT batches are allowed on MC Dev; UPDATE / DELETE batches are not). */
 	private static void insertViewContentRows(Connection conn, String table, String p, List<MNAOModelYearViewContentDetails> rows,
-			boolean vin, String contentStatus, int chunk) throws SQLException
+			boolean vin, java.util.Map<String, String> contentStatus, int chunk) throws SQLException
 	{
 		if(rows.isEmpty())
 		{
@@ -3394,7 +3405,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				pstmt.setTimestamp(i++, v.getImDocCreateDate());
 				pstmt.setTimestamp(i++, v.getImDocModifiedDate());
 				pstmt.setString(i++, v.getDescription());
-				pstmt.setString(i++, contentStatus);
+				pstmt.setString(i++, com.mazda.gms3.dmt.conversion.utils.ViewContentStatus.of(contentStatus, v.getDocumentId()));
 				// display order: codes are no longer supplied, the names come from the d01.txt row
 				pstmt.setString(i++, null==d ? null : d.getDisplayOrderLevel1Code());
 				pstmt.setString(i++, null==d ? null : d.getDisplayOrderLevel1Name());
@@ -3765,6 +3776,9 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 		
 		String locale = contentDetails.getLocale();
 		locale= locale.replace("-", "_");
+		// the document had view content? - UnlistedDisplayData reports it when no longer listed
+		com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, "gms3_vc_model_year_details", "VC_MY_LOCALE", "VC_MY_DOCUMENT_ID", contentDetails, documentId.trim());
+		com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, "gms3_vc_vin_details", "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID", contentDetails, documentId.trim());
 		deleteSql="DELETE FROM gms3_vc_model_year_details WHERE VC_MY_DOCUMENT_ID='"+documentId.trim()+"' "
 				+ " AND VC_MY_LOCALE='"+locale.trim()+"'";
 		stmt = conn.createStatement();

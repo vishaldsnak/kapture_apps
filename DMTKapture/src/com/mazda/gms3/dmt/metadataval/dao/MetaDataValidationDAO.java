@@ -8,10 +8,18 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncConstants;
 import com.mazda.gms3.dmt.dao.ScheduleDAO;
+import com.mazda.gms3.dmt.kapture.KaptureApiClient;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
 import com.mazda.gms3.dmt.mc.vo.CDProcessingDetails;
@@ -24,10 +32,7 @@ import com.mazda.gms3.dmt.metadataval.vo.MetaDataFileDetails;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
 import com.mazda.gms3.dmt.utils.DBConnectionHelper;
 import com.mazda.gms3.dmt.utils.Utilities;
-import com.mazda.gms3.dmt.vo.LeftMenuFileDetails;
 import com.mazda.gms3.dmt.vo.SelectItemDetails;
-import com.mazda.gms3.dmt.vo.VINEntFileDetails;
-import com.mazda.gms3.dmt.vo.VinAttributeEntFileDetails;
 
 public class MetaDataValidationDAO extends DBConnectionHelper{
 
@@ -448,2658 +453,6 @@ public class MetaDataValidationDAO extends DBConnectionHelper{
 			pstmt.close();pstmt=null;
 	}
 
-	public ArrayList<VinDetails> checkMCMMEVINStatus(ArrayList<VinDetails> vinList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		if(null!=vinList && !"".equals(vinList) && null!=locale && !"".equals(locale))
-		{
-//			locale = locale.replace("-", "_");
-//			if(mmeLocales.indexOf(locale)>-1)
-//			{
-//				// MME MARKET LOCALE - CHECK FOR ALTERNATE LOCALE MAPPED TO PROCESSING LOCALE FOR CARLINE
-////				locale = ApplicationProperties.getProperty("en-uk").trim();
-//				locale = Utilities.getMarketWiseLocalesList(ApplicationProperties.getProperty("market.mme"), AutoSyncConstants.STATUS_YES, AutoSyncConstants.ITEM_KEY_CARLINE, locale);
-//				locale = locale.replace("_", "-").trim();
-//			}
-//			else
-//			{
-//				// user whatever value is passed for locale
-//				locale = locale.replace("_", "-").trim();
-//			}
-			
-			conn = getConnection();
-			locale = locale.replace("_", "-");
-			// get AlternateLocale mapped to procesisngLocale for CARLINE
-			locale = ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_CARLINE, conn);
-			
-			VinDetails details = null;
-			String sql="";
-			String refKey="";
-			String wmiCode="";
-			StringBuilder errorMessage = new StringBuilder();
-			for(int a=0;a<vinList.size();a++)
-			{
-				details = (VinDetails)vinList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-				// be default set values to N
-				details.setVinFoundInMDM("N");
-				details.setVinFoundInIM("N");
-				if(null!=details.getLineType() && details.getLineType().equals(MetaDataValidationUtils.LINE_TYPE_VALID))
-				{
-					errorMessage = new StringBuilder();
-					boolean errorsFound=false;
-					try
-					{
-						/*
-						 *  if locale is of any of MME Marker, then use en_UK locale for checking in MDM
-						 *  proceed
-						 *  check carlineCode + wmiCode + vdsCode +visStartRange +visEndRange exists in MDM or not
-						 */
-						sql="SELECT MDM_VIN_ID FROM gms3_mdm_vin_detail WHERE TRIM(LOWER(MDM_VIN_WMI_CODE))=? AND TRIM(LOWER(MDM_VIN_VDS_CODE))=? "
-								+ " AND TRIM(LOWER(MDM_VIN_VIS_START_RANGE))=? "
-								+ " AND TRIM(LOWER(MDM_VIN_VIS_END_RANGE))=? AND TRIM(LOWER(MDM_CRLN_CODE))=? AND TRIM(LOWER(MDM_ML_LANG_CODE))=? AND MDM_VIN_FLAG=? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, details.getWmiCode().trim().toLowerCase());
-						pstmt.setString(2, details.getVdsCode().trim().toLowerCase());
-						pstmt.setString(3, details.getVisStartRange().trim().toLowerCase());
-						pstmt.setString(4, details.getVisEndRange().trim().toLowerCase());
-						pstmt.setString(5, details.getCarlineCode().trim().toLowerCase());
-						pstmt.setString(6, locale.trim().toLowerCase());
-						pstmt.setString(7, ApplicationProperties.getProperty("flag.value.active"));
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_VIN_ID") > 0)
-							{
-								// VIN FOUND IN MDM
-								details.setVinFoundInMDM("Y");
-							}
-						}
-						rs.close();rs=null;
-						pstmt.close();pstmt=null;
-						sql = null;
-
-						if((null==details.getVinFoundInMDM()) || (null!=details.getVinFoundInMDM() && !"Y".equals(details.getVinFoundInMDM())))
-						{
-							// vin not found in MDM
-							errorMessage.append("VIN does not exist in MDM.");
-							// set errorsFound to true - status has to Failure for this row
-							errorsFound = true;
-						}
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkMCMMEVINStatus()", e);
-						/*
-						 * some exception in identifying the VIN FROM MDM
-						 */
-						errorMessage.append("Failed to find VIN in MDM, exception while executing Query ->"+ e.getMessage()+".");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-					// proceed for IM 
-					try
-					{
-						// proceed for checking in IM
-						// PREPARE REFkEY FOR VIN
-						if(details.getWmiCode().equals("-"))
-						{
-							wmiCode="___";
-						}
-						else
-						{
-							wmiCode = details.getWmiCode();
-						}
-						refKey = details.getCarlineCode()+wmiCode+details.getVdsCode()+details.getVisStartRange()+details.getVisEndRange();
-						refKey = Utilities.replaceCharsForRefKeys(refKey).trim().toUpperCase();
-						details.setVinRefKey(refKey.trim().toUpperCase());
-
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, refKey);
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								details.setVinFoundInIM("Y");
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-						refKey = null;
-						wmiCode =null;
-
-						if((null==details.getVinFoundInIM()) || (null!=details.getVinFoundInIM() && !"Y".equals(details.getVinFoundInIM())))
-						{
-							// VIN Not found in IM.
-							errorMessage.append("VIN does not exist in IM.");
-							// set errorsFound to true - status has to Failure for this row
-							errorsFound = true;
-						}
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkMCMMEVINStatus()", e);
-						/*
-						 * some exception in identifying the VIN from IM
-						 */
-						errorMessage.append("Failed to find VIN in IM, exception while executing Query ->"+ e.getMessage()+".");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-
-					// Check if Row does not any display Order Text file entry then failure
-					if(null==details.getDisplayOrderTextFileName() || "".equals(details.getDisplayOrderTextFileName()))
-					{
-						errorMessage.append("No entry found for Display Order Text File.");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-					if(errorsFound==true)
-					{
-						// update failureCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-						if(null!=errorMessage && null!=errorMessage.toString())
-						{
-							details.setErrorMessage(errorMessage.toString());
-						}
-					}
-					else
-					{
-						// update successCount
-						// VIN Located in MDM & IM + Display Order text File Entry Found - Success Transaction
-						// update successCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-						// set processing status as SUCCESS
-						details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-					}
-					errorMessage=null;
-				}
-				else
-				{
-					// set error Message line is INVALID, SOME nodes are missing
-					details.setErrorMessage("Line is INVALID. Required nodes are missing.");
-					// NO NEED OF UPDATING THE FAILURE COUNT FOR THIS ONE - AS ALL FAILURE COUNT ALREADY UPDATED FOR INVALID LINES TOGETHER
-				}
-			}
-			sql=null;
-			wmiCode = null;
-			refKey = null;
-			details = null;
-			errorMessage = null;
-		}
-		else
-		{
-			logger.info("checkMCMMEVINStatus :: VIN LIST / Locale as parameters are null. Return as it is.");
-		}
-
-		if(null!=rs)
-			rs.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=conn)
-			conn.close();
-		return vinList;
-	}
-	
-	public ArrayList<DisplayOrderDetails> checkDisplayOrderStatus(ArrayList<DisplayOrderDetails> displayOrderList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-
-		if(null!=displayOrderList && !"".equals(displayOrderList) && null!=locale && !"".equals(locale))
-		{
-			/*
-			 * Iterate for each row and check if the line is VALID
-			 * AND IS NOT ENG AT MT - CHEKC FOR ENGINE TYPE, MISSION TYPE, DRIVE ALXE & BODY TYPE REF KEYS IN IM
-			 * AS WELL AS IN MDM.
-			 */
-
-//			String localeForEngMissDriveBodyTypesCheck=locale;
-//			localeForEngMissDriveBodyTypesCheck = localeForEngMissDriveBodyTypesCheck.replace("-", "_");
-//			if(mmeLocales.indexOf(localeForEngMissDriveBodyTypesCheck)>-1)
-//			{
-//				// MME MARKET LOCALE - CHECK FOR ALTERNATE LOCALE MAPPED TO PROCESSING LOCALE FOR CARLINE
-////				localeForEngMissDriveBodyTypes = ApplicationProperties.getProperty("en-uk").trim();
-//				localeForEng = Utilities.getMarketWiseLocalesList(ApplicationProperties.getProperty("market.mme"), AutoSyncConstants.STATUS_YES, AutoSyncConstants.ITEM_KEY_ENGINE_TYPE, localeForEng);
-//				localeForMission = Utilities.getMarketWiseLocalesList(ApplicationProperties.getProperty("market.mme"), AutoSyncConstants.STATUS_YES, AutoSyncConstants.ITEM_KEY_TRANSMISSION_TYPE, localeForMission);
-//				localeForAxle = Utilities.getMarketWiseLocalesList(ApplicationProperties.getProperty("market.mme"), AutoSyncConstants.STATUS_YES, AutoSyncConstants.ITEM_KEY_AXLE_TYPE, localeForAxle);
-//				localeForBody = Utilities.getMarketWiseLocalesList(ApplicationProperties.getProperty("market.mme"), AutoSyncConstants.STATUS_YES, AutoSyncConstants.ITEM_KEY_BODY_TYPE, localeForBody);
-//				
-//				localeForEng = localeForEng.replace("_", "-");
-//				localeForMission = localeForMission.replace("_", "-");
-//				localeForAxle = localeForAxle.replace("_", "-");
-//				localeForBody = localeForBody.replace("_", "-");
-//			}
-//			else
-//			{
-//				// restore locale value and use as it is
-////				localeForEngMissDriveBodyTypes = localeForEngMissDriveBodyTypes.replace("_", "-");
-//				localeForEng = localeForEng.replace("_", "-");
-//				localeForMission = localeForMission.replace("_", "-");
-//				localeForAxle = localeForAxle.replace("_", "-");
-//				localeForBody = localeForBody.replace("_", "-");
-//			}
-
-			conn = getConnection();
-			
-			// get Alternate Locales for each Master DATA Type
-			String localeForEng=ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_ENGINE_TYPE, conn);
-			String localeForMission=ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_TRANSMISSION_TYPE, conn);
-			String localeForAxle = ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_AXLE_TYPE, conn);
-			String localeForBody = ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_BODY_TYPE, conn);
-			
-			DisplayOrderDetails details = null;
-			String sql="";
-			StringBuilder errorMessage=new StringBuilder();
-			String[] tokens=null;
-			String errorMetaDataCodesMDM=null;
-			String errorMetaDataCodesIM=null;
-			for(int a=0;a<displayOrderList.size();a++)
-			{
-				details = (DisplayOrderDetails)displayOrderList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-				if(null!=details.getLineType() && details.getLineType().equals(MetaDataValidationUtils.LINE_TYPE_VALID))
-				{
-					errorMessage=new StringBuilder();
-					boolean errorsFound=false;
-
-					// FETCH NAMES FOR EACH DISPLAY ORDER LEVEL CODES
-					// NAME FOR LEVEL 1 CODE
-					if(null!=details.getDisplayOrderLevel1Code() && !"".equals(details.getDisplayOrderLevel1Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel1Name(getDisplayOrderName(details.getDisplayOrderLevel1Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel1Name() || "".equals(details.getDisplayOrderLevel1Name()))
-							{
-								errorMessage.append("Display Order Name for Level 1 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 1 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 2 CODE
-					if(null!=details.getDisplayOrderLevel2Code() && !"".equals(details.getDisplayOrderLevel2Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel2Name(getDisplayOrderName(details.getDisplayOrderLevel2Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel2Name() || "".equals(details.getDisplayOrderLevel2Name()))
-							{
-								errorMessage.append("Display Order Name for Level 2 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 2 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 3 CODE
-					if(null!=details.getDisplayOrderLevel3Code() && !"".equals(details.getDisplayOrderLevel3Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel3Name(getDisplayOrderName(details.getDisplayOrderLevel3Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel3Name() || "".equals(details.getDisplayOrderLevel3Name()))
-							{
-								errorMessage.append("Display Order Name for Level 3 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 3 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 4 CODE
-					if(null!=details.getDisplayOrderLevel4Code() && !"".equals(details.getDisplayOrderLevel4Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel4Name(getDisplayOrderName(details.getDisplayOrderLevel4Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel4Name() || "".equals(details.getDisplayOrderLevel4Name()))
-							{
-								errorMessage.append("Display Order Name for Level 4 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 4 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 5 CODE
-					if(null!=details.getDisplayOrderLevel5Code() && !"".equals(details.getDisplayOrderLevel5Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel5Name(getDisplayOrderName(details.getDisplayOrderLevel5Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel5Name() || "".equals(details.getDisplayOrderLevel5Name()))
-							{
-								errorMessage.append("Display Order Name for Level 5 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 5 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 6 CODE
-					if(null!=details.getDisplayOrderLevel6Code() && !"".equals(details.getDisplayOrderLevel6Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel6Name(getDisplayOrderName(details.getDisplayOrderLevel6Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel6Name() || "".equals(details.getDisplayOrderLevel6Name()))
-							{
-								errorMessage.append("Display Order Name for Level 6 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 6 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					/*
-					 * NOW CHECK IF NOT ENGINE / AT / MT
-					 * THEN ENGINE TYPE / MISSION TYPE / BODY TYPE / DRIVE AXLE TYPE MUST EXIST IN MDM AS WELL AS IM
-					 */
-					if(details.isEngineATMT()==false)
-					{
-						// MANUALS / WD
-						if(null!=details.getEngineType() && !"".equals(details.getEngineType()))
-						{
-							errorMetaDataCodesMDM="";
-							errorMetaDataCodesIM="";
-							tokens = details.getEngineType().split(",");
-							boolean found=false;
-							if(null!=tokens && tokens.length>0)
-							{
-								for(int r=0;r<tokens.length;r++)
-								{
-									if(null!=tokens[r] && !"".equals(tokens[r].trim()) && !"e99".equals(tokens[r].trim().toLowerCase()))
-									{
-										// MDM CHECK
-										try
-										{
-											sql="SELECT A.MDM_ET_ID FROM gms3_mdm_engine_type A, gms3_mdm_manual_language B WHERE A.MDM_ET_FLAG=? "
-													+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-													+ " AND TRIM(LOWER(A.MDM_ET_TYPE_CODE))=?";
-											pstmt = conn.prepareStatement(sql);
-											pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-											pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-											pstmt.setString(3, localeForEng.trim().toLowerCase());
-											pstmt.setString(4, tokens[r].trim().toLowerCase());
-											rs = pstmt.executeQuery();
-											if(rs.next())
-											{
-												if(rs.getLong("MDM_ET_ID")>0)
-												{
-													found = true;
-												}
-											}
-											sql=null;
-											pstmt.close();pstmt=null;
-											rs.close();rs=null;
-
-											if(found==false)
-											{
-												errorMessage.append("Engine Type {"+tokens[r]+"} does not exist in MDM.");
-												// error found - status has to be failure for this row
-												errorsFound=true;
-												// add to errorMetaDataCodesMDM
-												if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-												{
-													errorMetaDataCodesMDM+=",";
-												}
-												errorMetaDataCodesMDM+=tokens[r];
-											}
-										}
-										catch(Exception e1)
-										{
-											Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-											errorMessage.append("Failed to find Engine Type {"+tokens[r]+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesMDM
-											if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-											{
-												errorMetaDataCodesMDM+=",";
-											}
-											errorMetaDataCodesMDM+=tokens[r];
-										}
-
-
-										// IM CHECK
-										found=false;
-										try
-										{
-											sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-											pstmt = conn.prepareStatement(sql);
-											pstmt.setString(1, Utilities.replaceCharsForRefKeys(tokens[r]).trim().toUpperCase());
-											rs = pstmt.executeQuery();
-											if(rs.next())
-											{
-												if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-												{
-													found=true;
-												}
-											}
-											pstmt.close();pstmt=null;
-											rs.close();rs=null;
-											sql=null;
-
-											if(found==false)
-											{
-												errorMessage.append("Engine Type {"+tokens[r]+"} does not exist in IM.");
-												// error found - status has to be failure for this row
-												errorsFound=true;
-												// add to errorMetaDataCodesIM
-												if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-												{
-													errorMetaDataCodesIM+=",";
-												}
-												errorMetaDataCodesIM+=tokens[r];
-											}
-										}
-										catch(Exception e1)
-										{
-											Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-											errorMessage.append("Failed to find Engine Type {"+tokens[r]+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesIM
-											if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-											{
-												errorMetaDataCodesIM+=",";
-											}
-											errorMetaDataCodesIM+=tokens[r];
-										}
-									}
-								}
-							}
-
-							tokens=null;
-							if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-							{
-								details.setFailedEngineTypeCodesMDM(errorMetaDataCodesMDM);
-							}
-							errorMetaDataCodesMDM = null;
-							if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-							{
-								details.setFailedEngineTypeCodesIM(errorMetaDataCodesIM);
-							}
-							errorMetaDataCodesIM=null;
-						}
-
-
-						// TRANSMISSION TYPES
-						if(null!=details.getMissionType() && !"".equals(details.getMissionType()))
-						{
-							errorMetaDataCodesMDM="";
-							errorMetaDataCodesIM="";
-							tokens = details.getMissionType().split(",");
-							boolean found=false;
-							if(null!=tokens && tokens.length>0)
-							{
-								for(int r=0;r<tokens.length;r++)
-								{
-									if(null!=tokens[r] && !"".equals(tokens[r].trim()) && !"m99".equals(tokens[r].trim().toLowerCase()))
-									{
-										// MDM CHECK
-										try
-										{
-											sql="SELECT A.MDM_TRANS_TYPE_ID FROM gms3_mdm_trans_type A, "
-													+ " gms3_mdm_manual_language B WHERE A.MDM_TRANS_TYPE_FLAG=? AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID "
-													+ " AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? AND TRIM(LOWER(A.MDM_TRANS_TYPE_TYPE_CODE))=? ";
-											pstmt = conn.prepareStatement(sql);
-											pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-											pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-											pstmt.setString(3, localeForMission.trim().toLowerCase());
-											pstmt.setString(4, tokens[r].trim().toLowerCase());
-											rs = pstmt.executeQuery();
-											if(rs.next())
-											{
-												if(rs.getLong("MDM_TRANS_TYPE_ID")>0)
-												{
-													found = true;
-												}
-											}
-											sql=null;
-											pstmt.close();pstmt=null;
-											rs.close();rs=null;
-
-											if(found==false)
-											{
-												errorMessage.append("Transmission Type {"+tokens[r]+"} does not exist in MDM.");
-												// error found - status has to be failure for this row
-												errorsFound=true;
-												// add to errorMetaDataCodesMDM
-												if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-												{
-													errorMetaDataCodesMDM+=",";
-												}
-												errorMetaDataCodesMDM+=tokens[r];
-											}
-										}
-										catch(Exception e1)
-										{
-											Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-											errorMessage.append("Failed to find Transmission Type {"+tokens[r]+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesMDM
-											if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-											{
-												errorMetaDataCodesMDM+=",";
-											}
-											errorMetaDataCodesMDM+=tokens[r];
-										}
-
-
-										// IM CHECK
-										found=false;
-										try
-										{
-											sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-											pstmt = conn.prepareStatement(sql);
-											pstmt.setString(1, Utilities.replaceCharsForRefKeys(tokens[r]).trim().toUpperCase());
-											rs = pstmt.executeQuery();
-											if(rs.next())
-											{
-												if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-												{
-													found=true;
-												}
-											}
-											pstmt.close();pstmt=null;
-											rs.close();rs=null;
-											sql=null;
-
-											if(found==false)
-											{
-												errorMessage.append("Transmission Type {"+tokens[r]+"} does not exist in IM.");
-												// error found - status has to be failure for this row
-												errorsFound=true;
-												// add to errorMetaDataCodesIM
-												if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-												{
-													errorMetaDataCodesIM+=",";
-												}
-												errorMetaDataCodesIM+=tokens[r];
-											}
-										}
-										catch(Exception e1)
-										{
-											Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-											errorMessage.append("Failed to find Transmission Type {"+tokens[r]+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesIM
-											if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-											{
-												errorMetaDataCodesIM+=",";
-											}
-											errorMetaDataCodesIM+=tokens[r];
-										}
-									}
-								}
-							}
-
-							tokens=null;
-							if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-							{
-								details.setFailedMissionTypeCodesMDM(errorMetaDataCodesMDM);
-							}
-							errorMetaDataCodesMDM = null;
-							if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-							{
-								details.setFailedMissionTypeCodesIM(errorMetaDataCodesIM);
-							}
-							errorMetaDataCodesIM=null;
-						}
-
-						// DRIVE AXLE
-						if(null!=details.getDriveAxleType() && !"".equals(details.getDriveAxleType()))
-						{
-							errorMetaDataCodesMDM="";
-							errorMetaDataCodesIM="";
-							tokens = details.getDriveAxleType().split(",");
-							boolean found=false;
-							if(null!=tokens && tokens.length>0)
-							{
-								for(int r=0;r<tokens.length;r++)
-								{
-									// MDM CHECK
-									try
-									{
-										sql="SELECT A.MDM_AT_ID FROM gms3_mdm_axle_type A, gms3_mdm_manual_language B WHERE A.MDM_AT_FLAG=? "
-												+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-												+ " AND TRIM(LOWER(A.MDM_AT_AXLE_TYPE)) = ?";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-										pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-										pstmt.setString(3, localeForAxle.trim().toLowerCase());
-										pstmt.setString(4, tokens[r].trim().toLowerCase());
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											if(rs.getLong("MDM_AT_ID")>0)
-											{
-												found = true;
-											}
-										}
-										sql=null;
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-
-										if(found==false)
-										{
-											errorMessage.append("DriveAxle Type {"+tokens[r]+"} does not exist in MDM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesMDM
-											if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-											{
-												errorMetaDataCodesMDM+=",";
-											}
-											errorMetaDataCodesMDM+=tokens[r];
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-										errorMessage.append("Failed to find DriveAxle Type {"+tokens[r]+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-										// add to errorMetaDataCodesMDM
-										if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-										{
-											errorMetaDataCodesMDM+=",";
-										}
-										errorMetaDataCodesMDM+=tokens[r];
-									}
-
-
-									// IM CHECK
-									found=false;
-									try
-									{
-										sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1, Utilities.replaceCharsForRefKeys(tokens[r]).trim().toUpperCase());
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-											{
-												found=true;
-											}
-										}
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-										sql=null;
-
-										if(found==false)
-										{
-											errorMessage.append("DriveAxle Type {"+tokens[r]+"} does not exist in IM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesIM
-											if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-											{
-												errorMetaDataCodesIM+=",";
-											}
-											errorMetaDataCodesIM+=tokens[r];
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-										errorMessage.append("Failed to find DriveAxle Type {"+tokens[r]+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-										// add to errorMetaDataCodesIM
-										if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-										{
-											errorMetaDataCodesIM+=",";
-										}
-										errorMetaDataCodesIM+=tokens[r];
-									}
-								}
-							}
-
-							tokens=null;
-							if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-							{
-								details.setFailedDriveAxleTypeCodesMDM(errorMetaDataCodesMDM);
-							}
-							errorMetaDataCodesMDM = null;
-							if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-							{
-								details.setFailedDriveAxleTypeCodesIM(errorMetaDataCodesIM);
-							}
-							errorMetaDataCodesIM=null;
-						}
-
-						// BODY TYPE
-						if(null!=details.getBodyType() && !"".equals(details.getBodyType()))
-						{
-							errorMetaDataCodesMDM="";
-							errorMetaDataCodesIM="";
-							tokens = details.getBodyType().split(",");
-							boolean found=false;
-							if(null!=tokens && tokens.length>0)
-							{
-								for(int r=0;r<tokens.length;r++)
-								{
-									// MDM CHECK
-									try
-									{
-										sql="SELECT A.MDM_BT_ID FROM gms3_mdm_body_type A, gms3_mdm_manual_language B WHERE A.MDM_BT_FLAG=? "
-												+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-												+ " AND TRIM(LOWER(A.MDM_BT_BODY_TYPE)) = ?";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-										pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-										pstmt.setString(3, localeForBody.trim().toLowerCase());
-										pstmt.setString(4, tokens[r].trim().toLowerCase());
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											if(rs.getLong("MDM_BT_ID")>0)
-											{
-												found = true;
-											}
-										}
-										sql=null;
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-
-										if(found==false)
-										{
-											errorMessage.append("Body Type {"+tokens[r]+"} does not exist in MDM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesMDM
-											if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-											{
-												errorMetaDataCodesMDM+=",";
-											}
-											errorMetaDataCodesMDM+=tokens[r];
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-										errorMessage.append("Failed to find Body Type {"+tokens[r]+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-										// add to errorMetaDataCodesMDM
-										if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-										{
-											errorMetaDataCodesMDM+=",";
-										}
-										errorMetaDataCodesMDM+=tokens[r];
-									}
-
-
-									// IM CHECK
-									found=false;
-									try
-									{
-										sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1, Utilities.replaceCharsForRefKeys(tokens[r]).trim().toUpperCase());
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-											{
-												found=true;
-											}
-										}
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-										sql=null;
-
-										if(found==false)
-										{
-											errorMessage.append("Body Type {"+tokens[r]+"} does not exist in IM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to errorMetaDataCodesIM
-											if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-											{
-												errorMetaDataCodesIM+=",";
-											}
-											errorMetaDataCodesIM+=tokens[r];
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e1);
-										errorMessage.append("Failed to find Body Type {"+tokens[r]+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-										// add to errorMetaDataCodesIM
-										if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-										{
-											errorMetaDataCodesIM+=",";
-										}
-										errorMetaDataCodesIM+=tokens[r];
-									}
-								}
-							}
-
-							tokens=null;
-							if(null!=errorMetaDataCodesMDM && !"".equals(errorMetaDataCodesMDM))
-							{
-								details.setFailedBodyTypeCodesMDM(errorMetaDataCodesMDM);
-							}
-							errorMetaDataCodesMDM = null;
-							if(null!=errorMetaDataCodesIM && !"".equals(errorMetaDataCodesIM))
-							{
-								details.setFailedBodyTypeCodesIM(errorMetaDataCodesIM);
-							}
-							errorMetaDataCodesIM=null;
-						}
-					}
-
-
-					/*
-					 * if errorsFound = true = updateFailureCount
-					 * else = updateSuccessCount
-					 */
-
-					if(errorsFound==true)
-					{
-						// update failureCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-						if(null!=errorMessage && null!=errorMessage.toString())
-						{
-							details.setErrorMessage(errorMessage.toString());
-						}
-					}
-					else
-					{
-						// all is success - update successCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-						// set processingStatus as SUCCESS
-						details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-					}
-
-					errorMessage = null;
-				}
-				else
-				{
-					// set error Message line is INVALID, SOME nodes are missing
-					details.setErrorMessage("Line is INVALID. Required nodes are missing.");
-					// NO NEED OF UPDATING THE FAILURE COUNT FOR THIS ONE - AS ALL FAILURE COUNT ALREADY UPDATED FOR INVALID LINES TOGETHER
-				}
-			}
-			sql=null;
-			details = null;
-			errorMessage=null;
-			tokens = null;
-			errorMetaDataCodesMDM=null;
-			errorMetaDataCodesIM=null;
-			localeForEng=null;
-			localeForMission=null;
-			localeForAxle = null;
-			localeForBody = null;
-		}
-		else
-		{
-			logger.info("checkDisplayOrderStatus :: DISPLAY ORDER LIST / Locale as parameters are null. Return as it is.");
-		}
-
-		if(null!=rs)
-			rs.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=conn)
-			conn.close();
-
-		return displayOrderList;
-	}
-	
-	public ArrayList<CDProcessingDetails> checkCDProcessingDisplayOrderStatus(ArrayList<CDProcessingDetails> cdProcessingList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		if(null!=cdProcessingList && !"".equals(cdProcessingList) && null!=locale && !"".equals(locale))
-		{
-			/*
-			 * Iterate for each row and check if the line is VALID
-			 * AS WELL AS IN MDM.
-			 */
-			conn = getConnection();
-			CDProcessingDetails details = null;
-			StringBuilder errorMessage=new StringBuilder();
-			for(int a=0;a<cdProcessingList.size();a++)
-			{
-				details = (CDProcessingDetails)cdProcessingList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-				if(null!=details.getLineType() && details.getLineType().equals(MetaDataValidationUtils.LINE_TYPE_VALID))
-				{
-					errorMessage=new StringBuilder();
-					boolean errorsFound=false;
-
-					// FETCH NAMES FOR EACH DISPLAY ORDER LEVEL CODES
-					// NAME FOR LEVEL 1 CODE
-					if(null!=details.getDisplayOrderLevel1Code() && !"".equals(details.getDisplayOrderLevel1Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel1Name(getDisplayOrderName(details.getDisplayOrderLevel1Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel1Name() || "".equals(details.getDisplayOrderLevel1Name()))
-							{
-								errorMessage.append("Display Order Name for Level 1 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 1 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 2 CODE
-					if(null!=details.getDisplayOrderLevel2Code() && !"".equals(details.getDisplayOrderLevel2Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel2Name(getDisplayOrderName(details.getDisplayOrderLevel2Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel2Name() || "".equals(details.getDisplayOrderLevel2Name()))
-							{
-								errorMessage.append("Display Order Name for Level 2 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 2 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 3 CODE
-					if(null!=details.getDisplayOrderLevel3Code() && !"".equals(details.getDisplayOrderLevel3Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel3Name(getDisplayOrderName(details.getDisplayOrderLevel3Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel3Name() || "".equals(details.getDisplayOrderLevel3Name()))
-							{
-								errorMessage.append("Display Order Name for Level 3 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 3 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 4 CODE
-					if(null!=details.getDisplayOrderLevel4Code() && !"".equals(details.getDisplayOrderLevel4Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel4Name(getDisplayOrderName(details.getDisplayOrderLevel4Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel4Name() || "".equals(details.getDisplayOrderLevel4Name()))
-							{
-								errorMessage.append("Display Order Name for Level 4 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 4 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 5 CODE
-					if(null!=details.getDisplayOrderLevel5Code() && !"".equals(details.getDisplayOrderLevel5Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel5Name(getDisplayOrderName(details.getDisplayOrderLevel5Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel5Name() || "".equals(details.getDisplayOrderLevel5Name()))
-							{
-								errorMessage.append("Display Order Name for Level 5 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 5 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// NAME FOR LEVEL 6 CODE
-					if(null!=details.getDisplayOrderLevel6Code() && !"".equals(details.getDisplayOrderLevel6Code()))
-					{
-						try
-						{
-							details.setDisplayOrderLevel6Name(getDisplayOrderName(details.getDisplayOrderLevel6Code(), details.getModelType(), locale, conn));
-							if(null==details.getDisplayOrderLevel6Name() || "".equals(details.getDisplayOrderLevel6Name()))
-							{
-								errorMessage.append("Display Order Name for Level 6 Code, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkCDProcessingDisplayOrderStatus()", e1);
-							errorMessage.append("Failed to fetch Display Order Name for Level 6 Code, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					// check for Sequence no, in-case of CD Sequence has to be mandatory.
-					if(null==details.getSequenceNo() || "".equals(details.getSequenceNo()))
-					{
-						errorMessage.append("No Sequence number found.");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-
-					/*
-					 * if errorsFound = true = updateFailureCount
-					 * else = updateSuccessCount
-					 */
-
-					if(errorsFound==true)
-					{
-						// update failureCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-						if(null!=errorMessage && null!=errorMessage.toString())
-						{
-							details.setErrorMessage(errorMessage.toString());
-						}
-					}
-					else
-					{
-						// all is success - update successCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-						// set processingStatus as SUCCESS
-						details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-					}
-
-					errorMessage = null;
-				}
-				else
-				{
-					// set error Message line is INVALID, SOME nodes are missing
-					details.setErrorMessage("Line is INVALID. Required nodes are missing.");
-					// NO NEED OF UPDATING THE FAILURE COUNT FOR THIS ONE - AS ALL FAILURE COUNT ALREADY UPDATED FOR INVALID LINES TOGETHER
-				}
-			}
-			details = null;
-			errorMessage=null;
-		}
-		else
-		{
-			logger.info("checkCDProcessingDisplayOrderStatus :: CD PROCESSING LIST / Locale as parameters are null. Return as it is.");
-		}
-
-		if(null!=conn)
-			conn.close();
-		return cdProcessingList;
-	}
-	
-	public ArrayList<ESICategoryDetails> checkESICategoryStatus(ArrayList<ESICategoryDetails> esiCategoryList, String locale, String scheduleId, String metaDataType)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-
-		if(null!=esiCategoryList && !"".equals(esiCategoryList) && null!=locale && !"".equals(locale))
-		{
-			/*
-			 * Iterate for each row and check if the line is VALID
-			 * AS WELL AS IN MDM.
-			 */
-			conn = getConnection();
-			ESICategoryDetails details = null;
-			StringBuilder errorMessage=new StringBuilder();
-			String refKey="";
-			String sql="";
-			String recordId="";
-			String[] tokens=null;
-			String failedStrTypes=null;
-			String steeringTypeRefKey=null;
-			for(int a=0;a<esiCategoryList.size();a++)
-			{
-				details = (ESICategoryDetails)esiCategoryList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-				if(null!=details.getLineType() && details.getLineType().equals(MetaDataValidationUtils.LINE_TYPE_VALID))
-				{
-					errorMessage=new StringBuilder();
-					boolean errorsFound=false;
-					/*
-					 * Not Applicable for ESICATEGORY_MANUALS_OLD / ESICATEGORY_WD_OLD / ESICATEGORY_OLD
-					 */
-					if(!metaDataType.equals("ESICATEGORY_MANUALS_OLD") && !metaDataType.equals("ESICATEGORY_WD_OLD") && !metaDataType.equals("ESICATEGORY_OLD"))
-					{
-						// FETCH NAMES FOR EACH ESI CATEGORY CODES AND CHECK IF THEY EXIST IN IM OR NOT
-						// NAME FOR LEVEL 1 CODE
-						if(null!=details.getCategoryLevel1Code() && !"".equals(details.getCategoryLevel1Code()))
-						{
-							// MDM CHECK
-							// set defaultValue for MDM
-							details.setCode1ExistsInMDM("N");
-							try
-							{
-								details.setCategoryLevel1Name(getESICategoryName("LEVEL1", details.getCategoryLevel1Code(), "", "", locale, conn));
-								if(null==details.getCategoryLevel1Name() || "".equals(details.getCategoryLevel1Name()))
-								{
-									errorMessage.append("ESI Category Level 1, does not exist in MDM.");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-								else
-								{
-									// CODE 1 EXISTS IN MDM
-									details.setCode1ExistsInMDM("Y");
-								}
-							}
-							catch(Exception e1)
-							{
-								Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-								errorMessage.append("Failed to fetch ESI Category Level 1 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-
-							// IM CHECK
-							// set defaultValue for IM
-							details.setCode1ExistsInIM("N");
-							try
-							{
-								refKey="ESI"+details.getCategoryLevel1Code().trim().toUpperCase();
-								details.setCode1RefKey(refKey);
-								sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";								
-								pstmt = conn.prepareStatement(sql);
-								pstmt.setString(1,refKey);
-								rs = pstmt.executeQuery();
-								if(rs.next())
-								{
-									recordId = rs.getString("RECORDID");
-
-								}
-								pstmt.close();pstmt=null;
-								rs.close();rs=null;
-								sql=null;
-								refKey = null;
-
-								if(null!=recordId && !"".equals(recordId))
-								{
-									// refKey exists in IM
-									details.setCode1ExistsInIM("Y");
-								}
-								else
-								{
-									errorMessage.append("ESI Category Level 1, does not exist in IM.");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-							}
-							catch(Exception e1)
-							{
-								Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-								errorMessage.append("Failed to fetch ESI Category Level 1 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-
-							recordId=null;
-
-							// LEVEL 2 CODE
-							if(null!=details.getCategoryLevel2Code() && !"".equals(details.getCategoryLevel2Code()))
-							{
-								// MDM CHECK
-								// set defaultValue for MDM
-								details.setCode2ExistsInMDM("N");
-								try
-								{
-									details.setCategoryLevel2Name(getESICategoryName("LEVEL2", details.getCategoryLevel1Code(), details.getCategoryLevel2Code(), "", locale, conn));
-									if(null==details.getCategoryLevel2Name() || "".equals(details.getCategoryLevel2Name()))
-									{
-										errorMessage.append("ESI Category Level 2, does not exist in MDM.");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-									}
-									else
-									{
-										// CODE 2 EXISTS IN MDM
-										details.setCode2ExistsInMDM("Y");
-									}
-								}
-								catch(Exception e1)
-								{
-									Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-									errorMessage.append("Failed to fetch ESI Category Level 2 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-
-								// IM CHECK
-								// set defaultValue for IM
-								details.setCode2ExistsInIM("N");
-								try
-								{
-									refKey=details.getCategoryLevel2Code().trim().toUpperCase();
-									details.setCode2RefKey(refKey);
-									sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-									pstmt = conn.prepareStatement(sql);
-									pstmt.setString(1,refKey);
-									rs = pstmt.executeQuery();
-									if(rs.next())
-									{
-										recordId = rs.getString("RECORDID");
-
-									}
-									pstmt.close();pstmt=null;
-									rs.close();rs=null;
-									sql=null;
-									refKey = null;
-
-									if(null!=recordId && !"".equals(recordId))
-									{
-										// refKey exists in IM
-										details.setCode2ExistsInIM("Y");
-									}
-									else
-									{
-										errorMessage.append("ESI Category Level 2, does not exist in IM.");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-									}
-								}
-								catch(Exception e1)
-								{
-									Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-									errorMessage.append("Failed to fetch ESI Category Level 2 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-
-								recordId=null;
-
-								// LEVEL 3 CODE - NOT NULL & NOT 00
-								if(null!=details.getCategoryLevel3Code() && !"".equals(details.getCategoryLevel3Code()) && !"00".equals(details.getCategoryLevel3Code()))
-								{
-									// MDM CHECK
-									// set defaultValue for MDM
-									details.setCode3ExistsInMDM("N");
-									try
-									{
-										details.setCategoryLevel3Name(getESICategoryName("LEVEL3", details.getCategoryLevel1Code(), details.getCategoryLevel2Code(), details.getCategoryLevel3Code(), locale, conn));
-										if(null==details.getCategoryLevel3Name() || "".equals(details.getCategoryLevel3Name()))
-										{
-											errorMessage.append("ESI Category Level 3, does not exist in MDM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-										}
-										else
-										{
-											// CODE 3 EXISTS IN MDM
-											details.setCode3ExistsInMDM("Y");
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-										errorMessage.append("Failed to fetch ESI Category Level 3 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-									}
-
-									// IM CHECK
-									// set defaultValue for IM
-									details.setCode3ExistsInIM("N");
-									try
-									{
-										refKey=details.getCategoryLevel2Code().trim().toUpperCase()+details.getCategoryLevel3Code().trim().toUpperCase();
-										details.setCode3RefKey(refKey);
-										sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1,refKey);
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											recordId = rs.getString("RECORDID");
-
-										}
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-										sql=null;
-										refKey = null;
-
-										if(null!=recordId && !"".equals(recordId))
-										{
-											// refKey exists in IM
-											details.setCode3ExistsInIM("Y");
-										}
-										else
-										{
-											errorMessage.append("ESI Category Level 3, does not exist in IM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-										}
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-										errorMessage.append("Failed to fetch ESI Category Level 3 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-									}
-
-									recordId = null;
-								}
-							}
-						}
-						else
-						{
-							// error found - at least First Level ESI Category code is mandatory
-							errorMessage.append("No ESI Category Codes found.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-
-					
-					// check for Title, in-case of ESI File - Title has to be mandatory.
-					if(null==details.getTitle() || "".equals(details.getTitle()))
-					{
-						errorMessage.append("No Title found.");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-					
-					/*
-					 *	CHECK IF METADATA TYPE IS ESICATEGORY_WD_NEW / ESICATEGORY_WD_OLD, CHECK FOR STEERING TYPES EXIST IN IM OR NOT  
-					 */
-					if(metaDataType.equals("ESICATEGORY_WD_NEW") || metaDataType.equals("ESICATEGORY_WD_OLD"))
-					{
-						if(null!=details.getSteeringTypeInfoText() && !"".equals(details.getSteeringTypeInfoText()))
-						{
-							tokens = details.getSteeringTypeInfoText().split(",");
-							if(null!=tokens && tokens.length>0)
-							{
-								failedStrTypes="";
-								for(int w=0;w<tokens.length;w++)
-								{
-									// check for each Steering Type exists in IM or NOT
-									steeringTypeRefKey="";
-									recordId=null;
-									try
-									{
-										if(null!=tokens[w] && tokens[w].trim().toLowerCase().equals(ApplicationProperties.getProperty("steering.type.label.lhd")))
-										{
-											steeringTypeRefKey=ApplicationProperties.getProperty("steering.type.refkey.lhd");
-										}
-										else if(null!=tokens[w] && tokens[w].trim().toLowerCase().equals(ApplicationProperties.getProperty("steering.type.label.rhd")))
-										{
-											steeringTypeRefKey=ApplicationProperties.getProperty("steering.type.refkey.rhd");
-										}
-										
-										sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY = ?";
-										pstmt = conn.prepareStatement(sql);
-										pstmt.setString(1, steeringTypeRefKey);
-										rs = pstmt.executeQuery();
-										if(rs.next())
-										{
-											recordId = rs.getString("RECORDID");
-										}
-										sql=null;
-										pstmt.close();pstmt=null;
-										rs.close();rs=null;
-										steeringTypeRefKey=null;
-										
-										if(null==recordId || "".equals(recordId))
-										{
-											errorMessage.append("Steering Type {"+tokens[w]+"} does not exist in IM.");
-											// error found - status has to be failure for this row
-											errorsFound=true;
-											// add to failedSteeringTypes
-											if(null!=failedStrTypes && !"".equals(failedStrTypes))
-											{
-												failedStrTypes+=",";
-											}
-											failedStrTypes+=tokens[w];
-										}
-										recordId=null;
-									}
-									catch(Exception e1)
-									{
-										Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e1);
-										errorMessage.append("Failed to fetch Steering Type {"+tokens[w]+"}  from IM, exception while executing Query ->"+ e1.getMessage()+".");
-										// error found - status has to be failure for this row
-										errorsFound=true;
-										// add to failedSteeringTypes
-										if(null!=failedStrTypes && !"".equals(failedStrTypes))
-										{
-											failedStrTypes+=",";
-										}
-										failedStrTypes+=tokens[w];
-									}
-								}
-							}
-							tokens = null;
-							
-							if(null!=failedStrTypes && !"".equals(failedStrTypes))
-							{
-								details.setFailedSteeringTypeInIM(failedStrTypes);
-							}
-							failedStrTypes = null;
-						}
-					}
-					/*
-					 * if errorsFound = true = updateFailureCount
-					 * else = updateSuccessCount
-					 */
-					
-					if(errorsFound==true)
-					{
-						// update failureCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-						if(null!=errorMessage && null!=errorMessage.toString())
-						{
-							details.setErrorMessage(errorMessage.toString());
-						}
-					}
-					else
-					{
-						// all is success - update successCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-						// set processingStatus as SUCCESS
-						details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-					}
-					
-					errorMessage = null;
-				}
-				else
-				{
-					// set error Message line is INVALID, SOME nodes are missing
-					details.setErrorMessage("Line is INVALID. Required nodes are missing.");
-					// NO NEED OF UPDATING THE FAILURE COUNT FOR THIS ONE - AS ALL FAILURE COUNT ALREADY UPDATED FOR INVALID LINES TOGETHER
-				}
-			}
-			refKey=null;
-			sql=null;
-			recordId=null;
-			details = null;
-			errorMessage=null;
-			steeringTypeRefKey=null;
-			failedStrTypes=null;
-			tokens=null;
-		}
-		else
-		{
-			logger.info("checkESICategoryStatus :: ESI CATEGORY LIST / Locale as parameters are null. Return as it is.");
-		}
-		
-		if(null!=conn)
-			conn.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=rs)
-			rs.close();
-		return esiCategoryList;
-	}
-	
-	public ArrayList<LeftMenuFileDetails> checkLeftMenuStatus(ArrayList<LeftMenuFileDetails> leftMenuList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		if(null!=leftMenuList && leftMenuList.size()>0 && null!=locale && !"".equals(locale))
-		{
-			/*
-			 * Iterate for each row and check if the line is VALID
-			 * AS WELL AS IN MDM.
-			 */
-			conn = getConnection();
-			LeftMenuFileDetails details = null;
-			StringBuilder errorMessage=new StringBuilder();
-			String refKey="";
-			String sql="";
-			String recordId="";
-			for(int a=0;a<leftMenuList.size();a++)
-			{
-				details = (LeftMenuFileDetails)leftMenuList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-
-				errorMessage=new StringBuilder();
-				boolean errorsFound=false;
-
-				// FETCH NAMES FOR EACH ESI CATEGORY CODES AND CHECK IF THEY EXIST IN IM OR NOT
-				// NAME FOR LEVEL 1 CODE
-				if(null!=details.getCategoryCode() && !"".equals(details.getCategoryCode()))
-				{
-					// MDM CHECK
-					// set defaultValue for MDM
-					details.setCode1ExistsInMDM("N");
-					try
-					{
-						details.setCategoryLevel1Name(getESICategoryName("LEVEL1", details.getCategoryCode(), "", "", locale, conn));
-						if(null==details.getCategoryLevel1Name() || "".equals(details.getCategoryLevel1Name()))
-						{
-							errorMessage.append("ESI Category Level 1, does not exist in MDM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-						else
-						{
-							// CODE 1 EXISTS IN MDM
-							details.setCode1ExistsInMDM("Y");
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-						errorMessage.append("Failed to fetch ESI Category Level 1 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-					
-					// IM CHECK
-					// set defaultValue for IM
-					details.setCode1ExistsInIM("N");
-					try
-					{
-						refKey="ESI"+details.getCategoryCode().trim().toUpperCase();
-						details.setCode1RefKey(refKey);
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";								
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1,refKey);
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							recordId = rs.getString("RECORDID");
-							
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-						refKey = null;
-						
-						if(null!=recordId && !"".equals(recordId))
-						{
-							// refKey exists in IM
-							details.setCode1ExistsInIM("Y");
-						}
-						else
-						{
-							errorMessage.append("ESI Category Level 1, does not exist in IM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-						errorMessage.append("Failed to fetch ESI Category Level 1 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-					
-					recordId=null;
-					
-					// LEVEL 2 CODE
-					if(null!=details.getSubCategoryCode() && !"".equals(details.getSubCategoryCode()))
-					{
-						// MDM CHECK
-						// set defaultValue for MDM
-						details.setCode2ExistsInMDM("N");
-						try
-						{
-							details.setCategoryLevel2Name(getESICategoryName("LEVEL2", details.getCategoryCode(), details.getSubCategoryCode(), "", locale, conn));
-							if(null==details.getCategoryLevel2Name() || "".equals(details.getCategoryLevel2Name()))
-							{
-								errorMessage.append("ESI Category Level 2, does not exist in MDM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-							else
-							{
-								// CODE 2 EXISTS IN MDM
-								details.setCode2ExistsInMDM("Y");
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-							errorMessage.append("Failed to fetch ESI Category Level 2 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-						
-						// IM CHECK
-						// set defaultValue for IM
-						details.setCode2ExistsInIM("N");
-						try
-						{
-							refKey=details.getSubCategoryCode().trim().toUpperCase();
-							details.setCode2RefKey(refKey);
-							sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-							pstmt = conn.prepareStatement(sql);
-							pstmt.setString(1,refKey);
-							rs = pstmt.executeQuery();
-							if(rs.next())
-							{
-								recordId = rs.getString("RECORDID");
-								
-							}
-							pstmt.close();pstmt=null;
-							rs.close();rs=null;
-							sql=null;
-							refKey = null;
-							
-							if(null!=recordId && !"".equals(recordId))
-							{
-								// refKey exists in IM
-								details.setCode2ExistsInIM("Y");
-							}
-							else
-							{
-								errorMessage.append("ESI Category Level 2, does not exist in IM.");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-						}
-						catch(Exception e1)
-						{
-							Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-							errorMessage.append("Failed to fetch ESI Category Level 2 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-						
-						recordId=null;
-						
-						// LEVEL 3 CODE - NOT NULL & NOT 00
-						if(null!=details.getSubSubCategoryCode() && !"".equals(details.getSubSubCategoryCode()) && !"00".equals(details.getSubSubCategoryCode()))
-						{
-							// MDM CHECK
-							// set defaultValue for MDM
-							details.setCode3ExistsInMDM("N");
-							try
-							{
-								details.setCategoryLevel3Name(getESICategoryName("LEVEL3", details.getCategoryCode(), details.getSubCategoryCode(), details.getSubSubCategoryCode(), locale, conn));
-								if(null==details.getCategoryLevel3Name() || "".equals(details.getCategoryLevel3Name()))
-								{
-									errorMessage.append("ESI Category Level 3, does not exist in MDM.");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-								else
-								{
-									// CODE 3 EXISTS IN MDM
-									details.setCode3ExistsInMDM("Y");
-								}
-							}
-							catch(Exception e1)
-							{
-								Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-								errorMessage.append("Failed to fetch ESI Category Level 3 from MDM, exception while executing Query ->"+ e1.getMessage()+".");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-							
-							// IM CHECK
-							// set defaultValue for IM
-							details.setCode3ExistsInIM("N");
-							try
-							{
-								refKey=details.getSubCategoryCode().trim().toUpperCase()+details.getSubSubCategoryCode().trim().toUpperCase();
-								details.setCode3RefKey(refKey);
-								sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-								pstmt = conn.prepareStatement(sql);
-								pstmt.setString(1,refKey);
-								rs = pstmt.executeQuery();
-								if(rs.next())
-								{
-									recordId = rs.getString("RECORDID");
-									
-								}
-								pstmt.close();pstmt=null;
-								rs.close();rs=null;
-								sql=null;
-								refKey = null;
-								
-								if(null!=recordId && !"".equals(recordId))
-								{
-									// refKey exists in IM
-									details.setCode3ExistsInIM("Y");
-								}
-								else
-								{
-									errorMessage.append("ESI Category Level 3, does not exist in IM.");
-									// error found - status has to be failure for this row
-									errorsFound=true;
-								}
-							}
-							catch(Exception e1)
-							{
-								Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkLeftMenuStatus()", e1);
-								errorMessage.append("Failed to fetch ESI Category Level 3 from IM, exception while executing Query ->"+ e1.getMessage()+".");
-								// error found - status has to be failure for this row
-								errorsFound=true;
-							}
-							
-							recordId = null;
-						}
-					}
-				}
-				else
-				{
-					// error found - at least First Level ESI Category code is mandatory
-					errorMessage.append("No ESI Category Codes found.");
-					// error found - status has to be failure for this row
-					errorsFound=true;
-				}
-
-				
-				// check for Title, in-case of LEFT MENU File - Title has to be mandatory.
-				if(null==details.getTitle() || "".equals(details.getTitle()))
-				{
-					errorMessage.append("No Title found.");
-					// error found - status has to be failure for this row
-					errorsFound=true;
-				}
-				
-				/*
-				 * if errorsFound = true = updateFailureCount
-				 * else = updateSuccessCount
-				 */
-				
-				if(errorsFound==true)
-				{
-					// update failureCount
-					updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-					if(null!=errorMessage && null!=errorMessage.toString())
-					{
-						details.setErrorMessage(errorMessage.toString());
-					}
-				}
-				else
-				{
-					// all is success - update successCount
-					updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-					// set processingStatus as SUCCESS
-					details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-				}
-				errorMessage = null;
-			}
-			refKey=null;
-			sql=null;
-			recordId=null;
-			details = null;
-			errorMessage=null;
-		}
-		else
-		{
-			logger.info("checkLeftMenuStatus :: LEFT MENU LIST / Locale as parameters are null. Return as it is.");
-		}
-		
-		if(null!=conn)
-			conn.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=rs)
-			rs.close();
-		return leftMenuList;
-	}
-	
-	public ArrayList<VINEntFileDetails> checkMNAOVINStatus(ArrayList<VINEntFileDetails> vinList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		if(null!=vinList && !"".equals(vinList) && null!=locale && !"".equals(locale))
-		{
-			conn = getConnection();
-			locale = locale.replace("-", "_");
-			if(locale.trim().toLowerCase().equals(ApplicationProperties.getProperty("en-ca").trim().toLowerCase()))
-			{
-				// LOCALE - USE en_US
-				locale = ApplicationProperties.getProperty("en-us").trim();
-				locale = locale.replace("_", "-").trim();
-			}
-			else
-			{
-				// user whatever value is passed for locale
-				locale = locale.replace("_", "-").trim();
-			}
-			
-			
-			VINEntFileDetails details = null;
-			String sql="";
-			String refKey="";
-			StringBuilder errorMessage = new StringBuilder();
-			for(int a=0;a<vinList.size();a++)
-			{
-				details = (VINEntFileDetails)vinList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-				// be default set values to N
-				details.setVinFoundInMDM("N");
-				details.setVinFoundInIM("N");
-				if(null!=details.getVinWMI() && !"".equals(details.getVinWMI()) && null!=details.getVinVDS() && !"".equals(details.getVinVDS()) &&  
-					null!=details.getVinStartRange() && !"".equals(details.getVinStartRange()) && null!=details.getVinEndRange() && !"".equals(details.getVinEndRange())
-					&& null!=details.getVinCarline() && !"".equals(details.getVinCarline()))
-				{
-					errorMessage = new StringBuilder();
-					boolean errorsFound=false;
-					try
-					{
-						/*
-						 *  if locale is en_CA, then use en_US locale for checking in MDM
-						 *  proceed
-						 *  check carlineCode + wmiCode + vdsCode +visStartRange +visEndRange exists in MDM or not
-						 */
-						sql="SELECT MDM_VIN_ID FROM gms3_mdm_vin_detail WHERE TRIM(LOWER(MDM_VIN_WMI_CODE))=? AND TRIM(LOWER(MDM_VIN_VDS_CODE))=? "
-								+ " AND TRIM(LOWER(MDM_VIN_VIS_START_RANGE))=? "
-								+ " AND TRIM(LOWER(MDM_VIN_VIS_END_RANGE))=? AND TRIM(LOWER(MDM_CRLN_CODE))=? AND TRIM(LOWER(MDM_ML_LANG_CODE))=? AND MDM_VIN_FLAG=? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, details.getVinWMI().trim().toLowerCase());
-						pstmt.setString(2, details.getVinVDS().trim().toLowerCase());
-						pstmt.setString(3, details.getVinStartRange().trim().toLowerCase());
-						pstmt.setString(4, details.getVinEndRange().trim().toLowerCase());
-						pstmt.setString(5, details.getVinCarline().trim().toLowerCase());
-						pstmt.setString(6, locale.trim().toLowerCase());
-						pstmt.setString(7, ApplicationProperties.getProperty("flag.value.active"));
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_VIN_ID") > 0)
-							{
-								// VIN FOUND IN MDM
-								details.setVinFoundInMDM("Y");
-							}
-						}
-						rs.close();rs=null;
-						pstmt.close();pstmt=null;
-						sql = null;
-
-						if((null==details.getVinFoundInMDM()) || (null!=details.getVinFoundInMDM() && !"Y".equals(details.getVinFoundInMDM())))
-						{
-							// vin not found in MDM
-							errorMessage.append("VIN does not exist in MDM.");
-							// set errorsFound to true - status has to Failure for this row
-							errorsFound = true;
-						}
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkMNAOVINStatus()", e);
-						/*
-						 * some exception in identifying the VIN FROM MDM
-						 */
-						errorMessage.append("Failed to find VIN in MDM, exception while executing Query ->"+ e.getMessage()+".");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-					// proceed for IM 
-					try
-					{
-						// proceed for checking in IM
-						// PREPARE REFkEY FOR VIN
-						refKey = details.getVinWMI().trim()+details.getVinVDS().trim()+details.getVinStartRange().trim()+details.getVinEndRange().trim();
-						refKey = Utilities.replaceCharsForRefKeys(refKey).trim().toUpperCase();
-						details.setVinRefKey(refKey.trim().toUpperCase());
-
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, refKey);
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								details.setVinFoundInIM("Y");
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-						refKey = null;
-
-						if((null==details.getVinFoundInIM()) || (null!=details.getVinFoundInIM() && !"Y".equals(details.getVinFoundInIM())))
-						{
-							// VIN Not found in IM.
-							errorMessage.append("VIN does not exist in IM.");
-							// set errorsFound to true - status has to Failure for this row
-							errorsFound = true;
-						}
-					}
-					catch(Exception e)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkMNAOVINStatus()", e);
-						/*
-						 * some exception in identifying the VIN from IM
-						 */
-						errorMessage.append("Failed to find VIN in IM, exception while executing Query ->"+ e.getMessage()+".");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-
-					// Check if Row does not have any Model year entry then failure
-					if(null==details.getModelYear() || "".equals(details.getModelYear()))
-					{
-						errorMessage.append("No entry found for Model Year in the node.");
-						// set errorsFound to true - status has to Failure for this row
-						errorsFound = true;
-					}
-
-					if(errorsFound==true)
-					{
-						// update failureCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-						if(null!=errorMessage && null!=errorMessage.toString())
-						{
-							details.setErrorMessage(errorMessage.toString());
-						}
-					}
-					else
-					{
-						// update successCount
-						// VIN Located in MDM & IM + Model Year Entry Found - Success Transaction
-						// update successCount
-						updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-						// set processing status as SUCCESS
-						details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-					}
-				}
-			else
-			{
-				// set error Message Node is INVALID, SOME elements are missing
-				details.setErrorMessage("Node is INVALID. Required elements are missing.");
-				// update failureCount
-				updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-			}
-				
-				errorMessage=null;
-			}
-			sql=null;
-			refKey = null;
-			details = null;
-			errorMessage = null;
-		}
-		else
-		{
-			logger.info("checkMNAOVINStatus :: VIN LIST / Locale as parameters are null. Return as it is.");
-		}
-
-		if(null!=rs)
-			rs.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=conn)
-			conn.close();
-		return vinList;
-	}
-	
-	public ArrayList<VinAttributeEntFileDetails> checkVINAttributeStatus(ArrayList<VinAttributeEntFileDetails> vinAttributeList, String locale, String scheduleId)throws SQLException
-	{
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-
-		if(null!=vinAttributeList && !"".equals(vinAttributeList) && null!=locale && !"".equals(locale))
-		{
-			/*
-			 * CHECK FOR ENGINE TYPE, MISSION TYPE, DRIVE ALXE & BODY TYPE REF KEYS IN IM
-			 * AS WELL AS IN MDM.
-			 */
-			locale = locale.replace("_", "-");
-			
-			conn = getConnection();
-			VinAttributeEntFileDetails details = null;
-			String sql="";
-			StringBuilder errorMessage=new StringBuilder();
-			for(int a=0;a<vinAttributeList.size();a++)
-			{
-				details = (VinAttributeEntFileDetails)vinAttributeList.get(a);
-				// set defaultStatus as Failure
-				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
-
-				errorMessage=new StringBuilder();
-				boolean errorsFound=false;
-
-				/*
-				 * ENGINE TYPE / MISSION TYPE / BODY TYPE / DRIVE AXLE TYPE MUST EXIST IN MDM AS WELL AS IM
-				 */
-				if(null!=details.getVinEngineType() && !"".equals(details.getVinEngineType()))
-				{
-					boolean found=false;
-
-					// MDM CHECK
-					try
-					{
-						sql="SELECT A.MDM_ET_ID FROM gms3_mdm_engine_type A, gms3_mdm_manual_language B WHERE A.MDM_ET_FLAG=? "
-								+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-								+ " AND TRIM(LOWER(A.MDM_ET_TYPE_CODE))=?";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(3, locale.trim().toLowerCase());
-						pstmt.setString(4, details.getVinEngineType().trim().toLowerCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_ET_ID")>0)
-							{
-								found = true;
-							}
-						}
-						sql=null;
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Engine Type {"+details.getVinEngineType()+"} does not exist in MDM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Engine Type {"+details.getVinEngineType()+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-
-
-					// IM CHECK
-					found=false;
-					try
-					{
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, Utilities.replaceCharsForRefKeys(details.getVinEngineType()).trim().toUpperCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								found=true;
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Engine Type {"+details.getVinEngineType()+"} does not exist in IM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Engine Type {"+details.getVinEngineType()+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-				
-				}
-
-
-				// TRANSMISSION TYPES
-				if(null!=details.getVinTransType() && !"".equals(details.getVinTransType()))
-				{
-					boolean found=false;
-
-					// MDM CHECK
-					try
-					{
-						sql="SELECT A.MDM_TRANS_TYPE_ID FROM gms3_mdm_trans_type A, "
-								+ " gms3_mdm_manual_language B WHERE A.MDM_TRANS_TYPE_FLAG=? AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID "
-								+ " AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? AND TRIM(LOWER(A.MDM_TRANS_TYPE_TYPE_CODE))=? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(3, locale.trim().toLowerCase());
-						pstmt.setString(4, details.getVinTransType().trim().toLowerCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_TRANS_TYPE_ID")>0)
-							{
-								found = true;
-							}
-						}
-						sql=null;
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Transmission Type {"+details.getVinTransType()+"} does not exist in MDM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Transmission Type {"+details.getVinTransType()+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-
-
-					// IM CHECK
-					found=false;
-					try
-					{
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, Utilities.replaceCharsForRefKeys(details.getVinTransType()).trim().toUpperCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								found=true;
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Transmission Type {"+details.getVinTransType()+"} does not exist in IM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Transmission Type {"+details.getVinTransType()+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-				
-				}
-
-				// DRIVE AXLE
-				if(null!=details.getVinAxleType() && !"".equals(details.getVinAxleType()))
-				{
-					boolean found=false;
-
-					// MDM CHECK
-					try
-					{
-						sql="SELECT A.MDM_AT_ID FROM gms3_mdm_axle_type A, gms3_mdm_manual_language B WHERE A.MDM_AT_FLAG=? "
-								+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-								+ " AND TRIM(LOWER(A.MDM_AT_AXLE_TYPE)) = ?";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(3, locale.trim().toLowerCase());
-						pstmt.setString(4, details.getVinAxleType().trim().toLowerCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_AT_ID")>0)
-							{
-								found = true;
-							}
-						}
-						sql=null;
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-
-						if(found==false)
-						{
-							errorMessage.append("DriveAxle Type {"+details.getVinAxleType()+"} does not exist in MDM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find DriveAxle Type {"+details.getVinAxleType()+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-
-
-					// IM CHECK
-					found=false;
-					try
-					{
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, Utilities.replaceCharsForRefKeys(details.getVinAxleType()).trim().toUpperCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								found=true;
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-
-						if(found==false)
-						{
-							errorMessage.append("DriveAxle Type {"+details.getVinAxleType()+"} does not exist in IM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find DriveAxle Type {"+details.getVinAxleType()+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-				}
-
-				// BODY TYPE
-				if(null!=details.getVinBodyType() && !"".equals(details.getVinBodyType()))
-				{
-					boolean found=false;
-
-					// MDM CHECK
-					try
-					{
-						sql="SELECT A.MDM_BT_ID FROM gms3_mdm_body_type A, gms3_mdm_manual_language B WHERE A.MDM_BT_FLAG=? "
-								+ " AND B.MDM_ML_FLAG=? AND A.MDM_ML_ID = B.MDM_ML_ID AND TRIM(LOWER(B.MDM_ML_LANG_CODE))=? "
-								+ " AND TRIM(LOWER(A.MDM_BT_BODY_TYPE)) = ?";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
-						pstmt.setString(3, locale.trim().toLowerCase());
-						pstmt.setString(4, details.getVinBodyType().trim().toLowerCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(rs.getLong("MDM_BT_ID")>0)
-							{
-								found = true;
-							}
-						}
-						sql=null;
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Body Type {"+details.getVinBodyType()+"} does not exist in MDM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Body Type {"+details.getVinBodyType()+"} in MDM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-
-
-					// IM CHECK
-					found=false;
-					try
-					{
-						sql="SELECT RECORDID FROM OK_IM.TAG WHERE REFERENCEKEY= ? ";
-						pstmt = conn.prepareStatement(sql);
-						pstmt.setString(1, Utilities.replaceCharsForRefKeys(details.getVinBodyType()).trim().toUpperCase());
-						rs = pstmt.executeQuery();
-						if(rs.next())
-						{
-							if(null!=rs.getString("RECORDID") && !"".equals(rs.getString("RECORDID")))
-							{
-								found=true;
-							}
-						}
-						pstmt.close();pstmt=null;
-						rs.close();rs=null;
-						sql=null;
-
-						if(found==false)
-						{
-							errorMessage.append("Body Type {"+details.getVinBodyType()+"} does not exist in IM.");
-							// error found - status has to be failure for this row
-							errorsFound=true;
-						}
-					}
-					catch(Exception e1)
-					{
-						Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINAttributeStatus()", e1);
-						errorMessage.append("Failed to find Body Type {"+details.getVinBodyType()+"} in IM, exception while executing Query ->"+ e1.getMessage()+".");
-						// error found - status has to be failure for this row
-						errorsFound=true;
-					}
-				}
-
-				/*
-				 * if errorsFound = true = updateFailureCount
-				 * else = updateSuccessCount
-				 */
-
-				if(errorsFound==true)
-				{
-					// update failureCount
-					updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_FAILURE);
-					if(null!=errorMessage && null!=errorMessage.toString())
-					{
-						details.setErrorMessage(errorMessage.toString());
-					}
-				}
-				else
-				{
-					// all is success - update successCount
-					updateScheduleSuccessOrFailureCount(scheduleId, conn, MetaDataScheduleConstants.STATUS_SUCCESS);
-					// set processingStatus as SUCCESS
-					details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
-				}
-
-				errorMessage = null;
-			
-			}
-			sql=null;
-			details = null;
-			errorMessage=null;
-		}
-		else
-		{
-			logger.info("checkVINAttributeStatus :: VIN ATTRIBUTE LIST / Locale as parameters are null. Return as it is.");
-		}
-
-		if(null!=rs)
-			rs.close();
-		if(null!=pstmt)
-			pstmt.close();
-		if(null!=conn)
-			conn.close();
-
-		return vinAttributeList;
-	}
-	
-	private void updateScheduleSuccessOrFailureCount(String scheduleId, Connection conn, String type)
-	{
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try
-		{
-			if(null!=scheduleId && !"".equals(scheduleId))
-			{
-				int count=0;
-				String sql="";
-				if(type.equals(MetaDataScheduleConstants.STATUS_SUCCESS))
-				{
-					sql="SELECT DC_PROCESSED_COUNT AS COUNT FROM gms3_dmt_metadata_val_sch WHERE DC_SCHEDULE_ID="+scheduleId;
-				}
-				else if(type.equals(MetaDataScheduleConstants.STATUS_FAILURE))
-				{
-					sql="SELECT DC_FAILED_COUNT AS COUNT FROM gms3_dmt_metadata_val_sch WHERE DC_SCHEDULE_ID="+scheduleId;
-				}
-				pstmt = conn.prepareStatement(sql);
-				rs = pstmt.executeQuery();
-				if(rs.next())
-				{
-					count = rs.getInt("COUNT");
-				}
-				pstmt.close();pstmt=null;
-				rs.close();rs=null;
-				sql=null;
-
-				// increment count by 1
-				count = count+1;
-
-				// update back in table
-				if(type.equals(MetaDataScheduleConstants.STATUS_SUCCESS))
-				{
-					sql="UPDATE gms3_dmt_metadata_val_sch SET  DC_PROCESSED_COUNT=?   WHERE DC_SCHEDULE_ID=?";
-				}
-				else if(type.equals(MetaDataScheduleConstants.STATUS_FAILURE))
-				{
-					sql="UPDATE gms3_dmt_metadata_val_sch SET  DC_FAILED_COUNT=? WHERE DC_SCHEDULE_ID=?";
-				}
-				pstmt = conn.prepareStatement(sql);
-				pstmt.setInt(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				sql=null;
-				pstmt.close();pstmt=null;
-			}
-			else
-			{
-				logger.info("updateScheduleSuccessOrFailureCount :: Schedule Id as parameters is null.");
-			}
-		}
-		catch(Exception e)
-		{
-			Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "updateScheduleSuccessOrFailureCount()", e);
-		}
-	}
-	
-	private String getDisplayOrderName(String displayOrderCode, String modelType, String localeCode, Connection conn) throws SQLException
-	{
-		String displayOrderName=null;
-		ResultSet rs = null;
-		Statement stmt = null;
-		if(null!=displayOrderCode && !"".equals(displayOrderCode) && null!=modelType && !"".equals(modelType) && null!=localeCode && !"".equals(localeCode))
-		{
-			String sql="SELECT A.MDM_DISPORD_NAME FROM gms3_mdm_display_order A, gms3_mdm_manual_language B WHERE A.MDM_ML_ID=B.MDM_ML_ID "
-					+ " AND TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+localeCode.trim().toLowerCase()+"' "
-					+ " AND TRIM(LOWER(A.MDM_DISPORD_MODEL_TYPE))='"+modelType.trim().toLowerCase()+"' "
-					+ " AND TRIM(LOWER(A.MDM_DISPORD_CODE))='"+displayOrderCode.trim().toLowerCase()+"' "
-					+ " AND A.MDM_DISPORD_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"'";
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				displayOrderName = rs.getString("MDM_DISPORD_NAME");
-			}
-			sql = null;
-		}
-		else
-		{
-			logger.info("getDisplayOrderName :: Required Parameters Display Order Code  / Model Type / Locale are null. Return null.");
-		}
-
-		if(null!=rs)
-			rs.close();
-		if(null!=stmt)
-			stmt.close();
-		return displayOrderName;
-	}
-	
-	private String getESICategoryName(String level, String code1, String code2, String code3, String locale, Connection conn)throws SQLException 
-	{
-		String categoryName="";
-		Statement stmt =null;
-		ResultSet rs = null;
-		
-		/*
-		 * USE EN_UK LOCALE ONLY FOR MME MARKET
-		 */
-//		boolean useENUKLocale=false;
-//		String enukLocale=null;
-//		locale = locale.replace("-", "_");
-//		if(mmeLocales.trim().toLowerCase().indexOf(locale.trim().toLowerCase())>-1)
-//		{
-//			// MME LOCALE
-//			useENUKLocale=true;
-//			enukLocale=ApplicationProperties.getProperty("en-uk");
-//			enukLocale = enukLocale.replace("_", "-");
-//		}
-		
-		// GET ALTERNATE LOCALE FOR PROCESSING LOCALE FOR ESI CATEGORY MASTER DATA TYPE
-		locale = ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_ESI_CATEGORY, conn);
-		// re- replace _ by - for MDM Transactions.
-		locale = locale.replace("_", "-");
-		String getCatNameSql="";
-		if(level.equals("LEVEL1"))
-		{
-			if(null!=code1 && !"".equals(code1))
-			{
-				getCatNameSql = "SELECT DISTINCT A.MDM_CAT_NAME_ENG_LANG AS CAT_NAME FROM gms3_mdm_category A, gms3_mdm_manual_language B WHERE A.MDM_ML_ID =B.MDM_ML_ID AND ";
-//				if(useENUKLocale==true)
-//				{
-//					getCatNameSql=getCatNameSql+ " (TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"' OR TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+enukLocale.trim().toLowerCase()+"') ";
-//				}
-//				else
-				{
-					getCatNameSql=getCatNameSql+ " TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"'  ";
-				}
-				getCatNameSql=getCatNameSql+ " AND TRIM(LOWER(A.MDM_CAT_CODE)) = '"+code1.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql+ " AND A.MDM_CAT_FLAG ='"+ApplicationProperties.getProperty("flag.value.active")+"' ";
-				getCatNameSql=getCatNameSql+ " AND B.MDM_ML_FLAG ='"+ApplicationProperties.getProperty("flag.value.active")+"'";
-			}
-		}
-		else if(level.equals("LEVEL2"))
-		{
-			if(null!=code1 && !"".equals(code1) && null!=code2 && !"".equals(code2))
-			{
-				getCatNameSql = "SELECT DISTINCT A.MDM_SCAT_NAME_ENG_LANG AS CAT_NAME FROM gms3_mdm_category A, gms3_mdm_manual_language B WHERE A.MDM_ML_ID =B.MDM_ML_ID AND ";
-//				if(useENUKLocale==true)
-//				{
-//					getCatNameSql=getCatNameSql+ " (TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"' OR TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+enukLocale.trim().toLowerCase()+"') ";
-//				}
-//				else
-				{
-					getCatNameSql=getCatNameSql+ " TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"'  ";
-				}
-				getCatNameSql=getCatNameSql		+ " AND TRIM(LOWER(A.MDM_CAT_CODE)) = '"+code1.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql		+ " AND TRIM(LOWER(A.MDM_SCAT_CODE)) = '"+code2.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql		+ " AND A.MDM_CAT_FLAG  ='"+ApplicationProperties.getProperty("flag.value.active")+"' ";
-				getCatNameSql=getCatNameSql		+ " AND B.MDM_ML_FLAG ='"+ApplicationProperties.getProperty("flag.value.active")+"'";
-			}
-		}
-		else if(level.equals("LEVEL3"))
-		{
-			if(null!=code1 && !"".equals(code1) && null!=code2 && !"".equals(code2) && null!=code3 && !"".equals(code3))
-			{
-				getCatNameSql = "SELECT DISTINCT A.MDM_SSCAT_NAME_ENG_LANG AS CAT_NAME FROM gms3_mdm_category A, gms3_mdm_manual_language B WHERE A.MDM_ML_ID =B.MDM_ML_ID AND ";
-//				if(useENUKLocale==true)
-//				{
-//					getCatNameSql=getCatNameSql+ " (TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"' OR TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+enukLocale.trim().toLowerCase()+"') ";
-//				}
-//				else
-				{
-					getCatNameSql=getCatNameSql+ " TRIM(LOWER(B.MDM_ML_LANG_CODE))='"+locale.trim().toLowerCase()+"'  ";
-				}
-				getCatNameSql=getCatNameSql		+ " AND TRIM(LOWER(A.MDM_CAT_CODE)) = '"+code1.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql		+ " AND TRIM(LOWER(A.MDM_SCAT_CODE)) = '"+code2.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql		+ " AND TRIM(LOWER(A.MDM_SSCAT_CODE)) = '"+code3.trim().toLowerCase()+"' ";
-				getCatNameSql=getCatNameSql		+ " AND A.MDM_CAT_FLAG  ='"+ApplicationProperties.getProperty("flag.value.active")+"' ";
-				getCatNameSql=getCatNameSql		+ " AND B.MDM_ML_FLAG ='"+ApplicationProperties.getProperty("flag.value.active")+"'";
-			}
-		}
-		if(null!=getCatNameSql && !"".equals(getCatNameSql))
-		{
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(getCatNameSql);
-			if(rs.next())
-			{
-				categoryName = rs.getString("CAT_NAME");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-		}
-		getCatNameSql= null;
-		locale=  null;
-//		enukLocale=null;
-	
-		return categoryName;
-	}
-	
 	public boolean deleteScheduleDetails(String scheduleIds) 
 	{
 		PreparedStatement pstmt = null;
@@ -3166,6 +519,891 @@ public class MetaDataValidationDAO extends DBConnectionHelper{
 			scheduleIds=null;
 		}
 		return true;
+	}
+
+	/*
+	 * =====================================================================================================
+	 * LINE CHECKS - KAPTURE (2026-10-10)
+	 *
+	 * The legacy checks looked every value up one by one: in MDM, and in InfoManager (OK_IM.TAG). Now:
+	 *  - "exists in Kapture" = the reference key is in the Kapture categories table (kapture.category.db.table)
+	 *    for ANY locale - the same rule as the locale-free OK_IM.TAG look-up (Kapture creates a category in every
+	 *    default locale). Read in ONE pass per file (IN chunks of db.write.batch.size), matched in memory,
+	 *    exactly and in upper case, as the conversion matches it.
+	 *  - MDM values are read once per file for the locale and matched in memory (same TRIM + LOWER rule).
+	 *  - The success / failure counters are written ONCE at the end of the file (addCheckCounts), not per line.
+	 *  - Display order and CD lines carry level NAMES now - no level code checks any more.
+	 * =====================================================================================================
+	 */
+
+	/** Message of a line that misses required nodes; these lines are counted as failed by the caller. */
+	private static final String INVALID_LINE_MESSAGE = "Line is INVALID. Required nodes are missing.";
+
+	/**
+	 * The reference keys (upper case) of the given keys that exist in Kapture for any locale.
+	 * Throws when the look-up itself fails - a failed look-up is not "no such category".
+	 */
+	private Set<String> findRefKeysInKapture(Collection<String> refKeys) throws SQLException
+	{
+		Set<String> found = new HashSet<String>();
+		List<String> keys = new ArrayList<String>(new LinkedHashSet<String>(refKeys));
+		if(keys.isEmpty())
+		{
+			return found;
+		}
+		String table = KaptureApiClient.require("kapture.category.db.table").trim();
+		int chunk = KaptureApiClient.requireInt("db.write.batch.size");
+		long start = System.currentTimeMillis();
+		Connection conn = getCMSConnection();
+		if(null==conn)
+		{
+			throw new SQLException("No Kapture CMS connection.");
+		}
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			for(int from=0; from<keys.size(); from+=chunk)
+			{
+				int to = Math.min(from+chunk, keys.size());
+				StringBuilder in = new StringBuilder();
+				for(int i=from; i<to; i++)
+				{
+					in.append(i>from ? ",?" : "?");
+				}
+				pstmt = conn.prepareStatement("SELECT DISTINCT referencekey FROM "+table+" WHERE referencekey IN ("+in+")");
+				for(int i=from; i<to; i++)
+				{
+					pstmt.setString(1+(i-from), keys.get(i));
+				}
+				rs = pstmt.executeQuery();
+				while(rs.next())
+				{
+					String ref = rs.getString(1);
+					if(null!=ref)
+					{
+						found.add(ref.trim().toUpperCase());
+					}
+				}
+				rs.close();rs=null;
+				pstmt.close();pstmt=null;
+			}
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+			conn.close();
+		}
+		logger.info("findRefKeysInKapture :: "+table+" :: keys "+keys.size()+" :: found "+found.size()+" :: "+(System.currentTimeMillis()-start)+" ms");
+		return found;
+	}
+
+	/** The Kapture result of one look-up pass: the keys found, or why the look-up failed. */
+	private static class KaptureKeys
+	{
+		Set<String> found = new HashSet<String>();
+		String error = null;
+
+		/** null when the key is in Kapture, else the line error for it ("<what> does not exist in Kapture."). */
+		String check(String refKey, String what)
+		{
+			if(null!=error)
+			{
+				return "Failed to find "+what+" in Kapture, exception while executing Query ->"+error+".";
+			}
+			if(null==refKey || "".equals(refKey) || !found.contains(refKey.trim().toUpperCase()))
+			{
+				return what+" does not exist in Kapture.";
+			}
+			return null;
+		}
+	}
+
+	private KaptureKeys lookUpInKapture(Collection<String> refKeys, String caller)
+	{
+		KaptureKeys result = new KaptureKeys();
+		try
+		{
+			result.found = findRefKeysInKapture(refKeys);
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), caller, e);
+			result.error = e.getMessage();
+		}
+		return result;
+	}
+
+	/** Adds the success / failure counts of the checked lines to the schedule row, in one statement. */
+	private void addCheckCounts(String scheduleId, int successCount, int failureCount)
+	{
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try
+		{
+			conn = getConnection();
+			pstmt = conn.prepareStatement("UPDATE gms3_dmt_metadata_val_sch SET dc_processed_count = IFNULL(dc_processed_count,0) + ?,"
+					+ " dc_failed_count = IFNULL(dc_failed_count,0) + ? WHERE dc_schedule_id = ?");
+			pstmt.setInt(1, successCount);
+			pstmt.setInt(2, failureCount);
+			pstmt.setLong(3, Long.parseLong(scheduleId));
+			pstmt.executeUpdate();
+			logger.info("addCheckCounts :: schedule "+scheduleId+" :: success "+successCount+" :: failure "+failureCount);
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "addCheckCounts()", e);
+		}
+		finally
+		{
+			try
+			{
+				if(null!=pstmt)
+					pstmt.close();
+				if(null!=conn)
+					conn.close();
+			}
+			catch(SQLException e)
+			{
+				Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "addCheckCounts()", e);
+			}
+		}
+	}
+
+	/** trim + lower case, the MDM comparison rule of the legacy queries (TRIM(LOWER(col)) = ?); null stays null. */
+	private static String mdmKey(String value)
+	{
+		return null==value ? null : value.trim().toLowerCase();
+	}
+
+	/**
+	 * The active MDM VINs of the locale, as mdmKey(wmi)|vds|vis start|vis end|carline - the columns of the legacy
+	 * per-line query.
+	 */
+	private Set<String> loadMdmVins(Connection conn, String locale) throws SQLException
+	{
+		Set<String> vins = new HashSet<String>();
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = conn.prepareStatement("SELECT mdm_vin_wmi_code, mdm_vin_vds_code, mdm_vin_vis_start_range, mdm_vin_vis_end_range, mdm_crln_code"
+					+ " FROM gms3_mdm_vin_detail WHERE TRIM(LOWER(mdm_ml_lang_code)) = ? AND mdm_vin_flag = ?");
+			pstmt.setString(1, mdmKey(locale));
+			pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
+			rs = pstmt.executeQuery();
+			while(rs.next())
+			{
+				vins.add(vinKey(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)));
+			}
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+		}
+		logger.info("loadMdmVins :: locale "+locale+" :: active VINs "+vins.size());
+		return vins;
+	}
+
+	private static String vinKey(String wmi, String vds, String visStart, String visEnd, String carline)
+	{
+		return mdmKey(wmi)+"|"+mdmKey(vds)+"|"+mdmKey(visStart)+"|"+mdmKey(visEnd)+"|"+mdmKey(carline);
+	}
+
+	/**
+	 * The active codes (mdmKey) of one MDM master data table for the locale - engine / transmission / axle / body type.
+	 */
+	private Set<String> loadMdmCodes(Connection conn, String table, String flagColumn, String codeColumn, String locale) throws SQLException
+	{
+		Set<String> codes = new HashSet<String>();
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = conn.prepareStatement("SELECT a."+codeColumn+" FROM "+table+" a, gms3_mdm_manual_language b WHERE a."+flagColumn+" = ?"
+					+ " AND b.mdm_ml_flag = ? AND a.mdm_ml_id = b.mdm_ml_id AND TRIM(LOWER(b.mdm_ml_lang_code)) = ?");
+			pstmt.setString(1, ApplicationProperties.getProperty("flag.value.active"));
+			pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
+			pstmt.setString(3, mdmKey(locale));
+			rs = pstmt.executeQuery();
+			while(rs.next())
+			{
+				if(null!=rs.getString(1))
+				{
+					codes.add(mdmKey(rs.getString(1)));
+				}
+			}
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+		}
+		return codes;
+	}
+
+	/**
+	 * The ESI category names of the locale's MDM (English names, as legacy), keyed "c", "c|s", "c|s|ss" on mdmKey of
+	 * the codes. A key with a blank name is kept with "" - legacy treats a blank name as "does not exist in MDM".
+	 */
+	private Map<String, String> loadMdmEsiNames(Connection conn, String locale) throws SQLException
+	{
+		Map<String, String> names = new HashMap<String, String>();
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			pstmt = conn.prepareStatement("SELECT a.mdm_cat_code, a.mdm_scat_code, a.mdm_sscat_code, a.mdm_cat_name_eng_lang,"
+					+ " a.mdm_scat_name_eng_lang, a.mdm_sscat_name_eng_lang FROM gms3_mdm_category a, gms3_mdm_manual_language b"
+					+ " WHERE a.mdm_ml_id = b.mdm_ml_id AND TRIM(LOWER(b.mdm_ml_lang_code)) = ? AND a.mdm_cat_flag = ? AND b.mdm_ml_flag = ?");
+			pstmt.setString(1, mdmKey(locale));
+			pstmt.setString(2, ApplicationProperties.getProperty("flag.value.active"));
+			pstmt.setString(3, ApplicationProperties.getProperty("flag.value.active"));
+			rs = pstmt.executeQuery();
+			while(rs.next())
+			{
+				String c = mdmKey(rs.getString(1));
+				String s = mdmKey(rs.getString(2));
+				String ss = mdmKey(rs.getString(3));
+				putName(names, c, rs.getString(4));
+				if(null!=c && null!=s)
+				{
+					putName(names, c+"|"+s, rs.getString(5));
+					if(null!=ss)
+					{
+						putName(names, c+"|"+s+"|"+ss, rs.getString(6));
+					}
+				}
+			}
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+		}
+		logger.info("loadMdmEsiNames :: locale "+locale+" :: keys "+names.size());
+		return names;
+	}
+
+	private static void putName(Map<String, String> names, String key, String name)
+	{
+		if(null==key)
+		{
+			return;
+		}
+		String n = null==name ? "" : name;
+		String old = names.get(key);
+		if(null==old || ("".equals(old.trim()) && !"".equals(n.trim())))
+		{
+			names.put(key, n);
+		}
+	}
+
+	/** The comma separated codes of a display order type field, trimmed, blanks and the given "none" code left out. */
+	private static List<String> typeCodes(String field, String noneCode)
+	{
+		List<String> codes = new ArrayList<String>();
+		if(null!=field && !"".equals(field))
+		{
+			for(String t : field.split(","))
+			{
+				if(null!=t && !"".equals(t.trim()) && (null==noneCode || !noneCode.equals(t.trim().toLowerCase())))
+				{
+					codes.add(t.trim());
+				}
+			}
+		}
+		return codes;
+	}
+
+	/** Kapture reference key of an engine / transmission / axle / body type code - as the legacy IM look-up built it. */
+	private static String typeRefKey(String code)
+	{
+		return Utilities.replaceCharsForRefKeys(code).trim().toUpperCase();
+	}
+
+	private static String join(List<String> values)
+	{
+		StringBuilder sb = new StringBuilder();
+		for(String v : values)
+		{
+			if(sb.length()>0)
+			{
+				sb.append(",");
+			}
+			sb.append(v);
+		}
+		return sb.length()>0 ? sb.toString() : null;
+	}
+
+	/**
+	 * MNAO model year category of a vin.txt line - the conversion's rule (conversion/impl/CategoryUtils
+	 * processModelYearCategories): model name without '-', reference key characters replaced, upper case, '_',
+	 * model year without "MY", upper case. e.g. CX90 + 2026MY -> CX90_2026.
+	 */
+	private static String modelYearRefKey(String modelName, String modelYear)
+	{
+		if(null==modelName || "".equals(modelName) || null==modelYear || "".equals(modelYear))
+		{
+			return null;
+		}
+		String name = Utilities.replaceCharsForRefKeys(modelName.replace("-", ""));
+		String year = modelYear;
+		if(year.trim().toLowerCase().contains("my"))
+		{
+			year = year.replace("my", "").replace("MY", "").replace("mY", "").replace("My", "");
+		}
+		return name.toUpperCase()+"_"+year.toUpperCase();
+	}
+
+	/**
+	 * VIN lines of MC / MME (vin.txt, 8 / 9 fields) and MNAO (vin.txt, 11 fields).
+	 * Per valid line: the VIN is active in MDM (locale = alternate locale of the processing locale - CARLINE for MC / MME,
+	 * VIN for MNAO), the VIN category is in Kapture, the line names its display order file; MNAO also: the model year
+	 * category is in Kapture.
+	 */
+	private ArrayList<VinDetails> checkVINs(ArrayList<VinDetails> vinList, String locale, String scheduleId, boolean mnao)throws SQLException
+	{
+		if(null==vinList || null==locale || "".equals(locale))
+		{
+			logger.info("checkVINs :: VIN LIST / Locale as parameters are null. Return as it is.");
+			return vinList;
+		}
+		// MDM VINs of the locale - one read
+		Set<String> mdmVins = null;
+		String mdmError = null;
+		Connection conn = getConnection();
+		try
+		{
+			String mdmLocale = ScheduleDAO.getAlternateLocale(locale.replace("_", "-"),
+					mnao ? AutoSyncConstants.ITEM_KEY_VIN_RANGE : AutoSyncConstants.ITEM_KEY_CARLINE, conn);
+			mdmVins = loadMdmVins(conn, mdmLocale);
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkVINs()", e);
+			mdmError = e.getMessage();
+		}
+		finally
+		{
+			conn.close();
+		}
+
+		// reference keys of every valid line, then one Kapture look-up
+		List<String> refKeys = new ArrayList<String>();
+		for(VinDetails details : vinList)
+		{
+			if(MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				String refKey;
+				if(mnao)
+				{
+					// WMI + VDS + VIS START + VIS END (as the conversion's MNAO VIN category)
+					refKey = details.getWmiCode()+details.getVdsCode()+details.getVisStartRange()+details.getVisEndRange();
+					details.setModelYearRefKey(modelYearRefKey(details.getModelName(), details.getModelYear()));
+					if(null!=details.getModelYearRefKey())
+					{
+						refKeys.add(details.getModelYearRefKey());
+					}
+				}
+				else
+				{
+					// CARLINE + WMI ('-' = 3 underscores) + VDS + VIS START + VIS END
+					String wmiCode = "-".equals(details.getWmiCode()) ? "___" : details.getWmiCode();
+					refKey = details.getCarlineCode()+wmiCode+details.getVdsCode()+details.getVisStartRange()+details.getVisEndRange();
+				}
+				details.setVinRefKey(Utilities.replaceCharsForRefKeys(refKey).trim().toUpperCase());
+				refKeys.add(details.getVinRefKey());
+			}
+		}
+		KaptureKeys kapture = lookUpInKapture(refKeys, "checkVINs()");
+
+		int successCount = 0;
+		int failureCount = 0;
+		for(VinDetails details : vinList)
+		{
+			details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
+			details.setVinFoundInMDM("N");
+			details.setVinFoundInIM("N");
+			if(!MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				// already counted with the invalid lines
+				details.setErrorMessage(INVALID_LINE_MESSAGE);
+				continue;
+			}
+			StringBuilder errorMessage = new StringBuilder();
+			if(null!=mdmError)
+			{
+				errorMessage.append("Failed to find VIN in MDM, exception while executing Query ->"+mdmError+".");
+			}
+			else if(mdmVins.contains(vinKey(details.getWmiCode(), details.getVdsCode(), details.getVisStartRange(), details.getVisEndRange(), details.getCarlineCode())))
+			{
+				details.setVinFoundInMDM("Y");
+			}
+			else
+			{
+				errorMessage.append("VIN does not exist in MDM.");
+			}
+
+			String error = kapture.check(details.getVinRefKey(), "VIN");
+			if(null==error)
+			{
+				details.setVinFoundInIM("Y");
+			}
+			else
+			{
+				errorMessage.append(error);
+			}
+
+			if(mnao)
+			{
+				details.setModelYearFoundInKapture("N");
+				error = kapture.check(details.getModelYearRefKey(), "Model Year {"+details.getModelYearRefKey()+"}");
+				if(null==error)
+				{
+					details.setModelYearFoundInKapture("Y");
+				}
+				else
+				{
+					errorMessage.append(error);
+				}
+			}
+
+			if(null==details.getDisplayOrderTextFileName() || "".equals(details.getDisplayOrderTextFileName()))
+			{
+				errorMessage.append("No entry found for Display Order Text File.");
+			}
+
+			if(errorMessage.length()>0)
+			{
+				details.setErrorMessage(errorMessage.toString());
+				failureCount++;
+			}
+			else
+			{
+				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
+				successCount++;
+			}
+		}
+		addCheckCounts(scheduleId, successCount, failureCount);
+		return vinList;
+	}
+
+	public ArrayList<VinDetails> checkMCMMEVINStatus(ArrayList<VinDetails> vinList, String locale, String scheduleId)throws SQLException
+	{
+		return checkVINs(vinList, locale, scheduleId, false);
+	}
+
+	public ArrayList<VinDetails> checkMNAOVINStatus(ArrayList<VinDetails> vinList, String locale, String scheduleId)throws SQLException
+	{
+		return checkVINs(vinList, locale, scheduleId, true);
+	}
+
+	/**
+	 * Display order lines. The level fields carry NAMES now (no code check). For a model that is not ENGINE / AT / MT, every
+	 * engine / transmission / drive axle / body type code must be active in MDM (alternate locale of its type) AND be a
+	 * category in Kapture. E99 / M99 (no engine / transmission) are not checked, as legacy.
+	 */
+	public ArrayList<DisplayOrderDetails> checkDisplayOrderStatus(ArrayList<DisplayOrderDetails> displayOrderList, String locale, String scheduleId)throws SQLException
+	{
+		if(null==displayOrderList || null==locale || "".equals(locale))
+		{
+			logger.info("checkDisplayOrderStatus :: DISPLAY ORDER LIST / Locale as parameters are null. Return as it is.");
+			return displayOrderList;
+		}
+		// MDM codes of the four types - one read each
+		Set<String> engines = null, missions = null, axles = null, bodies = null;
+		String mdmError = null;
+		Connection conn = getConnection();
+		try
+		{
+			engines = loadMdmCodes(conn, "gms3_mdm_engine_type", "mdm_et_flag", "mdm_et_type_code",
+					ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_ENGINE_TYPE, conn));
+			missions = loadMdmCodes(conn, "gms3_mdm_trans_type", "mdm_trans_type_flag", "mdm_trans_type_type_code",
+					ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_TRANSMISSION_TYPE, conn));
+			axles = loadMdmCodes(conn, "gms3_mdm_axle_type", "mdm_at_flag", "mdm_at_axle_type",
+					ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_AXLE_TYPE, conn));
+			bodies = loadMdmCodes(conn, "gms3_mdm_body_type", "mdm_bt_flag", "mdm_bt_body_type",
+					ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_BODY_TYPE, conn));
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkDisplayOrderStatus()", e);
+			mdmError = e.getMessage();
+		}
+		finally
+		{
+			conn.close();
+		}
+
+		List<String> refKeys = new ArrayList<String>();
+		for(DisplayOrderDetails details : displayOrderList)
+		{
+			if(MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()) && !details.isEngineATMT())
+			{
+				List<String> all = new ArrayList<String>();
+				all.addAll(typeCodes(details.getEngineType(), "e99"));
+				all.addAll(typeCodes(details.getMissionType(), "m99"));
+				all.addAll(typeCodes(details.getDriveAxleType(), null));
+				all.addAll(typeCodes(details.getBodyType(), null));
+				for(String code : all)
+				{
+					refKeys.add(typeRefKey(code));
+				}
+			}
+		}
+		KaptureKeys kapture = lookUpInKapture(refKeys, "checkDisplayOrderStatus()");
+
+		int successCount = 0;
+		int failureCount = 0;
+		for(DisplayOrderDetails details : displayOrderList)
+		{
+			details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
+			if(!MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				details.setErrorMessage(INVALID_LINE_MESSAGE);
+				continue;
+			}
+			StringBuilder errorMessage = new StringBuilder();
+			if(!details.isEngineATMT())
+			{
+				// ENGINE TYPES
+				List<String> failedMDM = new ArrayList<String>();
+				List<String> failedKapture = new ArrayList<String>();
+				checkTypeCodes(typeCodes(details.getEngineType(), "e99"), "Engine Type", engines, mdmError, kapture, errorMessage, failedMDM, failedKapture);
+				details.setFailedEngineTypeCodesMDM(join(failedMDM));
+				details.setFailedEngineTypeCodesIM(join(failedKapture));
+				// TRANSMISSION TYPES
+				failedMDM = new ArrayList<String>();
+				failedKapture = new ArrayList<String>();
+				checkTypeCodes(typeCodes(details.getMissionType(), "m99"), "Transmission Type", missions, mdmError, kapture, errorMessage, failedMDM, failedKapture);
+				details.setFailedMissionTypeCodesMDM(join(failedMDM));
+				details.setFailedMissionTypeCodesIM(join(failedKapture));
+				// DRIVE AXLE TYPES
+				failedMDM = new ArrayList<String>();
+				failedKapture = new ArrayList<String>();
+				checkTypeCodes(typeCodes(details.getDriveAxleType(), null), "DriveAxle Type", axles, mdmError, kapture, errorMessage, failedMDM, failedKapture);
+				details.setFailedDriveAxleTypeCodesMDM(join(failedMDM));
+				details.setFailedDriveAxleTypeCodesIM(join(failedKapture));
+				// BODY TYPES
+				failedMDM = new ArrayList<String>();
+				failedKapture = new ArrayList<String>();
+				checkTypeCodes(typeCodes(details.getBodyType(), null), "Body Type", bodies, mdmError, kapture, errorMessage, failedMDM, failedKapture);
+				details.setFailedBodyTypeCodesMDM(join(failedMDM));
+				details.setFailedBodyTypeCodesIM(join(failedKapture));
+			}
+			if(errorMessage.length()>0)
+			{
+				details.setErrorMessage(errorMessage.toString());
+				failureCount++;
+			}
+			else
+			{
+				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
+				successCount++;
+			}
+		}
+		addCheckCounts(scheduleId, successCount, failureCount);
+		return displayOrderList;
+	}
+
+	/** One type field of a display order line: each code in MDM and in Kapture; failures go to the message and the lists. */
+	private static void checkTypeCodes(List<String> codes, String what, Set<String> mdmCodes, String mdmError, KaptureKeys kapture,
+			StringBuilder errorMessage, List<String> failedMDM, List<String> failedKapture)
+	{
+		for(String code : codes)
+		{
+			if(null!=mdmError)
+			{
+				errorMessage.append("Failed to find "+what+" {"+code+"} in MDM, exception while executing Query ->"+mdmError+".");
+				failedMDM.add(code);
+			}
+			else if(!mdmCodes.contains(mdmKey(code)))
+			{
+				errorMessage.append(what+" {"+code+"} does not exist in MDM.");
+				failedMDM.add(code);
+			}
+			String error = kapture.check(typeRefKey(code), what+" {"+code+"}");
+			if(null!=error)
+			{
+				errorMessage.append(error);
+				failedKapture.add(code);
+			}
+		}
+	}
+
+	/**
+	 * CD processing lines. The level fields carry NAMES now (no code check); the sequence number is mandatory.
+	 */
+	public ArrayList<CDProcessingDetails> checkCDProcessingDisplayOrderStatus(ArrayList<CDProcessingDetails> cdProcessingList, String locale, String scheduleId)throws SQLException
+	{
+		if(null==cdProcessingList || null==locale || "".equals(locale))
+		{
+			logger.info("checkCDProcessingDisplayOrderStatus :: CD PROCESSING LIST / Locale as parameters are null. Return as it is.");
+			return cdProcessingList;
+		}
+		int successCount = 0;
+		int failureCount = 0;
+		for(CDProcessingDetails details : cdProcessingList)
+		{
+			details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
+			if(!MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				details.setErrorMessage(INVALID_LINE_MESSAGE);
+				continue;
+			}
+			if(null==details.getSequenceNo() || "".equals(details.getSequenceNo()))
+			{
+				details.setErrorMessage("No Sequence number found.");
+				failureCount++;
+			}
+			else
+			{
+				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
+				successCount++;
+			}
+		}
+		addCheckCounts(scheduleId, successCount, failureCount);
+		return cdProcessingList;
+	}
+
+	/**
+	 * ESI category lines (esicat / esi*.txt). Not for the OLD model types: level 1 / 2 / 3 codes in MDM (alternate ESI
+	 * locale, English names) and in Kapture (ESI + level 1, level 2, level 2 + level 3; level 3 "00" is not checked).
+	 * All types: the title is mandatory; wiring diagram types: every steering type is a category in Kapture.
+	 */
+	public ArrayList<ESICategoryDetails> checkESICategoryStatus(ArrayList<ESICategoryDetails> esiCategoryList, String locale, String scheduleId, String metaDataType)throws SQLException
+	{
+		if(null==esiCategoryList || null==locale || "".equals(locale))
+		{
+			logger.info("checkESICategoryStatus :: ESI CATEGORY LIST / Locale as parameters are null. Return as it is.");
+			return esiCategoryList;
+		}
+		boolean checkCodes = !metaDataType.equals("ESICATEGORY_MANUALS_OLD") && !metaDataType.equals("ESICATEGORY_WD_OLD") && !metaDataType.equals("ESICATEGORY_OLD");
+		boolean wiringDiagram = metaDataType.equals("ESICATEGORY_WD_NEW") || metaDataType.equals("ESICATEGORY_WD_OLD");
+		String esiPrefix = ApplicationProperties.getProperty("prefix.esicategory.type.refkey");
+
+		Map<String, String> mdmNames = null;
+		String mdmError = null;
+		if(checkCodes)
+		{
+			Connection conn = getConnection();
+			try
+			{
+				mdmNames = loadMdmEsiNames(conn, ScheduleDAO.getAlternateLocale(locale, AutoSyncConstants.ITEM_KEY_ESI_CATEGORY, conn));
+			}
+			catch(Exception e)
+			{
+				Utilities.printStackTraceToLogs(MetaDataValidationDAO.class.getName(), "checkESICategoryStatus()", e);
+				mdmError = e.getMessage();
+			}
+			finally
+			{
+				conn.close();
+			}
+		}
+
+		// reference keys of every valid line, then one Kapture look-up
+		List<String> refKeys = new ArrayList<String>();
+		for(ESICategoryDetails details : esiCategoryList)
+		{
+			if(!MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				continue;
+			}
+			if(checkCodes && notBlank(details.getCategoryLevel1Code()))
+			{
+				details.setCode1RefKey(esiPrefix+details.getCategoryLevel1Code().trim().toUpperCase());
+				refKeys.add(details.getCode1RefKey());
+				if(notBlank(details.getCategoryLevel2Code()))
+				{
+					details.setCode2RefKey(details.getCategoryLevel2Code().trim().toUpperCase());
+					refKeys.add(details.getCode2RefKey());
+					if(notBlank(details.getCategoryLevel3Code()) && !"00".equals(details.getCategoryLevel3Code()))
+					{
+						details.setCode3RefKey(details.getCategoryLevel2Code().trim().toUpperCase()+details.getCategoryLevel3Code().trim().toUpperCase());
+						refKeys.add(details.getCode3RefKey());
+					}
+				}
+			}
+			if(wiringDiagram)
+			{
+				for(String steeringType : typeCodes(details.getSteeringTypeInfoText(), null))
+				{
+					String ref = steeringTypeRefKey(steeringType);
+					if(null!=ref)
+					{
+						refKeys.add(ref);
+					}
+				}
+			}
+		}
+		KaptureKeys kapture = lookUpInKapture(refKeys, "checkESICategoryStatus()");
+
+		int successCount = 0;
+		int failureCount = 0;
+		for(ESICategoryDetails details : esiCategoryList)
+		{
+			details.setProcessingStatus(MetaDataScheduleConstants.STATUS_FAILURE);
+			if(!MetaDataValidationUtils.LINE_TYPE_VALID.equals(details.getLineType()))
+			{
+				details.setErrorMessage(INVALID_LINE_MESSAGE);
+				continue;
+			}
+			StringBuilder errorMessage = new StringBuilder();
+			if(checkCodes)
+			{
+				if(notBlank(details.getCategoryLevel1Code()))
+				{
+					String c = mdmKey(details.getCategoryLevel1Code());
+					// LEVEL 1
+					details.setCode1ExistsInMDM("N");
+					details.setCategoryLevel1Name(esiName(mdmNames, c, mdmError, "Level 1", errorMessage));
+					if(notBlank(details.getCategoryLevel1Name()))
+					{
+						details.setCode1ExistsInMDM("Y");
+					}
+					details.setCode1ExistsInIM("N");
+					String error = kapture.check(details.getCode1RefKey(), "ESI Category Level 1");
+					if(null==error)
+					{
+						details.setCode1ExistsInIM("Y");
+					}
+					else
+					{
+						errorMessage.append(error);
+					}
+					// LEVEL 2
+					if(notBlank(details.getCategoryLevel2Code()))
+					{
+						String s = mdmKey(details.getCategoryLevel2Code());
+						details.setCode2ExistsInMDM("N");
+						details.setCategoryLevel2Name(esiName(mdmNames, c+"|"+s, mdmError, "Level 2", errorMessage));
+						if(notBlank(details.getCategoryLevel2Name()))
+						{
+							details.setCode2ExistsInMDM("Y");
+						}
+						details.setCode2ExistsInIM("N");
+						error = kapture.check(details.getCode2RefKey(), "ESI Category Level 2");
+						if(null==error)
+						{
+							details.setCode2ExistsInIM("Y");
+						}
+						else
+						{
+							errorMessage.append(error);
+						}
+						// LEVEL 3
+						if(notBlank(details.getCategoryLevel3Code()) && !"00".equals(details.getCategoryLevel3Code()))
+						{
+							String ss = mdmKey(details.getCategoryLevel3Code());
+							details.setCode3ExistsInMDM("N");
+							details.setCategoryLevel3Name(esiName(mdmNames, c+"|"+s+"|"+ss, mdmError, "Level 3", errorMessage));
+							if(notBlank(details.getCategoryLevel3Name()))
+							{
+								details.setCode3ExistsInMDM("Y");
+							}
+							details.setCode3ExistsInIM("N");
+							error = kapture.check(details.getCode3RefKey(), "ESI Category Level 3");
+							if(null==error)
+							{
+								details.setCode3ExistsInIM("Y");
+							}
+							else
+							{
+								errorMessage.append(error);
+							}
+						}
+					}
+				}
+				else
+				{
+					errorMessage.append("No ESI Category Codes found.");
+				}
+			}
+
+			// the title is mandatory in an ESI file
+			if(null==details.getTitle() || "".equals(details.getTitle()))
+			{
+				errorMessage.append("No Title found.");
+			}
+
+			// wiring diagrams: every steering type must be a category in Kapture
+			if(wiringDiagram)
+			{
+				List<String> failedSteeringTypes = new ArrayList<String>();
+				for(String steeringType : typeCodes(details.getSteeringTypeInfoText(), null))
+				{
+					String error = kapture.check(steeringTypeRefKey(steeringType), "Steering Type {"+steeringType+"}");
+					if(null!=error)
+					{
+						errorMessage.append(error);
+						failedSteeringTypes.add(steeringType);
+					}
+				}
+				details.setFailedSteeringTypeInIM(join(failedSteeringTypes));
+			}
+
+			if(errorMessage.length()>0)
+			{
+				details.setErrorMessage(errorMessage.toString());
+				failureCount++;
+			}
+			else
+			{
+				details.setProcessingStatus(MetaDataScheduleConstants.STATUS_SUCCESS);
+				successCount++;
+			}
+		}
+		addCheckCounts(scheduleId, successCount, failureCount);
+		return esiCategoryList;
+	}
+
+	private static boolean notBlank(String value)
+	{
+		return null!=value && !"".equals(value);
+	}
+
+	/** MDM name of an ESI level, "" when missing (the line error is appended); legacy reads a blank name as missing too. */
+	private static String esiName(Map<String, String> mdmNames, String key, String mdmError, String level, StringBuilder errorMessage)
+	{
+		if(null!=mdmError)
+		{
+			errorMessage.append("Failed to fetch ESI Category "+level+" from MDM, exception while executing Query ->"+mdmError+".");
+			return "";
+		}
+		String name = mdmNames.get(key);
+		if(null==name || "".equals(name))
+		{
+			errorMessage.append("ESI Category "+level+", does not exist in MDM.");
+			return "";
+		}
+		return name;
+	}
+
+	/** Kapture reference key of a steering type label (LHD / RHD), null for any other label - which then does not exist. */
+	private static String steeringTypeRefKey(String steeringType)
+	{
+		String t = steeringType.trim().toLowerCase();
+		if(t.equals(ApplicationProperties.getProperty("steering.type.label.lhd")))
+		{
+			return ApplicationProperties.getProperty("steering.type.refkey.lhd");
+		}
+		if(t.equals(ApplicationProperties.getProperty("steering.type.label.rhd")))
+		{
+			return ApplicationProperties.getProperty("steering.type.refkey.rhd");
+		}
+		return null;
 	}
 
 }

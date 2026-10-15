@@ -913,10 +913,11 @@ public class KaptureContentService {
 		o.addProperty("title", nz(a.title));
 		// on a create Kapture accepts only "Unpublished"; on an update it must be the CURRENT state
 		o.addProperty("articleState", update ? identity.articleState : stateUnpublished);
-		o.addProperty("articleOwner", client.getUserDisplayName());
-		o.addProperty("articleCreator", client.getUserDisplayName());
-		o.addProperty("articleCreatorUserID", client.getUserPkId());
-		o.addProperty("createdBy", client.getUserDisplayName());
+		// the document's own authorship when the caller carries it over from the read, else the token user
+		o.addProperty("articleOwner", carried(a, "articleOwner", client.getUserDisplayName()));
+		o.addProperty("articleCreator", carried(a, "articleCreator", client.getUserDisplayName()));
+		o.addProperty("articleCreatorUserID", carried(a, "articleCreatorUserID", client.getUserPkId()));
+		o.addProperty("createdBy", carried(a, "createdBy", client.getUserDisplayName()));
 		o.addProperty("modifiedBy", client.getUserDisplayName());
 		o.addProperty("type", a.channelType);
 		o.addProperty("ISARTICLE", "KAPTURE");
@@ -953,7 +954,8 @@ public class KaptureContentService {
 			j.addProperty("userGroupName", ug[1]);
 			ugs.add(j);
 		}
-		o.add("articlelistusergroup", ugs);
+		// the document's own groups / views when the caller keeps them (sent as Kapture returned them)
+		o.add("articlelistusergroup", null != a.userGroupsJson ? a.userGroupsJson : ugs);
 		JsonArray vws = new JsonArray();
 		for (String[] v : views) {
 			JsonObject j = new JsonObject();
@@ -961,7 +963,7 @@ public class KaptureContentService {
 			j.addProperty("viewName", v[1]);
 			vws.add(j);
 		}
-		o.add("articlelistview", vws);
+		o.add("articlelistview", null != a.viewsJson ? a.viewsJson : vws);
 		o.add("facetsSchemaFields", new JsonArray());
 		o.add("fieldSecurities", new JsonArray());
 		o.add("articleTagList", new JsonArray());
@@ -1206,5 +1208,179 @@ public class KaptureContentService {
 
 	private static String nz(String s) {
 		return null == s ? "" : s;
+	}
+
+	private static String carried(KaptureArticle a, String key, String fallback) {
+		String v = null == a.carriedOver ? null : a.carriedOver.get(key);
+		return null == v || "".equals(v.trim()) ? fallback : v;
+	}
+
+	// ---- whole-article read and publish (IPM Facelift VIN Update) ----------------
+
+	/**
+	 * The latest version of a document as Kapture returns it - the WHOLE article (title, category arrays, user groups,
+	 * views, authorship and the object under the channel's name), for an update that changes only part of it.
+	 *
+	 * @return null when the document could not be read (not found answers HTTP 200 with an empty body) - the caller
+	 *         must then fail the document, never send it with the rest blank
+	 */
+	public JsonObject readArticle(String documentId, String channelType, String locale) {
+		try {
+			String contentId = contentIdFor(channelType);
+			if (null == contentId) {
+				return null;
+			}
+			KaptureApiResult r = client.latestArticle(documentId, contentId, locale);
+			if (!r.isOk() || null == r.body || "".equals(r.body.trim())) {
+				logger.info("readArticle :: could not read " + documentId + " (" + locale + ") :: " + r.describe());
+				return null;
+			}
+			JsonObject article = articleHolding(new JsonParser().parse(r.body), channelType, 0);
+			if (null == article) {
+				logger.info("readArticle :: the answer for " + documentId + " carries no " + channelType + " object.");
+			}
+			return article;
+		} catch (RuntimeException e) {
+			Utilities.printStackTraceToLogs(KaptureContentService.class.getName(), "readArticle()", e);
+			return null;
+		}
+	}
+
+	/** The object that holds the channel's object - the article - at the root of the answer or wrapped in it. */
+	private static JsonObject articleHolding(JsonElement e, String channelType, int depth) {
+		if (null == e || depth > 4) {
+			return null;
+		}
+		if (e.isJsonObject()) {
+			JsonObject o = e.getAsJsonObject();
+			if (o.has(channelType) && o.get(channelType).isJsonObject()) {
+				return o;
+			}
+			for (Map.Entry<String, JsonElement> m : o.entrySet()) {
+				JsonObject found = articleHolding(m.getValue(), channelType, depth + 1);
+				if (null != found) {
+					return found;
+				}
+			}
+		} else if (e.isJsonArray()) {
+			JsonArray arr = e.getAsJsonArray();
+			for (int i = 0; i < arr.size(); i++) {
+				JsonObject found = articleHolding(arr.get(i), channelType, depth + 1);
+				if (null != found) {
+					return found;
+				}
+			}
+		}
+		return null;
+	}
+
+	/** One document to publish: the version an update just wrote (row id, version and state from its result). */
+	public static class PublishItem {
+		public final String documentId;
+		public final KaptureRecordResult written;
+		public final String title;
+		public final KaptureArticle article;
+		/** null = published (read back from k_article), else why not */
+		public String error;
+		/** the published version read back from k_article (e.g. 3.0) - the publish answer carries no version */
+		public String publishedVersion;
+
+		public PublishItem(String documentId, KaptureRecordResult written, String title, KaptureArticle article) {
+			this.documentId = documentId;
+			this.written = written;
+			this.title = title;
+			this.article = article;
+		}
+	}
+
+	/**
+	 * Publishes the versions just written for documents of ONE channel and ONE locale - the bulk action endpoint, the
+	 * same request as the Publish Content job (publish.batch.size per request). A document counts as published only
+	 * when k_article says so afterwards (latest version Published with a published version), whatever the answer said.
+	 */
+	public void publish(String channelType, String locale, List<PublishItem> items, String correlationPrefix) {
+		if (null == items || items.isEmpty()) {
+			return;
+		}
+		String contentId;
+		try {
+			contentId = contentIdFor(channelType);
+		} catch (RuntimeException e) {
+			for (PublishItem it : items) {
+				it.error = "Channel lookup failed: " + e.getMessage();
+			}
+			return;
+		}
+		if (null == contentId) {
+			for (PublishItem it : items) {
+				it.error = "Channel " + channelType + " is not defined in Kapture";
+			}
+			return;
+		}
+		int chunk = KaptureApiClient.requireInt("publish.batch.size");
+		for (int from = 0; from < items.size(); from += chunk) {
+			List<PublishItem> part = items.subList(from, Math.min(from + chunk, items.size()));
+			JsonArray array = new JsonArray();
+			for (PublishItem it : part) {
+				JsonObject o = new JsonObject();
+				try {
+					o.addProperty("id", Long.parseLong(nz(it.written.rowId).trim()));
+				} catch (RuntimeException e) {
+					o.addProperty("id", nz(it.written.rowId).trim());
+				}
+				o.addProperty("contentId", contentId);
+				o.addProperty("articleId", it.documentId);
+				o.addProperty("type", channelType);
+				o.addProperty("primaryLocale", locale);
+				o.addProperty("articleState", nz(it.written.articleState));
+				o.addProperty("articleVersion", nz(it.written.articleVersion));
+				o.addProperty("publishedVersion", "");
+				o.addProperty("title", nz(it.title));
+				o.addProperty("articleOwner", carried(it.article, "articleOwner", client.getUserDisplayName()));
+				o.addProperty("articleCreator", carried(it.article, "articleCreator", client.getUserDisplayName()));
+				o.addProperty("modifiedBy", client.getUserDisplayName());
+				o.addProperty("createdBy", carried(it.article, "createdBy", client.getUserDisplayName()));
+				array.add(o);
+			}
+			long t = System.currentTimeMillis();
+			KaptureApiResult r;
+			try {
+				r = client.publishDocuments(contentId, array, locale, correlationPrefix + "-" + correlationId("P"));
+			} catch (RuntimeException e) {
+				Utilities.printStackTraceToLogs(KaptureContentService.class.getName(), "publish()", e);
+				for (PublishItem it : part) {
+					it.error = "Publish request failed: " + e.getMessage();
+				}
+				continue;
+			}
+			logger.info("publish :: " + channelType + " " + locale + " :: " + part.size() + " document(s) :: " + r.describe() + " :: "
+					+ (System.currentTimeMillis() - t) + " ms");
+			// READ BACK - a document is published when k_article says so
+			Map<String, List<String>> ids = new HashMap<String, List<String>>();
+			List<String> idList = new ArrayList<String>();
+			for (PublishItem it : part) {
+				idList.add(it.documentId);
+			}
+			ids.put(locale, idList);
+			Map<String, KaptureLookupDAO.ArticleIdentity> now;
+			try {
+				now = KaptureLookupDAO.getArticleIdentities(ids);
+			} catch (RuntimeException e) {
+				for (PublishItem it : part) {
+					it.error = "Published state could not be read back from Kapture: " + e.getMessage() + " :: answer " + r.describe();
+				}
+				continue;
+			}
+			for (PublishItem it : part) {
+				KaptureLookupDAO.ArticleIdentity id = now.get(KaptureLookupDAO.identityKey(it.documentId, locale));
+				boolean live = null != id && isPublishedState(id.articleState) && KaptureLookupDAO.hasPublishedVersion(id.publishedVersion);
+				it.error = live ? null : "Updated in Kapture (version " + nz(it.written.articleVersion) + ") but not published (state "
+						+ (null == id ? "-" : id.articleState) + "): " + r.describe();
+				it.publishedVersion = live ? id.publishedVersion : null;
+				if (live) {
+					logger.info("publish :: " + it.documentId + " -> PUBLISHED version=" + id.publishedVersion + " (written " + nz(it.written.articleVersion) + ")");
+				}
+			}
+		}
 	}
 }

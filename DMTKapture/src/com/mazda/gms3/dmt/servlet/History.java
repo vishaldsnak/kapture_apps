@@ -35,9 +35,16 @@ public class History extends HttpServlet {
 	private static final long serialVersionUID = 1L;
     static Logger logger = LogManager.getLogger(History.class);
     
-	static MessageProperties msgProps= null;
+	/*
+	 * PER REQUEST, NOT SHARED (2026-10-11) - these were static fields every user of the servlet shared. Set at the start
+	 * of doGet / doPost.
+	 */
+	private static final ThreadLocal<MessageProperties> MSGPROPS = new ThreadLocal<MessageProperties>();
+	private static final ThreadLocal<String> WSLID = new ThreadLocal<String>();
+
+	static MessageProperties msgProps() { return MSGPROPS.get(); }
+	static String wslId() { return WSLID.get(); }
 	
-	static String wslId="";
     /**
      * @see HttpServlet#HttpServlet()
      */
@@ -51,13 +58,14 @@ public class History extends HttpServlet {
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -65,7 +73,7 @@ public class History extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
 			 */
@@ -121,13 +129,14 @@ public class History extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -135,7 +144,7 @@ public class History extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
 			 */
@@ -340,11 +349,11 @@ public class History extends HttpServlet {
 						{
 							if(schDetails.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.pending.value")))
 							{
-								schDetails.setScheduleStatusLabel(msgProps.getProperty("schedule.status.pending.label"));
+								schDetails.setScheduleStatusLabel(msgProps().getProperty("schedule.status.pending.label"));
 							}
 							else if(schDetails.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.processing.value")))
 							{
-								schDetails.setScheduleStatusLabel(msgProps.getProperty("schedule.status.processing.label"));
+								schDetails.setScheduleStatusLabel(msgProps().getProperty("schedule.status.processing.label"));
 								// set showAbortLink to true
 								schDetails.setShowAbort(true);
 
@@ -357,21 +366,21 @@ public class History extends HttpServlet {
 									// also check here, if innerLinksCount is 0, then show innerLinksProcessingStatus as Counting
 									if(schDetails.getTotalInnerLinksCount()==0)
 									{
-										schDetails.setInnerLinksProcessingStatus(msgProps.getProperty("label.counting"));
+										schDetails.setInnerLinksProcessingStatus(msgProps().getProperty("label.counting"));
 									}
 								}
 							}
 							else if(schDetails.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.success.value")))
 							{
-								schDetails.setScheduleStatusLabel(msgProps.getProperty("schedule.status.success.label"));
+								schDetails.setScheduleStatusLabel(msgProps().getProperty("schedule.status.success.label"));
 							}
 							else if(schDetails.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.failure.value")))
 							{
-								schDetails.setScheduleStatusLabel(msgProps.getProperty("schedule.status.failure.label"));
+								schDetails.setScheduleStatusLabel(msgProps().getProperty("schedule.status.failure.label"));
 							}
 							else if(schDetails.getScheduleStatus().equals(ApplicationProperties.getProperty("schedule.status.aborted.value")))
 							{
-								schDetails.setScheduleStatusLabel(msgProps.getProperty("schedule.status.aborted.label"));
+								schDetails.setScheduleStatusLabel(msgProps().getProperty("schedule.status.aborted.label"));
 							}
 
 							/*
@@ -409,7 +418,7 @@ public class History extends HttpServlet {
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(History.class.getName(), "getScheduleList()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 	
@@ -422,12 +431,16 @@ public class History extends HttpServlet {
 					&& null!=request.getParameter("DMT_HIS_ThreadId") && !"".equals(request.getParameter("DMT_HIS_ThreadId")) && 
 					null!=request.getParameter("DMT_HIS_ScheduleType") && !"".equals(request.getParameter("DMT_HIS_ScheduleType")))
 			{
-				// delete from display order temp table
-				ScheduleDAO.deleteDisplayOrderTemp();
-				
 				String scheduleId=(String)request.getParameter("DMT_HIS_ScheduleId");
 				String threadId=(String)request.getParameter("DMT_HIS_ThreadId");
 				String scheduleType=(String)request.getParameter("DMT_HIS_ScheduleType");
+
+				// delete from display order temp table - a content load only: an IPM Facelift VIN Update job never writes
+				// it, and clearing it would wipe the staging rows of a content load running at the same time
+				if(!AutomationConstants.SCHEDULE_TYPE_AUTOMATION.equals(scheduleType.trim()))
+				{
+					ScheduleDAO.deleteDisplayOrderTemp();
+				}
 				logger.info("abortConversionOperation :: Killing Thread Id {"+ threadId+"} for Schedule ::> " + scheduleId);
 				
 				/*
@@ -463,11 +476,11 @@ public class History extends HttpServlet {
 									// remove success message from here - do it downwards
 //									if(scheduleType.trim().equals(AutomationConstants.SCHEDULE_TYPE_DATALOAD))
 //									{
-//										sessionBean.setSuccessMessage(msgProps.getProperty("abort.success.message"));
+//										sessionBean.setSuccessMessage(msgProps().getProperty("abort.success.message"));
 //									}
 //									else
 //									{
-//										sessionBean.setSuccessMessage(msgProps.getProperty("abort.ipm.facelift.vin.update.success.message"));
+//										sessionBean.setSuccessMessage(msgProps().getProperty("abort.ipm.facelift.vin.update.success.message"));
 //									}
 								} 
 								catch (Exception e) 
@@ -476,13 +489,13 @@ public class History extends HttpServlet {
 									// no need of showing any error
 									if(scheduleType.equals(AutomationConstants.SCHEDULE_TYPE_DATALOAD))
 									{
-										logger.info(msgProps.getProperty("error.message.conversion.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
-//										sessionBean.setErrorMessage(msgProps.getProperty("error.message.conversion.already.finish"));
+										logger.info(msgProps().getProperty("error.message.conversion.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
+//										sessionBean.setErrorMessage(msgProps().getProperty("error.message.conversion.already.finish"));
 									}
 									else
 									{
-										logger.info(msgProps.getProperty("error.message.ipm.facelift.vin.update.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
-//										sessionBean.setErrorMessage(msgProps.getProperty("error.message.ipm.facelift.vin.update.already.finish"));
+										logger.info(msgProps().getProperty("error.message.ipm.facelift.vin.update.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
+//										sessionBean.setErrorMessage(msgProps().getProperty("error.message.ipm.facelift.vin.update.already.finish"));
 									}
 								}
 								break;
@@ -494,13 +507,13 @@ public class History extends HttpServlet {
 					{
 						if(scheduleType.equals(AutomationConstants.SCHEDULE_TYPE_DATALOAD))
 						{
-							logger.info(msgProps.getProperty("error.message.conversion.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
-//							sessionBean.setErrorMessage(msgProps.getProperty("error.message.conversion.not.active"));
+							logger.info(msgProps().getProperty("error.message.conversion.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+//							sessionBean.setErrorMessage(msgProps().getProperty("error.message.conversion.not.active"));
 						}
 						else
 						{
-							logger.info(msgProps.getProperty("error.message.ipm.facelift.vin.update.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
-//							sessionBean.setErrorMessage(msgProps.getProperty("error.message.ipm.facelift.vin.update.not.active"));
+							logger.info(msgProps().getProperty("error.message.ipm.facelift.vin.update.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+//							sessionBean.setErrorMessage(msgProps().getProperty("error.message.ipm.facelift.vin.update.not.active"));
 						}
 					}
 				} 
@@ -508,13 +521,13 @@ public class History extends HttpServlet {
 				{
 					if(scheduleType.equals(AutomationConstants.SCHEDULE_TYPE_DATALOAD))
 					{
-						logger.info(msgProps.getProperty("error.message.conversion.not.active")+" :: Proceed for updating Job Status in DATABASE.");
-//						sessionBean.setErrorMessage(msgProps.getProperty("error.message.conversion.not.active"));
+						logger.info(msgProps().getProperty("error.message.conversion.not.active")+" :: Proceed for updating Job Status in DATABASE.");
+//						sessionBean.setErrorMessage(msgProps().getProperty("error.message.conversion.not.active"));
 					}
 					else
 					{
-						logger.info(msgProps.getProperty("error.message.ipm.facelift.vin.update.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
-//						sessionBean.setErrorMessage(msgProps.getProperty("error.message.ipm.facelift.vin.update.not.active"));
+						logger.info(msgProps().getProperty("error.message.ipm.facelift.vin.update.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+//						sessionBean.setErrorMessage(msgProps().getProperty("error.message.ipm.facelift.vin.update.not.active"));
 					}
 				}
 				threadArray = null;
@@ -536,14 +549,14 @@ public class History extends HttpServlet {
 					String emailUserId=null;
 					try
 					{
-						emailUserId = UserProfileDAO.getUserEmail(wslId);
+						emailUserId = UserProfileDAO.getUserEmail(wslId());
 					}
 					catch(Exception e)
 					{
 						Utilities.printStackTraceToLogs(History.class.getName(), "abortConversionOperation()", e);
 					}
 					
-					logger.info("startConversion :: Email Id read from Kapture for WSL ID >> " + wslId+" >> is >> "+ emailUserId);
+					logger.info("startConversion :: Email Id read from Kapture for WSL ID >> " + wslId()+" >> is >> "+ emailUserId);
 					
 					
 					NotificationEmailHelper.generateNotificationEmail(scheduleId, emailUserId);
@@ -553,11 +566,11 @@ public class History extends HttpServlet {
 					// show success Message - independent of whether thread was active or not
 					if(scheduleType.trim().equals(AutomationConstants.SCHEDULE_TYPE_DATALOAD))
 					{
-						sessionBean.setSuccessMessage(msgProps.getProperty("abort.success.message"));
+						sessionBean.setSuccessMessage(msgProps().getProperty("abort.success.message"));
 					}
 					else
 					{
-						sessionBean.setSuccessMessage(msgProps.getProperty("abort.ipm.facelift.vin.update.success.message"));
+						sessionBean.setSuccessMessage(msgProps().getProperty("abort.ipm.facelift.vin.update.success.message"));
 					}
 					
 					/*
@@ -569,19 +582,19 @@ public class History extends HttpServlet {
 				{
 					Utilities.printStackTraceToLogs(History.class.getName(), "abortConversionOperation()", e);
 					logger.info("abortConversionOperation :: Error while updating status for Schedule Id {"+scheduleId+"} in DATABASE.");
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 				}
 			}
 			else
 			{
 				logger.info("abortConversionOperation :: Schedule Id & Thread Id from request as param are null. Throw Message");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(History.class.getName(), "abortConversionOperation()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 	
@@ -601,7 +614,7 @@ public class History extends HttpServlet {
 					boolean bool = ScheduleDAO.deleteScheduleDetails(selRows);
 					if(bool==true)
 					{
-						sessionBean.setSuccessMessage(msgProps.getProperty("contentload.schedule.delete.success"));
+						sessionBean.setSuccessMessage(msgProps().getProperty("contentload.schedule.delete.success"));
 						/*
 						 * call getScheduleList
 						 */
@@ -609,18 +622,18 @@ public class History extends HttpServlet {
 					}
 					else
 					{
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.contentload.schedule.delete"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.contentload.schedule.delete"));
 					}
 				}
 				else
 				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.select.onerow.delete"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.select.onerow.delete"));
 				}
 				selRows=  null;
 			}
 			else
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.select.onerow.delete"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.select.onerow.delete"));
 			}
 		}
 		catch(Exception  e)

@@ -2010,7 +2010,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 
 							// get DocumentId, Source Location, Doc Creation Time & Update Time
 							getDocumentIdSql = " SELECT DC_IM_DOC_ID, DC_SOURCE_NETWORK_LOC, DATE_FORMAT(DC_CREATED_TMSTP,'%d-%m-%Y') AS DC_CREATED_TMSTP, "
-									+ " DATE_FORMAT(DC_UPDATED_TMSTP,'%d-%m-%Y') AS DC_UPDATED_TMSTP  FROM "+ tableName+" WHERE "
+									+ " DATE_FORMAT(DC_UPDATED_TMSTP,'%d-%m-%Y') AS DC_UPDATED_TMSTP, DC_IM_DOC_PUBLISHED_STATUS  FROM "+ tableName+" WHERE "
 									+ "	TRIM(LOWER(DC_SOURCE_NETWORK_LOC)) IN ("+keyToCheck.trim().toLowerCase()+") "
 									+ " AND DC_DOC_STATUS='"+ApplicationProperties.getProperty("flag.value.active")+"'";
 							logger.info("saveDisplayOrderDetails :: getDocumentIdSql  :: " + getDocumentIdSql);
@@ -2048,6 +2048,8 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 											}
 											// set documentId
 											contentDetails.setDocumentId(documentId);
+											// its published flag - decides the status of its view content rows (ViewContentStatus)
+											contentDetails.setImDocStatus(rs.getString("DC_IM_DOC_PUBLISHED_STATUS"));
 										}
 										contentDetails = null;
 									}
@@ -5080,6 +5082,8 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 	private void processViewContentData(List<MCViewContentDetails> viewContentList,	Connection conn,String locale, List<ContentDetails> docsList) throws SQLException
 	{
 		PreparedStatement pstmt = null;
+		// VC_CONTENT_STATUS per document - from its published flag
+		java.util.Map<String, String> contentStatus = com.mazda.gms3.dmt.conversion.utils.ViewContentStatus.byDocument(docsList);
 		/*
 		 * FIRST DELETE ALL THE INFORMATION FOR THE DOCUMENT
 		 * INSERT NEW DETAILS.
@@ -5142,9 +5146,9 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 								+ " VC_VIN_DISP_CODE_6, VC_VIN_DISP_NAME_6, VC_VIN_IMDOC_CREATE_DATE, VC_VIN_IMDOC_MODIFIED_DATE, VC_VIN_DOCUMENT_TITLE, "
 								+ " VC_VIN_DOCUMENT_STATUS, VC_VIN_DISPORD_SEQ_NO, VC_VIN_CARLINE_NAME, VC_VIN_DOCUMENT_TYPE_NAME, VC_VIN_DOCUMENT_SUBTYPE_NAME,"
 								+ " VC_VIN_ENGINE_BOOK_CODE, VC_VIN_ENGINE_BOOK_NAME, VC_VIN_MISSION_BOOK_CODE,VC_VIN_MISSION_BOOK_NAME, VC_VIN_CREATED_TMSTP,VC_VIN_ESI_FLAG, VC_CONTENT_STATUS ) "
-								// VC_CONTENT_STATUS - every row DMT writes is DRAFT; the Publish Content job changes it to PUBLISHED (as MC)
-								+ " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'"
-								+ ApplicationProperties.getProperty("view.content.status.draft").replace("'", "''") + "')";
+								// VC_CONTENT_STATUS - the document's state (ViewContentStatus, as MC): Draft for a document this job converted
+								// (its Publish Content job changes it to Published), Published for an already published one not converted
+								+ " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 						pstmt = conn.prepareStatement(sql);
 
 						for(int t=0;t<subList.size();t++)
@@ -5349,6 +5353,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 
 							pstmt.setTimestamp(42, new Timestamp(new Date().getTime()));
 							pstmt.setString(43, details.getEsiCatFlag());
+							pstmt.setString(44, com.mazda.gms3.dmt.conversion.utils.ViewContentStatus.of(contentStatus, details.getDocumentId()));
 							pstmt.addBatch();
 							details = null;
 						}
@@ -6692,6 +6697,8 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 		deleteSql = null;
 
 		// CD PROCESSING
+		// the document had CD data / view content? - UnlistedDisplayData reports it when no longer listed
+		com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.CD_DATA, cdProcessingTableName, null, "DC_IM_DOC_ID", contentDetails, documentId);
 		deleteSql="DELETE FROM "+ cdProcessingTableName+" WHERE DC_IM_DOC_ID='"+documentId+"'";
 		stmt = conn.createStatement();
 		stmt.executeUpdate(deleteSql);
@@ -6702,6 +6709,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 		String locale = contentDetails.getLocale();
 		locale = locale.replace("-", "_");
 		// DELETE FROM VIEW CONTENT TABLE AS WELL.
+		com.mazda.gms3.dmt.dao.ClearedDisplayData.recordExisting(conn, com.mazda.gms3.dmt.dao.ClearedDisplayData.VIEW_CONTENT, vcTableName, "VC_VIN_LOCALE", "VC_VIN_DOCUMENT_ID", contentDetails, documentId.trim());
 		deleteSql="DELETE FROM "+vcTableName+" WHERE VC_VIN_DOCUMENT_ID ='"+documentId.trim()+"' "
 				+ " AND VC_VIN_LOCALE='"+locale.trim()+"'";
 		stmt = conn.createStatement();

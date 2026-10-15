@@ -1213,6 +1213,48 @@ public class ScheduleDAO  extends DBConnectionHelper{
 	 * @return
 	 * @throws SQLException
 	 */
+	/**
+	 * Adds processed / failed document counts to the schedule and its item in TWO statements - the increment is done in
+	 * SQL, so nothing is read first (IPM Facelift VIN Update: once per batch instead of four statements per document).
+	 */
+	public static void addDocumentCounts(long scheduleId, long itemId, long processed, long failed) throws SQLException
+	{
+		if(processed<=0 && failed<=0)
+		{
+			return;
+		}
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		try
+		{
+			conn = getConnection();
+			pstmt = conn.prepareStatement("UPDATE gms3_dmt_conv_schedule SET dc_processed_docs_count = COALESCE(dc_processed_docs_count, 0) + ?,"
+					+ " dc_failed_docs_count = COALESCE(dc_failed_docs_count, 0) + ? WHERE dc_schedule_id = ?");
+			pstmt.setLong(1, processed);
+			pstmt.setLong(2, failed);
+			pstmt.setLong(3, scheduleId);
+			pstmt.executeUpdate();
+			pstmt.close();
+			pstmt = null;
+			if(itemId>0)
+			{
+				pstmt = conn.prepareStatement("UPDATE gms3_dmt_conv_sch_criteria SET dc_processed_docs_count = COALESCE(dc_processed_docs_count, 0) + ?,"
+						+ " dc_failed_docs_count = COALESCE(dc_failed_docs_count, 0) + ? WHERE dc_criteria_id = ?");
+				pstmt.setLong(1, processed);
+				pstmt.setLong(2, failed);
+				pstmt.setLong(3, itemId);
+				pstmt.executeUpdate();
+			}
+		}
+		finally
+		{
+			if(null!=pstmt)
+				pstmt.close();
+			if(null!=conn)
+				conn.close();
+		}
+	}
+
 	public static boolean updateProcessingCount(String scheduleId, String itemId)
 	{
 		Connection conn = null;
@@ -2865,13 +2907,17 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		return list;
 	}
 
+	/**
+	 * Creates the update job (job B) schedule and one criteria row per selected item, all or nothing. Prepared statements;
+	 * each criteria row is ONE insert with all its columns (DC_MODEL_FOLDER_NAME carries the channel ref key, as before).
+	 * Returns schDetails - its schedule id is set only when everything was created.
+	 */
 	public static ScheduleDetails createAutomationSchedule(ScheduleDetails schDetails) throws SQLException 
 	{
-		Long scheduleId=null;
+		long scheduleId=0;
 		Connection conn = null;
 		ResultSet rs = null;
 		PreparedStatement pstmt = null;
-		Statement stmt = null;
 		try
 		{
 			if(null!=schDetails)
@@ -2879,127 +2925,87 @@ public class ScheduleDAO  extends DBConnectionHelper{
 				conn = getConnection();
 				conn.setAutoCommit(false);
 				/*
-				 * INSERT IN TO gms3_dmt_conv_schedule
-				 * First insert the SCH_NAME, USER_ID AND SCHEDULE_TIME to get the SCHEDULE_ID
+				 * INSERT IN TO gms3_dmt_conv_schedule - the generated id completes the name and the thread id
 				 */
-				String sql="INSERT INTO gms3_dmt_conv_schedule(DC_SCHEDULE_NAME,DC_USER_ID,DC_RECORD_STATUS) VALUES"
-						+ "('"+schDetails.getScheduleName()+"','"+schDetails.getUserId()+"','"+AutoSyncConstants.STATUS_ACTIVE+"')";
-				logger.info("createAutomationSchedule :: Generate Schedule Id :: Sql :: > " + sql);
-				stmt = conn.createStatement();
-				String generatedColumns[] = { "DC_SCHEDULE_ID" };
-				stmt.execute(sql,generatedColumns);
-				rs = stmt.getGeneratedKeys();
+				pstmt = conn.prepareStatement("INSERT INTO gms3_dmt_conv_schedule(dc_schedule_name,dc_user_id,dc_record_status) VALUES (?,?,?)",
+						Statement.RETURN_GENERATED_KEYS);
+				pstmt.setString(1, schDetails.getScheduleName());
+				pstmt.setString(2, schDetails.getUserId());
+				pstmt.setString(3, AutoSyncConstants.STATUS_ACTIVE);
+				pstmt.executeUpdate();
+				rs = pstmt.getGeneratedKeys();
 				if(rs.next())
 				{
 					scheduleId = rs.getLong(1);
 				}
 				rs.close();rs =null;
-				stmt.close();stmt = null;
-				sql=null;
-				generatedColumns = null;
-				if(null!=scheduleId && scheduleId>0)
+				pstmt.close();pstmt = null;
+				if(scheduleId>0)
 				{
 					logger.info("createAutomationSchedule :: Procced for Storing details for Schedule Id :: > " + scheduleId);
-					/*
-					 * add scheduleId to name and update It
-					 * add scheduleId to thread and update It
-					 */
-					schDetails.setScheduleName(schDetails.getScheduleName()+String.valueOf(scheduleId));
-					schDetails.setThreadId(schDetails.getThreadId()+String.valueOf(scheduleId));
-					String schSql="UPDATE gms3_dmt_conv_schedule SET DC_SCHEDULE_NAME=?,"
-							+  "DC_STATUS=?,DC_TOTAL_DOCS_COUNT=?,"
-							+ " DC_SCH_THREAD_ID=?,DC_SCHEDULE_TMSTP=? WHERE DC_SCHEDULE_ID= ?" ;
-					pstmt = conn.prepareStatement(schSql);
-					pstmt.setString(1, schDetails.getScheduleName());
+					String scheduleName = schDetails.getScheduleName()+String.valueOf(scheduleId);
+					String threadId = schDetails.getThreadId()+String.valueOf(scheduleId);
+					java.sql.Timestamp now = new java.sql.Timestamp(new Date().getTime());
+					pstmt = conn.prepareStatement("UPDATE gms3_dmt_conv_schedule SET dc_schedule_name=?,dc_status=?,dc_total_docs_count=?,"
+							+ "dc_sch_thread_id=?,dc_schedule_tmstp=? WHERE dc_schedule_id=?");
+					pstmt.setString(1, scheduleName);
 					pstmt.setString(2, schDetails.getScheduleStatus());
 					pstmt.setLong(3, schDetails.getTotalDocsForProcessing());
-					pstmt.setString(4, schDetails.getThreadId());
-					pstmt.setTimestamp(5, new java.sql.Timestamp(new Date().getTime()));
+					pstmt.setString(4, threadId);
+					pstmt.setTimestamp(5, now);
 					pstmt.setLong(6, scheduleId);
 					pstmt.executeUpdate();
-					pstmt.close();
-					pstmt=  null;
-					schSql= null;
-					
+					pstmt.close();pstmt = null;
+
 					boolean allItemsCreated = true;
-					if(null!=schDetails.getAutomationItemsList() && schDetails.getAutomationItemsList().size()>0)
+					if(null!=schDetails.getAutomationItemsList())
 					{
-						Long itemId=null;
-						for(int a=0;a<schDetails.getAutomationItemsList().size();a++)
+						pstmt = conn.prepareStatement("INSERT INTO gms3_dmt_conv_sch_criteria(dc_schedule_id,dc_locale,dc_model,dc_manual_type,"
+								+ "dc_total_docs_count,dc_criteria_created_tmstp,dc_model_folder_name) VALUES (?,?,?,?,?,?,?)", Statement.RETURN_GENERATED_KEYS);
+						for(ItemDetails itemDetails : schDetails.getAutomationItemsList())
 						{
-							// HERE USE COLUMN DC_MODEL_FOLDER_NAME FOR STORING CHANNEL REF KEY
-							ItemDetails itemDetails = (ItemDetails)schDetails.getAutomationItemsList().get(a);
-							sql="INSERT INTO gms3_dmt_conv_sch_criteria(DC_SCHEDULE_ID,DC_LOCALE) VALUES ("+scheduleId+",'"+itemDetails.getLocale()+"')";
-							stmt = conn.createStatement();
-							String generatedItemColumns[] = { "DC_CRITERIA_ID" };
-							stmt.execute(sql,generatedItemColumns);
-							rs = stmt.getGeneratedKeys();
+							pstmt.setLong(1, scheduleId);
+							pstmt.setString(2, itemDetails.getLocale());
+							pstmt.setString(3, itemDetails.getCarlineInfo());
+							pstmt.setString(4, itemDetails.getDocumentTypeRefKey());
+							pstmt.setLong(5, null==itemDetails.getTotalDocumentsCount() ? 0 : itemDetails.getTotalDocumentsCount().longValue());
+							pstmt.setTimestamp(6, now);
+							pstmt.setString(7, itemDetails.getChannelRefKey());
+							pstmt.executeUpdate();
+							long itemId = 0;
+							rs = pstmt.getGeneratedKeys();
 							if(rs.next())
 							{
 								itemId = rs.getLong(1);
 							}
-							rs.close();rs=null;
-							stmt.close();stmt=null;
-							sql=null;
-							generatedItemColumns = null;
-							
-							if(null!=itemId && itemId>0)
+							rs.close();rs = null;
+							if(itemId<=0)
 							{
-								sql="UPDATE gms3_dmt_conv_sch_criteria SET DC_MODEL=?, DC_MANUAL_TYPE = ?,DC_TOTAL_DOCS_COUNT = ?,"
-										+ " DC_CRITERIA_CREATED_TMSTP = ?,DC_MODEL_FOLDER_NAME = ? WHERE DC_CRITERIA_ID = ?";
-								pstmt = conn.prepareStatement(sql);
-								pstmt.setString(1, itemDetails.getCarlineInfo());
-								pstmt.setString(2, itemDetails.getDocumentTypeRefKey());
-								pstmt.setLong(3, itemDetails.getTotalDocumentsCount());
-								pstmt.setTimestamp(4, new java.sql.Timestamp(new Date().getTime()));
-								pstmt.setString(5, itemDetails.getChannelRefKey());
-								pstmt.setLong(6, itemId);
-								pstmt.executeUpdate();
-								pstmt.close();
-								pstmt=  null;
-								sql=null;
-								// set Item id
-								itemDetails.setItemId(itemId);
-							}
-							else
-							{
-								// all itemsCreated = false and break the loop.
 								allItemsCreated = false;
 								break;
 							}
-							itemId = null;
+							itemDetails.setItemId(itemId);
 						}
+						pstmt.close();pstmt = null;
 					}
-					
-					if(allItemsCreated==true)
+
+					if(allItemsCreated)
 					{
-						/*
-						 * commit the complete transaction
-						 */
 						conn.commit();
-						logger.info("createAutomationSchedule :: IPM Facelift VIN Update Conversion with Name as {"+schDetails.getScheduleName()+"} Created Successfully.");
-						// set scheduleId in schDetails
+						schDetails.setScheduleName(scheduleName);
+						schDetails.setThreadId(threadId);
 						schDetails.setScheduleId(scheduleId);
+						logger.info("createAutomationSchedule :: IPM Facelift VIN Update Conversion with Name as {"+schDetails.getScheduleName()+"} Created Successfully.");
 					}
 					else
 					{
-						/*
-						 * SOME iTEMS FAILED WHILE CREATION
-						 * Roll Back the transaction
-						 */
 						conn.rollback();
 						logger.info("createAutomationSchedule :: Failed to create IPM Facelift VIN Update Conversion. Could not process all Items.");
 					}
 				}
 				else
 				{
-					/*
-					 * roll back transaction
-					 */
-					if(null!=conn && !conn.isClosed())
-					{
-						conn.rollback();
-					}
+					conn.rollback();
 					logger.info("createAutomationSchedule :: Failed to Generate Schedule Id. Return null.");
 				}
 			}
@@ -3011,20 +3017,20 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		catch(Exception e)
 		{
 			logger.info("createAutomationSchedule :: Exception while Creating Schedule.Roll back data insertion. Return null.");
-			conn.rollback();
 			Utilities.printStackTraceToLogs(ScheduleDAO.class.getName(), "createAutomationSchedule()", e);
+			try { if(null!=conn) conn.rollback(); } catch(SQLException ignore) { /* the exception above is the one reported */ }
 		}
 		finally
 		{
-			if(null!=conn)
-				conn.close();
-			if(null!=pstmt)
-				pstmt.close();
-			if(null!=stmt)
-				stmt.close();
 			if(null!=rs)
 				rs.close();
-			scheduleId = null;
+			if(null!=pstmt)
+				pstmt.close();
+			if(null!=conn)
+			{
+				conn.setAutoCommit(true);
+				conn.close();
+			}
 		}
 		return schDetails;
 	}

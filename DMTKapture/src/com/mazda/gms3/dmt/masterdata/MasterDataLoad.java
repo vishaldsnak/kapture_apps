@@ -16,6 +16,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 
 import com.mazda.gms3.dmt.dao.ScheduleDAO;
+import com.mazda.gms3.dmt.kapture.KaptureApiClient;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
@@ -59,12 +60,21 @@ public class MasterDataLoad {
 			ScheduleDAO.updateCurrentJobStatus(scheduleId, null, "MASTER DATA LOAD");
 			File folder = SourceContentPaths.masterDataFolder(settingsPath);
 			logger.info("run :: MASTER DATA LOAD for Schedule {" + scheduleId + "} from :: > " + PathUtil.winPath(folder));
-			for (String locale : locales) {
-				MdmExcelLoader loader = new MdmExcelLoader();
-				if (loader.load(folder, locale)) {
-					markBooksSynced(loader.getManualLanguageId());
+			List<String> all = withCompanions(locales);
+			for (String locale : all) {
+				// a companion locale (e.g. en-CA with en-US) never has content of its own and its files are not always
+				// sent with the content's: no file for it is no failure, only its waiting rows go to Kapture
+				boolean companion = !contains(locales, locale);
+				if (companion && !MdmExcelLoader.hasFiles(folder, locale)) {
+					logger.info("run :: companion locale " + locale + " :: no master data file in " + PathUtil.winPath(folder)
+							+ " - only the rows already waiting for Kapture are sent");
+				} else {
+					MdmExcelLoader loader = new MdmExcelLoader();
+					if (loader.load(folder, locale)) {
+						markBooksSynced(loader.getManualLanguageId());
+					}
+					loadRecords.addAll(loader.records);
 				}
-				loadRecords.addAll(loader.records);
 
 				// THE ROWS WAITING FOR KAPTURE ARE SENT EVEN WHEN NO FILE WAS FOUND - rows left
 				// over from an earlier run that could not reach Kapture are completed here
@@ -93,6 +103,54 @@ public class MasterDataLoad {
 		PENDING_REPORTS.put(scheduleId.trim(), new List[] { loadRecords, categoryRecords });
 		logger.info("run :: MASTER DATA LOAD for Schedule {" + scheduleId + "} finished :: failed rows :: > " + failed);
 		return failed > 0;
+	}
+
+	/**
+	 * The locales of the schedule followed by their companion locales (masterdata.companion.locales, pairs
+	 * locale:companion, e.g. en-US:en-CA). A companion never gets content of its own but its categories must stay
+	 * in sync with the locale it goes with - MNAO: the en_CA model year categories are mapped to en_US documents.
+	 * The locales keep the form they were given in (MDM form, e.g. en-US); a locale already listed is not repeated.
+	 */
+	public static List<String> withCompanions(Collection<String> locales) {
+		List<String> all = new ArrayList<String>();
+		if (null == locales) {
+			return all;
+		}
+		for (String l : locales) {
+			if (null != l && !"".equals(l.trim()) && !contains(all, l)) {
+				all.add(l.trim());
+			}
+		}
+		String[] pairs = KaptureApiClient.require("masterdata.companion.locales").split(",");
+		for (String l : new ArrayList<String>(all)) {
+			for (int i = 0; i < pairs.length; i++) {
+				String[] pair = pairs[i].split(":");
+				if (2 != pair.length || "".equals(pair[0].trim()) || "".equals(pair[1].trim())) {
+					throw new IllegalStateException("masterdata.companion.locales in application.properties: '" + pairs[i].trim()
+							+ "' is not locale:companion");
+				}
+				if (key(pair[0]).equals(key(l)) && !contains(all, pair[1])) {
+					// in the form of the locale it goes with: en-US -> en-CA, en_US -> en_CA
+					String companion = pair[1].trim().replace("_", "-");
+					all.add(l.indexOf('_') >= 0 ? companion.replace("-", "_") : companion);
+					logger.info("withCompanions :: " + l + " :: companion locale " + all.get(all.size() - 1) + " processed too");
+				}
+			}
+		}
+		return all;
+	}
+
+	private static boolean contains(Collection<String> locales, String locale) {
+		for (String l : locales) {
+			if (null != l && key(l).equals(key(locale))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static String key(String locale) {
+		return locale.trim().replace("_", "-").toLowerCase();
 	}
 
 	/** schedule id -> {load records, category records} until the end of the job */

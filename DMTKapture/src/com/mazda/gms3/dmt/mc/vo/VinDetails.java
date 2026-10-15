@@ -70,7 +70,29 @@ public class VinDetails {
 	public void setModelYear(String modelYear) {
 		this.modelYear = modelYear;
 	}
-	
+
+	/*
+	 * MNAO metadata validation ONLY: the model year category of the line and whether it is in Kapture (Y / N).
+	 */
+	private String modelYearRefKey=null;
+	private String modelYearFoundInKapture=null;
+
+	public String getModelYearRefKey() {
+		return modelYearRefKey;
+	}
+
+	public void setModelYearRefKey(String modelYearRefKey) {
+		this.modelYearRefKey = modelYearRefKey;
+	}
+
+	public String getModelYearFoundInKapture() {
+		return modelYearFoundInKapture;
+	}
+
+	public void setModelYearFoundInKapture(String modelYearFoundInKapture) {
+		this.modelYearFoundInKapture = modelYearFoundInKapture;
+	}
+
 	public String getProcessingFolder() {
 		return processingFolder;
 	}

@@ -4,7 +4,18 @@ REM  Build script for DMT for Kapture (Data Migration Tool)  ->  dmtgt.war
 REM
 REM  TARGET RUNTIME:  OpenJDK 25  +  Apache Tomcat 11.x   (MC Dev policy)
 REM
-REM  Usage:   build.bat
+REM  Usage:   build.bat LOCAL | DEV | QA | PROD
+REM
+REM  ENVIRONMENTS - the parameter picks the configuration packaged into the WAR:
+REM     LOCAL  workstation: src\application.properties, src\log.properties, WebContent\META-INF\context.xml
+REM     DEV    MC Dev   : env\DEV\   (application.properties, log.properties, context.xml)
+REM     QA     MC QA    : env\QA\
+REM     PROD   PROD     : env\PROD\  (refused while a __TBC__ value is left)
+REM  The env files replace WEB-INF\classes\application.properties / log.properties and META-INF\context.xml.
+REM  Their values come from Environment_Config\Kapture_Environment_Config.xlsx - change
+REM  them there AND in env\<ENV>\. Before packaging, env\EnvConfigCheck.java checks that
+REM  every key of src\application.properties is in the env file and no __TBC__ is left.
+REM  Output: dist\<ENV>\dmtgt.war (META-INF\build-env.txt inside says which environment).
 REM
 REM  This script DELIBERATELY IGNORES %JAVA_HOME% AND %CATALINA_HOME%. Those are
 REM  left pointing at JDK 1.8 / Tomcat 9 on this workstation because the one-time
@@ -42,6 +53,18 @@ SETLOCAL ENABLEDELAYEDEXPANSION
 
 SET APP_DIR=%~dp0
 IF "%APP_DIR:~-1%"=="\" SET APP_DIR=%APP_DIR:~0,-1%
+
+REM ---------------------------------------------------------------- environment
+SET ENV=%~1
+IF /I "%ENV%"=="LOCAL" SET ENV=LOCAL
+IF /I "%ENV%"=="DEV" SET ENV=DEV
+IF /I "%ENV%"=="QA" SET ENV=QA
+IF /I "%ENV%"=="PROD" SET ENV=PROD
+IF NOT "%ENV%"=="LOCAL" IF NOT "%ENV%"=="DEV" IF NOT "%ENV%"=="QA" IF NOT "%ENV%"=="PROD" (
+    echo Usage: build.bat LOCAL ^| DEV ^| QA ^| PROD
+    ENDLOCAL & exit /b 1
+)
+SET ENV_DIR=%APP_DIR%\env\%ENV%
 
 REM ---------------------------------------------------------------- JDK 25
 IF "%DMT_JDK_HOME%"=="" SET DMT_JDK_HOME=D:\Softwares\jdk-25.0.4+7
@@ -83,13 +106,9 @@ REM naming it dmtgt-javax.war would deploy it at /dmtgt-javax and every bookmark
 REM link, and the iv-user header path, would be wrong.
 SET JAVAX_DIR=%BUILD%\tomcat9
 SET JAVAX_WAR=%JAVAX_DIR%\dmtgt.war
-SET OUT_WAR=%APP_DIR%\dmtgt.war
+SET DIST_DIR=%APP_DIR%\dist\%ENV%
+SET OUT_WAR=%DIST_DIR%\dmtgt.war
 
-REM build-lib\infomanager holds the InfoManager client jars. They are COMPILE-TIME ONLY
-REM and are NEVER packaged: the MC flow no longer uses InfoManager, and the flows that
-REM still reference it (MNAO, MME, master data sync, facelift automation) only need the
-REM classes to compile until they are ported.
-REM
 REM build-lib holds the javax servlet/jsp/el API jars, compile-time only, never
 REM packaged. They are vendored so the build needs no Tomcat 9 on the machine.
 IF NOT EXIST "%BUILDLIB%\servlet-api.jar" (
@@ -99,7 +118,30 @@ IF NOT EXIST "%BUILDLIB%\servlet-api.jar" (
     ENDLOCAL & exit /b 1
 )
 
+REM Non-LOCAL: the env folder must be complete and consistent BEFORE anything is built.
+IF "%ENV%"=="LOCAL" GOTO env_checked
+IF NOT EXIST "%ENV_DIR%\application.properties" (
+    echo ERROR: %ENV_DIR%\application.properties is missing.
+    ENDLOCAL & exit /b 1
+)
+IF NOT EXIST "%ENV_DIR%\log.properties" (
+    echo ERROR: %ENV_DIR%\log.properties is missing.
+    ENDLOCAL & exit /b 1
+)
+IF NOT EXIST "%ENV_DIR%\context.xml" (
+    echo ERROR: %ENV_DIR%\context.xml is missing.
+    ENDLOCAL & exit /b 1
+)
+echo [0/6] Checking env\%ENV%...
+%JAVA_TOOL% "%APP_DIR%\env\EnvConfigCheck.java" "%SRC%\application.properties" "%ENV_DIR%"
+IF ERRORLEVEL 1 (
+    echo Environment check FAILED - nothing was built.
+    ENDLOCAL & exit /b 1
+)
+:env_checked
+
 echo.
+echo   ENVIRONMENT %ENV%
 echo   JDK        %DMT_JDK_HOME%
 echo   TOMCAT     %DMT_TOMCAT_HOME%   (migration tool only)
 echo   OUTPUT     %OUT_WAR%
@@ -109,6 +151,7 @@ REM ---------------------------------------------------------------- clean
 IF EXIST "%BUILD%" rmdir /S /Q "%BUILD%"
 mkdir "%CLASSES%" 2>NUL
 mkdir "%JAVAX_DIR%" 2>NUL
+IF NOT EXIST "%DIST_DIR%" mkdir "%DIST_DIR%"
 
 REM ---------------------------------------------------------------- web content
 echo [1/6] Copying WebContent...
@@ -116,6 +159,13 @@ xcopy "%WEBCONTENT%\*" "%STAGE%\" /S /E /I /Y >NUL
 IF ERRORLEVEL 1 (
     echo Copy of WebContent FAILED.
     ENDLOCAL & exit /b 1
+)
+IF NOT "%ENV%"=="LOCAL" (
+    copy /Y "%ENV_DIR%\context.xml" "%STAGE%\META-INF\context.xml" >NUL
+    IF ERRORLEVEL 1 (
+        echo Copy of env\%ENV%\context.xml FAILED.
+        ENDLOCAL & exit /b 1
+    )
 )
 
 REM ---------------------------------------------------------------- compile
@@ -127,7 +177,7 @@ FOR /R "%SRC%" %%F IN (*.java) DO (
 
 echo [3/6] Compiling with JDK 25...
 %JAVAC% -encoding UTF-8 -nowarn ^
-    -cp "%LIB%\*;%BUILDLIB%\*;%BUILDLIB%\infomanager\*" ^
+    -cp "%LIB%\*;%BUILDLIB%\*" ^
     -d "%CLASSES%" @"%BUILD%\sources.txt"
 IF ERRORLEVEL 1 (
     echo.
@@ -146,6 +196,25 @@ IF NOT EXIST "%CLASSES%\application.properties" (
     echo ERROR: application.properties did not reach WEB-INF\classes.
     ENDLOCAL & exit /b 1
 )
+REM Non-LOCAL: the environment's files replace the workstation ones copied above.
+IF NOT "%ENV%"=="LOCAL" (
+    copy /Y "%ENV_DIR%\application.properties" "%CLASSES%\application.properties" >NUL
+    IF ERRORLEVEL 1 (
+        echo Copy of env\%ENV%\application.properties FAILED.
+        ENDLOCAL & exit /b 1
+    )
+    copy /Y "%ENV_DIR%\log.properties" "%CLASSES%\log.properties" >NUL
+    IF ERRORLEVEL 1 (
+        echo Copy of env\%ENV%\log.properties FAILED.
+        ENDLOCAL & exit /b 1
+    )
+)
+REM Which environment this WAR was built for - read it with: jar xf dmtgt.war META-INF/build-env.txt
+(
+    echo environment=%ENV%
+    echo built=%DATE% %TIME%
+    echo machine=%COMPUTERNAME%
+) > "%STAGE%\META-INF\build-env.txt"
 
 REM ---------------------------------------------------------------- package
 echo [5/6] Packaging javax WAR...
@@ -174,7 +243,6 @@ echo   Tomcat 11 (deploy this)   %OUT_WAR%
 echo   Tomcat 9  (fallback)      %JAVAX_WAR%
 echo   conversion log            %BUILD%\jakarta-migration.log
 echo.
-echo REMINDER: WebContent\META-INF\context.xml carries the DataSource url, user
-echo and password, and it is packaged INSIDE this WAR. Point it at the target
-echo environment's MySQL before building for that environment.
+IF "%ENV%"=="LOCAL" (echo Configuration packaged: src\application.properties, src\log.properties, WebContent\META-INF\context.xml)
+IF NOT "%ENV%"=="LOCAL" (echo Configuration packaged: env\%ENV%\application.properties, log.properties, context.xml)
 ENDLOCAL

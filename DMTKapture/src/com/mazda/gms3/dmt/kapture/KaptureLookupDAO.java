@@ -118,6 +118,22 @@ public class KaptureLookupDAO {
 	}
 
 	/**
+	 * The locales Kapture holds content in (kapture.default.locales.table), upper-cased. A failed
+	 * lookup throws - it is not "no locale".
+	 */
+	public static java.util.Set<String> getDefaultLocales() {
+		String table = KaptureApiClient.require("kapture.default.locales.table").trim();
+		java.util.Set<String> out = new java.util.HashSet<String>();
+		for (String l : queryStrings("SELECT DISTINCT locale FROM " + table + " WHERE locale IS NOT NULL", new String[0],
+				"getDefaultLocales()")) {
+			if (null != l && !"".equals(l.trim())) {
+				out.add(l.trim().toUpperCase());
+			}
+		}
+		return out;
+	}
+
+	/**
 	 * The latest version of a document in Kapture for a locale; null when the document does
 	 * not exist there.
 	 *
