@@ -17,6 +17,7 @@ import com.mazda.gms3.cdrom.bean.CDRomScheduleItemDetails;
 import com.mazda.gms3.cdrom.dao.CDRomDAO;
 import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
+import com.mazda.gms3.mdm.utils.ApplicationProperties;
 import com.mazda.gms3.mdm.utils.GenerateFinalResponse;
 import com.mazda.gms3.mdm.utils.MessageProperties;
 import com.mazda.gms3.mdm.utils.Utilities;
@@ -146,13 +147,18 @@ public class CDRomScheduleReports extends HttpServlet {
 				File filepath = new File(path);
 				if (filepath.exists()) {
 					/*
-					 *  path will be //m1okfs10/okassets/library/MAZDA/GMS3_CUSTOM/CDROM/CD_ROM_1643165301255.zip
-					 *  remove the okassets physical context and make it relative URL
+					 *  path is the physical zip (cdrom.schedule.path + /CD_ROM_<ts>.zip), e.g.
+					 *  /s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/CDROM/CD_ROM_1643165301255.zip
+					 *  the download URL is the CD web folder (cdrom.extracted.webserver.path, /content/library/...)
+					 *  + the zip file name - never cut out of the physical path (that dropped /content)
 					 */
-					if(path.indexOf("/library")!=-1)
-					{
-						path = path.substring(path.indexOf("/library"),path.length());
+					String webServerPath = ApplicationProperties.getProperty("cdrom.extracted.webserver.path").trim();
+					if (!webServerPath.endsWith("/")) {
+						webServerPath = webServerPath + "/";
 					}
+					String zipName = path.replace("\\", "/");
+					zipName = zipName.substring(zipName.lastIndexOf('/') + 1);
+					path = webServerPath + zipName;
 					String filename = "";
 					if (type.equalsIgnoreCase("downloadContent")) {
 						int index = path.lastIndexOf('/');

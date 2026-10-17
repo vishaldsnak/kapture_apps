@@ -341,7 +341,11 @@ public class Schedule extends HttpServlet {
 
 				else if(sessionBean.getActionClicked().equals("SCHEDULE_CONVERSION"))
 				{
-					scheduleConversion(response, sessionBean);
+					// the job rules are checked and the schedule created under one lock (two clicks at once)
+					synchronized(com.mazda.gms3.dmt.dao.JobRules.SCHEDULE_LOCK)
+					{
+						scheduleConversion(response, sessionBean);
+					}
 				}
 
 				else if(sessionBean.getActionClicked().equals("RESET"))
@@ -401,11 +405,19 @@ public class Schedule extends HttpServlet {
 				}
 				else if(sessionBean.getActionClicked().equals("SCHEDULE_AUTOMATION"))
 				{
-					scheduleAutomation(sessionBean);
+					// the job rules are checked and the schedule created under one lock (two clicks at once)
+					synchronized(com.mazda.gms3.dmt.dao.JobRules.SCHEDULE_LOCK)
+					{
+						scheduleAutomation(sessionBean);
+					}
 				}
 				else if(sessionBean.getActionClicked().equals("IDENTIFY_IMPACTED_DOCUMENTS"))
 				{
-					identifyImpactedDocumentsDataForSchedule(sessionBean);
+					// the job rules are checked and the schedule created under one lock (two clicks at once)
+					synchronized(com.mazda.gms3.dmt.dao.JobRules.SCHEDULE_LOCK)
+					{
+						identifyImpactedDocumentsDataForSchedule(sessionBean);
+					}
 				}
 				else if(sessionBean.getActionClicked().equals("VALIDATE_FACELIFT"))
 				{
@@ -4897,21 +4909,24 @@ public class Schedule extends HttpServlet {
 		}
 
 		/*
-		 * check if there's any Pending / Processing Job - then do not allow to Schedule Conversion.
-		 * Date 19 November 2016
+		 * JOB RULES (2026-10-16, JobRules): conversions run in parallel - refused only while an IPM Facelift VIN Update /
+		 * Document Identification / Master Data Syncing job is Pending or Processing, or when the parallel jobs cap is
+		 * reached. The items of the selected rows are checked against the running conversion / publish jobs later.
 		 */
-		int count=0;
 		try 
 		{
-			count = ScheduleDAO.getPendingProcessingJobsCount();
+			com.mazda.gms3.dmt.dao.JobRules.Refusal refusal = com.mazda.gms3.dmt.dao.JobRules.contentRefusal(com.mazda.gms3.dmt.dao.JobRules.active());
+			if(null!=refusal)
+			{
+				sessionBean.setErrorMessage(msgProps().getMessage(refusal.args, refusal.key));
+				return false;
+			}
 		}
 		catch (Exception e) 
 		{
-			Utilities.printStackTraceToLogs(ScheduleDAO.class.getName(), "validateConversion", e);
-		}
-		if(count>0)
-		{
-			sessionBean.setErrorMessage(msgProps().getProperty("error.message.fail.schedule.conversion"));
+			// the rules cannot be checked - nothing is scheduled
+			Utilities.printStackTraceToLogs(Schedule.class.getName(), "validateConversion", e);
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			return false;
 		}
 		return true;
@@ -5039,126 +5054,32 @@ public class Schedule extends HttpServlet {
 			//			int pendingProcessingJobsCount= ScheduleDAO.getPendingProcessingJobsCount();
 			//			if(pendingProcessingJobsCount<5)
 			{
-				ArrayList<ScheduleItemDetails> processingSchItemsList = new ArrayList<ScheduleItemDetails>();
-				processingSchItemsList = ScheduleDAO.getPendingProcessingScheduleItemDetails();
 				/*
-				 * NOW CHECK FOR SELECTED ITEM(S) ALREADY PROCESSING
+				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE + FACELIFT FOLDER + MATERIAL FOLDER) THAT A PENDING / RUNNING
+				 * CONVERSION OR PUBLISH CONTENT JOB (ANY MARKET) IS PROCESSING CANNOT BE SCHEDULED UNTIL THAT JOB FINISHES (JobRules)
 				 */
 				boolean proceedFurther= true;
 				StringBuilder errorMessage = new StringBuilder();
+				java.util.List<com.mazda.gms3.dmt.dao.JobRules.Item> runningItems = com.mazda.gms3.dmt.dao.JobRules.runningContentItems();
 				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
 				{
 					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
 					if(schItemDetails.isRowSelected()==true)
 					{
-						// check in Pending / Processing Items List
-						if(null!=processingSchItemsList && processingSchItemsList.size()>0)
+						com.mazda.gms3.dmt.dao.JobRules.Item busy = com.mazda.gms3.dmt.dao.JobRules.busy(runningItems, new com.mazda.gms3.dmt.dao.JobRules.Item(
+								schItemDetails.getLocale(), schItemDetails.getModelFolderName(), schItemDetails.getManualType(),
+								schItemDetails.getFaceLiftFolderName(), schItemDetails.getMaterialFolderName(), null));
+						if(null!=busy)
 						{
-							for(int j=0;j<processingSchItemsList.size();j++)
-							{
-								ScheduleItemDetails processedItems = (ScheduleItemDetails)processingSchItemsList.get(j);
-								String aKey = "";
-								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-										&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-										&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-										&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-										&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName()))
-								{
-									aKey = processedItems.getMarket().trim()+processedItems.getLocale().trim()+processedItems.getModelFolderName().trim()+
-											processedItems.getManualType().trim()+processedItems.getFaceLiftFolderName().trim();
-
-									if(null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-									{
-										aKey = aKey+ processedItems.getMaterialFolderName().trim();
-									}
-
-								}
-								String bKey=schItemDetails.getMarket().trim()+schItemDetails.getLocale().trim()+schItemDetails.getModelFolderName().trim()+
-										schItemDetails.getManualType().trim()+schItemDetails.getFaceLiftFolderName().trim();
-								if(null!=schItemDetails.getMaterialFolderName() && !"".equals(schItemDetails.getMaterialFolderName().trim()))
-								{
-									bKey = bKey+ schItemDetails.getMaterialFolderName().trim();
-								}
-
-								if(null!=aKey && !"".equals(aKey) && null!=bKey && !"".equals(bKey))
-								{
-									if(aKey.trim().toLowerCase().equals(bKey.trim().toLowerCase()))
-									{
-										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-										String[] data = ids.split(",");
-										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-										errorMessage.append("\n");
-										ids = null;
-										data = null;
-										proceedFurther=false;
-										break;
-									}
-								}
-
-								//								
-								//								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-								//								&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-								//								&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-								//								&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-								//								&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName())
-								//								&& null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-								//								{
-								//									if(schItemDetails.getMarket().trim().toLowerCase().equals(processedItems.getMarket().trim().toLowerCase()) && 
-								//									schItemDetails.getLocale().trim().toLowerCase().equals(processedItems.getLocale().trim().toLowerCase()) &&
-								//									schItemDetails.getModelFolderName().trim().toLowerCase().equals(processedItems.getModelFolderName().trim().toLowerCase()) &&
-								//									schItemDetails.getManualType().trim().toLowerCase().equals(processedItems.getManualType().trim().toLowerCase()) && 
-								//									schItemDetails.getFaceLiftFolderName().trim().toLowerCase().equals(processedItems.getFaceLiftFolderName().trim().toLowerCase()) && 
-								//									schItemDetails.getMaterialFolderName().trim().toLowerCase().equals(processedItems.getMaterialFolderName().trim().toLowerCase()) )
-								//									{
-								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-								//										errorMessage.append("\n");
-								//										ids = null;
-								//										data = null;
-								//										proceedFurther=false;
-								//										break;
-								//									}
-								//								}
-								processedItems = null;
-								aKey  = null;
-								bKey=  null;
-							}
-						}
-					}
-				}
-
-				processingSchItemsList = null;
-
-				/*
-				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE) THAT A PENDING / RUNNING PUBLISH CONTENT JOB
-				 * IS PUBLISHING CANNOT BE CONVERTED UNTIL THAT JOB FINISHES
-				 */
-				java.util.Map<String, String> publishingItems = com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mme.key"));
-				publishingItems.putAll(com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mc.key")));
-				publishingItems.putAll(com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mnao.key")));
-				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
-				{
-					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
-					if(schItemDetails.isRowSelected()==true)
-					{
-						String publishJob = publishingItems.get(com.mazda.gms3.dmt.publish.PublishDAO.itemKey(schItemDetails.getLocale(),
-								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
-						if(null!=publishJob)
-						{
-							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
-									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
+							// Row No. {0} is already Processing under - {1}
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()), busy.scheduleName },
+									"error.message.item.already.processing"));
 							errorMessage.append("\n");
 							proceedFurther=false;
 						}
 					}
 				}
-				publishingItems = null;
+				runningItems = null;
 
 				if(proceedFurther==false)
 				{
@@ -5311,124 +5232,32 @@ public class Schedule extends HttpServlet {
 			//			int pendingProcessingJobsCount= ScheduleDAO.getPendingProcessingJobsCount();
 			//			if(pendingProcessingJobsCount<5)
 			{
-				ArrayList<ScheduleItemDetails> processingSchItemsList = new ArrayList<ScheduleItemDetails>();
-				processingSchItemsList = ScheduleDAO.getPendingProcessingScheduleItemDetails();
 				/*
-				 * NOW CHECK FOR SELECTED ITEM(S) ALREADY PROCESSING
+				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE + FACELIFT FOLDER + MATERIAL FOLDER) THAT A PENDING / RUNNING
+				 * CONVERSION OR PUBLISH CONTENT JOB (ANY MARKET) IS PROCESSING CANNOT BE SCHEDULED UNTIL THAT JOB FINISHES (JobRules)
 				 */
 				boolean proceedFurther= true;
 				StringBuilder errorMessage = new StringBuilder();
+				java.util.List<com.mazda.gms3.dmt.dao.JobRules.Item> runningItems = com.mazda.gms3.dmt.dao.JobRules.runningContentItems();
 				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
 				{
 					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
 					if(schItemDetails.isRowSelected()==true)
 					{
-						// check in Pending / Processing Items List
-						if(null!=processingSchItemsList && processingSchItemsList.size()>0)
+						com.mazda.gms3.dmt.dao.JobRules.Item busy = com.mazda.gms3.dmt.dao.JobRules.busy(runningItems, new com.mazda.gms3.dmt.dao.JobRules.Item(
+								schItemDetails.getLocale(), schItemDetails.getModelFolderName(), schItemDetails.getManualType(),
+								schItemDetails.getFaceLiftFolderName(), schItemDetails.getMaterialFolderName(), null));
+						if(null!=busy)
 						{
-							for(int j=0;j<processingSchItemsList.size();j++)
-							{
-								ScheduleItemDetails processedItems = (ScheduleItemDetails)processingSchItemsList.get(j);
-								String aKey = "";
-								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-										&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-										&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-										&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-										&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName()))
-								{
-									aKey = processedItems.getMarket().trim()+processedItems.getLocale().trim()+processedItems.getModelFolderName().trim()+
-											processedItems.getManualType().trim()+processedItems.getFaceLiftFolderName().trim();
-
-									if(null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-									{
-										aKey = aKey+ processedItems.getMaterialFolderName().trim();
-									}
-
-								}
-								String bKey=schItemDetails.getMarket().trim()+schItemDetails.getLocale().trim()+schItemDetails.getModelFolderName().trim()+
-										schItemDetails.getManualType().trim()+schItemDetails.getFaceLiftFolderName().trim();
-								if(null!=schItemDetails.getMaterialFolderName() && !"".equals(schItemDetails.getMaterialFolderName().trim()))
-								{
-									bKey = bKey+ schItemDetails.getMaterialFolderName().trim();
-								}
-
-								if(null!=aKey && !"".equals(aKey) && null!=bKey && !"".equals(bKey))
-								{
-									if(aKey.trim().toLowerCase().equals(bKey.trim().toLowerCase()))
-									{
-										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-										String[] data = ids.split(",");
-										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-										errorMessage.append("\n");
-										ids = null;
-										data = null;
-										proceedFurther=false;
-										break;
-									}
-								}
-
-								//								
-								//								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-								//								&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-								//								&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-								//								&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-								//								&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName())
-								//								&& null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-								//								{
-								//									if(schItemDetails.getMarket().trim().toLowerCase().equals(processedItems.getMarket().trim().toLowerCase()) && 
-								//									schItemDetails.getLocale().trim().toLowerCase().equals(processedItems.getLocale().trim().toLowerCase()) &&
-								//									schItemDetails.getModelFolderName().trim().toLowerCase().equals(processedItems.getModelFolderName().trim().toLowerCase()) &&
-								//									schItemDetails.getManualType().trim().toLowerCase().equals(processedItems.getManualType().trim().toLowerCase()) && 
-								//									schItemDetails.getFaceLiftFolderName().trim().toLowerCase().equals(processedItems.getFaceLiftFolderName().trim().toLowerCase()) && 
-								//									schItemDetails.getMaterialFolderName().trim().toLowerCase().equals(processedItems.getMaterialFolderName().trim().toLowerCase()) )
-								//									{
-								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-								//										errorMessage.append("\n");
-								//										ids = null;
-								//										data = null;
-								//										proceedFurther=false;
-								//										break;
-								//									}
-								//								}
-								processedItems = null;
-								aKey  = null;
-								bKey=  null;
-							}
-						}
-					}
-				}
-
-				processingSchItemsList = null;
-
-				/*
-				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE) THAT A PENDING / RUNNING PUBLISH CONTENT JOB
-				 * IS PUBLISHING CANNOT BE CONVERTED UNTIL THAT JOB FINISHES
-				 */
-				java.util.Map<String, String> publishingItems = com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mc.key"));
-				publishingItems.putAll(com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mme.key")));
-				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
-				{
-					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
-					if(schItemDetails.isRowSelected()==true)
-					{
-						String publishJob = publishingItems.get(com.mazda.gms3.dmt.publish.PublishDAO.itemKey(schItemDetails.getLocale(),
-								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
-						if(null!=publishJob)
-						{
-							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
-									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
+							// Row No. {0} is already Processing under - {1}
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()), busy.scheduleName },
+									"error.message.item.already.processing"));
 							errorMessage.append("\n");
 							proceedFurther=false;
 						}
 					}
 				}
-				publishingItems = null;
+				runningItems = null;
 
 				if(proceedFurther==false)
 				{
@@ -5577,124 +5406,32 @@ public class Schedule extends HttpServlet {
 			//			int pendingProcessingJobsCount= ScheduleDAO.getPendingProcessingJobsCount();
 			//			if(pendingProcessingJobsCount<5)
 			{
-				ArrayList<ScheduleItemDetails> processingSchItemsList = new ArrayList<ScheduleItemDetails>();
-				processingSchItemsList = ScheduleDAO.getPendingProcessingScheduleItemDetails();
 				/*
-				 * NOW CHECK FOR SELECTED ITEM(S) ALREADY PROCESSING
+				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE + FACELIFT FOLDER + MATERIAL FOLDER) THAT A PENDING / RUNNING
+				 * CONVERSION OR PUBLISH CONTENT JOB (ANY MARKET) IS PROCESSING CANNOT BE SCHEDULED UNTIL THAT JOB FINISHES (JobRules)
 				 */
 				boolean proceedFurther= true;
 				StringBuilder errorMessage = new StringBuilder();
+				java.util.List<com.mazda.gms3.dmt.dao.JobRules.Item> runningItems = com.mazda.gms3.dmt.dao.JobRules.runningContentItems();
 				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
 				{
 					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
 					if(schItemDetails.isRowSelected()==true)
 					{
-						// check in Pending / Processing Items List
-						if(null!=processingSchItemsList && processingSchItemsList.size()>0)
+						com.mazda.gms3.dmt.dao.JobRules.Item busy = com.mazda.gms3.dmt.dao.JobRules.busy(runningItems, new com.mazda.gms3.dmt.dao.JobRules.Item(
+								schItemDetails.getLocale(), schItemDetails.getModelFolderName(), schItemDetails.getManualType(),
+								schItemDetails.getFaceLiftFolderName(), schItemDetails.getMaterialFolderName(), null));
+						if(null!=busy)
 						{
-							for(int j=0;j<processingSchItemsList.size();j++)
-							{
-								ScheduleItemDetails processedItems = (ScheduleItemDetails)processingSchItemsList.get(j);
-								String aKey = "";
-								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-										&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-										&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-										&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-										&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName()))
-								{
-									aKey = processedItems.getMarket().trim()+processedItems.getLocale().trim()+processedItems.getModelFolderName().trim()+
-											processedItems.getManualType().trim()+processedItems.getFaceLiftFolderName().trim();
-
-									if(null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-									{
-										aKey = aKey+ processedItems.getMaterialFolderName().trim();
-									}
-
-								}
-								String bKey=schItemDetails.getMarket().trim()+schItemDetails.getLocale().trim()+schItemDetails.getModelFolderName().trim()+
-										schItemDetails.getManualType().trim()+schItemDetails.getFaceLiftFolderName().trim();
-								if(null!=schItemDetails.getMaterialFolderName() && !"".equals(schItemDetails.getMaterialFolderName().trim()))
-								{
-									bKey = bKey+ schItemDetails.getMaterialFolderName().trim();
-								}
-
-								if(null!=aKey && !"".equals(aKey) && null!=bKey && !"".equals(bKey))
-								{
-									if(aKey.trim().toLowerCase().equals(bKey.trim().toLowerCase()))
-									{
-										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-										String[] data = ids.split(",");
-										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-										errorMessage.append("\n");
-										ids = null;
-										data = null;
-										proceedFurther=false;
-										break;
-									}
-								}
-
-								//								
-								//								if(null!=processedItems.getMarket() && !"".equals(processedItems.getMarket()) 
-								//								&& null!=processedItems.getLocale() && !"".equals(processedItems.getLocale())
-								//								&& null!=processedItems.getModelFolderName() && !"".equals(processedItems.getModelFolderName())
-								//								&& null!=processedItems.getManualType() && !"".equals(processedItems.getManualType())
-								//								&& null!=processedItems.getFaceLiftFolderName() && !"".equals(processedItems.getFaceLiftFolderName())
-								//								&& null!=processedItems.getMaterialFolderName() && !"".equals(processedItems.getMaterialFolderName()))
-								//								{
-								//									if(schItemDetails.getMarket().trim().toLowerCase().equals(processedItems.getMarket().trim().toLowerCase()) && 
-								//									schItemDetails.getLocale().trim().toLowerCase().equals(processedItems.getLocale().trim().toLowerCase()) &&
-								//									schItemDetails.getModelFolderName().trim().toLowerCase().equals(processedItems.getModelFolderName().trim().toLowerCase()) &&
-								//									schItemDetails.getManualType().trim().toLowerCase().equals(processedItems.getManualType().trim().toLowerCase()) && 
-								//									schItemDetails.getFaceLiftFolderName().trim().toLowerCase().equals(processedItems.getFaceLiftFolderName().trim().toLowerCase()) && 
-								//									schItemDetails.getMaterialFolderName().trim().toLowerCase().equals(processedItems.getMaterialFolderName().trim().toLowerCase()) )
-								//									{
-								//										// set proceedFurther to false - show Error Message - Row No. {1} is already Processing under - Schedule name
-								//										String ids = String.valueOf(schItemDetails.getSrNo())+","+processedItems.getScheduleName();
-								//										String[] data = ids.split(",");
-								//										errorMessage.append(msgProps().getMessage(data, "error.message.item.already.processing"));
-								//										errorMessage.append("\n");
-								//										ids = null;
-								//										data = null;
-								//										proceedFurther=false;
-								//										break;
-								//									}
-								//								}
-								processedItems = null;
-								aKey  = null;
-								bKey=  null;
-							}
-						}
-					}
-				}
-
-				processingSchItemsList = null;
-
-				/*
-				 * A SELECTED ITEM (LOCALE + MODEL FOLDER + MANUAL TYPE) THAT A PENDING / RUNNING PUBLISH CONTENT JOB
-				 * IS PUBLISHING CANNOT BE CONVERTED UNTIL THAT JOB FINISHES
-				 */
-				java.util.Map<String, String> publishingItems = com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mme.key"));
-				publishingItems.putAll(com.mazda.gms3.dmt.publish.PublishDAO.runningItems(
-						ApplicationProperties.getProperty("schedule.name.publish.mc.key")));
-				for(int i=0;i<sessionBean.getScheduleItemsList().size();i++)
-				{
-					ScheduleItemDetails schItemDetails = (ScheduleItemDetails)sessionBean.getScheduleItemsList().get(i);
-					if(schItemDetails.isRowSelected()==true)
-					{
-						String publishJob = publishingItems.get(com.mazda.gms3.dmt.publish.PublishDAO.itemKey(schItemDetails.getLocale(),
-								schItemDetails.getModelFolderName(), schItemDetails.getManualType()));
-						if(null!=publishJob)
-						{
-							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()),
-									schItemDetails.getModelFolderName(), schItemDetails.getManualType(), publishJob }, "error.message.item.being.published"));
+							// Row No. {0} is already Processing under - {1}
+							errorMessage.append(msgProps().getMessage(new String[] { String.valueOf(schItemDetails.getSrNo()), busy.scheduleName },
+									"error.message.item.already.processing"));
 							errorMessage.append("\n");
 							proceedFurther=false;
 						}
 					}
 				}
-				publishingItems = null;
+				runningItems = null;
 
 				if(proceedFurther==false)
 				{
@@ -6190,24 +5927,31 @@ public class Schedule extends HttpServlet {
 			}
 		}
 		/*
-		 * check if there's any Pending / Processing Job - then do not allow to Schedule Conversion.
-		 * Date 19 November 2016
+		 * JOB RULES (2026-10-16, JobRules): refused while a Conversion / Publish job is Pending or Processing, or when the
+		 * parallel jobs cap is reached. Other Facelift / Document Identification / Master Data Syncing jobs may run.
 		 */
-		int count=0;
-		try 
+		return masterJobAllowed(sessionBean, "validateAutomationConversion()");
+	}
+	/** JobRules for an IPM Facelift VIN Update / Document Identification job; false (and the message set) when refused. */
+	private boolean masterJobAllowed(ScheduleBean sessionBean, String caller)
+	{
+		try
 		{
-			count = ScheduleDAO.getPendingProcessingJobsCount();
+			com.mazda.gms3.dmt.dao.JobRules.Refusal refusal = com.mazda.gms3.dmt.dao.JobRules.masterRefusal(com.mazda.gms3.dmt.dao.JobRules.active());
+			if(null!=refusal)
+			{
+				sessionBean.setErrorMessage(msgProps().getMessage(refusal.args, refusal.key));
+				return false;
+			}
+			return true;
 		}
-		catch (Exception e) 
+		catch (Exception e)
 		{
-			Utilities.printStackTraceToLogs(Schedule.class.getName(), "validateAutomationConversion()", e);
-		}
-		if(count>0)
-		{
-			sessionBean.setErrorMessage(msgProps().getProperty("error.message.fail.ipm.facelift.vin.update"));
+			// the rules cannot be checked - nothing is scheduled
+			Utilities.printStackTraceToLogs(Schedule.class.getName(), caller, e);
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			return false;
 		}
-		return true;
 	}
 	/**
 	 * Schedules the update job (job B) for the selected items of the viewed identification job. The load type comes from
@@ -6339,6 +6083,11 @@ public class Schedule extends HttpServlet {
 	{
 		try
 		{
+			// JOB RULES (2026-10-16): an impacted document can be in a running Conversion / Publish job
+			if(!masterJobAllowed(sessionBean, "identifyImpactedDocumentsData()"))
+			{
+				return;
+			}
 			if(null!=sessionBean.getInputDataList() && sessionBean.getInputDataList().size()>0)
 			{
 				/*

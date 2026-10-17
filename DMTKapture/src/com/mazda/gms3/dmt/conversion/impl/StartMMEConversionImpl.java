@@ -653,7 +653,7 @@ public class StartMMEConversionImpl {
 								/*
 								 * delete display order data from temp table
 								 */
-								ScheduleDAO.deleteDisplayOrderTemp();
+								ScheduleDAO.deleteDisplayOrderTemp(scheduleId);
 								displayOrderIndex = null;
 							}
 							else if(null!=itemDetails.getMarket() && !"".equals(itemDetails.getMarket())
@@ -1101,7 +1101,7 @@ public class StartMMEConversionImpl {
 		}
 		
 		// call function to delete from temp display ordet table safe side
-		ScheduleDAO.deleteDisplayOrderTemp();
+		ScheduleDAO.deleteDisplayOrderTemp(scheduleId);
 		
 		// call stopCurrentThread 
 		stopActiveThead(scheduleId);
@@ -1870,7 +1870,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				
 				/*
@@ -2140,7 +2140,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
@@ -2468,7 +2468,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList, ApplicationProperties.getProperty("directory.html5"));
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
@@ -2738,7 +2738,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
@@ -3029,7 +3029,7 @@ public class StartMMEConversionImpl {
 			
 			// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //			contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-			contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+			contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 			
 			// CALL FUNCTION TO ADD CATEGORIES TO DOCUMENT
 			contentDetails = CategoryUtils.performCategoriesOperation(contentDetails,"MME");
@@ -3294,7 +3294,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
@@ -3541,7 +3541,7 @@ public class StartMMEConversionImpl {
 //				}
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
 				* IDENTIFY THE APPLICABLE DISPLAY ORDER FOR THE PROCESSING DOCUMENT AND 
@@ -3727,7 +3727,7 @@ public class StartMMEConversionImpl {
 				
 				// SET APPLICABLE DISPLAY ORDER FOR THE PROCESSING FILE
 //				contentDetails = ConversionUtils.identifyAttributesFromDisplayOrderDetails(contentDetails, allDisplayOrderList,"");
-				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getFilePath()));
+				contentDetails.setApplicableDisplayOrderList(applicableDisplayOrderForDocument(contentDetails.getScheduleId(), contentDetails.getFilePath()));
 				
 				/*
 				* CHANGE IN IDENTIFYING VIN FOR THE DOCUMENT
@@ -6540,7 +6540,7 @@ public class StartMMEConversionImpl {
 			// the documents the display order files list - the view content of the others of the material folder is removed
 			ArrayList<ContentDetails> listedDocuments = new ArrayList<ContentDetails>();
 
-			ArrayList<DisplayOrderDetails> processingDisplayOrderList = ScheduleDAO.getApplicableDisplayOrderForMaterialOrFaceLiftFolder(itemDetails.getModelFolderName(), itemDetails.getManualType(), itemDetails.getFaceLiftFolderName(), itemDetails.getMaterialFolderName());
+			ArrayList<DisplayOrderDetails> processingDisplayOrderList = ScheduleDAO.getApplicableDisplayOrderForMaterialOrFaceLiftFolder(String.valueOf(itemDetails.getScheduleId()), itemDetails.getModelFolderName(), itemDetails.getManualType(), itemDetails.getFaceLiftFolderName(), itemDetails.getMaterialFolderName());
 			DisplayOrderDetails details = null;
 			if(null!=processingDisplayOrderList && processingDisplayOrderList.size()>0)
 			{
@@ -8565,11 +8565,11 @@ public class StartMMEConversionImpl {
 	 * THE DISPLAY ORDER ROWS OF ONE DOCUMENT - the same rows (as copies) ScheduleDAO.getApplicableDisplayOrderForDocument
 	 * reads from the staging table; that SELECT is still used when no index was built for the material folder.
 	 */
-	private ArrayList<DisplayOrderDetails> applicableDisplayOrderForDocument(String filePath)
+	private ArrayList<DisplayOrderDetails> applicableDisplayOrderForDocument(String scheduleId, String filePath)
 	{
 		if(null==displayOrderIndex)
 		{
-			return ScheduleDAO.getApplicableDisplayOrderForDocument(filePath);
+			return ScheduleDAO.getApplicableDisplayOrderForDocument(scheduleId, filePath);
 		}
 		if(null==filePath || "".equals(filePath))
 		{

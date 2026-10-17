@@ -3455,7 +3455,7 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		}
 	}
 	
-	public static ArrayList<DisplayOrderDetails> getApplicableDisplayOrderForDocument(String filePath)
+	public static ArrayList<DisplayOrderDetails> getApplicableDisplayOrderForDocument(String scheduleId, String filePath)
 	{
 		ArrayList<DisplayOrderDetails> applicableDisplayOrderDetails = null;
 		PreparedStatement pstmt=null;
@@ -3465,11 +3465,14 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		{
 			if(null!=filePath && !"".equals(filePath))
 			{
+				long jobId = displayOrderJob(scheduleId);
 				DisplayOrderDetails details = null;
 				conn = getConnection();
-				String sql="SELECT * FROM gms3_dmt_el_gr_nm_dispord WHERE TRIM(LOWER(DC_SOURCE_NETWORK_LOC)) = ?";
+				// the rows of this job only - other jobs can be staging theirs at the same time
+				String sql="SELECT * FROM gms3_dmt_el_gr_nm_dispord WHERE DC_SCHEDULE_ID = ? AND TRIM(LOWER(DC_SOURCE_NETWORK_LOC)) = ?";
 				pstmt=conn.prepareStatement(sql);
-				pstmt.setString(1, filePath.trim().toLowerCase());
+				pstmt.setLong(1, jobId);
+				pstmt.setString(2, filePath.trim().toLowerCase());
 				rs = pstmt.executeQuery();
 				while(rs.next())
 				{
@@ -3542,7 +3545,7 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		return applicableDisplayOrderDetails;
 	}
 	
-	public static ArrayList<DisplayOrderDetails> getApplicableDisplayOrderForMaterialOrFaceLiftFolder(String modelFolderName,String manualType,String faceliftFolderName,String materialFolderName)
+	public static ArrayList<DisplayOrderDetails> getApplicableDisplayOrderForMaterialOrFaceLiftFolder(String scheduleId, String modelFolderName,String manualType,String faceliftFolderName,String materialFolderName)
 	{
 		ArrayList<DisplayOrderDetails> applicableDisplayOrderDetails = null;
 		PreparedStatement pstmt=null;
@@ -3552,21 +3555,24 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		{
 			if(null!=modelFolderName && !"".equals(modelFolderName) && null!=manualType && !"".equals(manualType) && null!=faceliftFolderName && !"".equals(faceliftFolderName))
 			{
+				long jobId = displayOrderJob(scheduleId);
 				DisplayOrderDetails details = null;
 				conn = getConnection();
-				String sql="SELECT * FROM gms3_dmt_el_gr_nm_dispord WHERE TRIM(LOWER(DC_DISPORD_MODEL_FOLDER)) = ? AND TRIM(LOWER(DC_DISPORD_MANUALTYPE_FOLDER)) = ? AND "
+				// the rows of this job only - other jobs can be staging theirs at the same time
+				String sql="SELECT * FROM gms3_dmt_el_gr_nm_dispord WHERE DC_SCHEDULE_ID = ? AND TRIM(LOWER(DC_DISPORD_MODEL_FOLDER)) = ? AND TRIM(LOWER(DC_DISPORD_MANUALTYPE_FOLDER)) = ? AND "
 						+ "TRIM(LOWER(DC_DISPORD_FACELIFT_FOLDER)) = ? ";
 				if(null!=materialFolderName && !"".equals(materialFolderName))
 				{
 					sql+=" AND TRIM(LOWER(DC_DISPORD_MATERIAL_FOLDER)) = ?";
 				}
 				pstmt=conn.prepareStatement(sql);
-				pstmt.setString(1, modelFolderName.trim().toLowerCase());
-				pstmt.setString(2, manualType.trim().toLowerCase());
-				pstmt.setString(3, faceliftFolderName.trim().toLowerCase());
+				pstmt.setLong(1, jobId);
+				pstmt.setString(2, modelFolderName.trim().toLowerCase());
+				pstmt.setString(3, manualType.trim().toLowerCase());
+				pstmt.setString(4, faceliftFolderName.trim().toLowerCase());
 				if(null!=materialFolderName && !"".equals(materialFolderName))
 				{
-					pstmt.setString(4, materialFolderName.trim().toLowerCase());
+					pstmt.setString(5, materialFolderName.trim().toLowerCase());
 				}
 				logger.info("getApplicableDisplayOrderForMaterialOrFaceLiftFolder :: Sql :: >" + sql);
 				rs = pstmt.executeQuery();
@@ -3644,17 +3650,23 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		return applicableDisplayOrderDetails;
 	}
 
-	public static void deleteDisplayOrderTemp()
+	/**
+	 * Removes the display order staging rows of ONE job. Jobs run in parallel, so a job never clears the rows of another.
+	 */
+	public static void deleteDisplayOrderTemp(String scheduleId)
 	{
-		logger.info("deleteDisplayOrderTemp :: ------------ START DELETE PROCESS ------------");
+		logger.info("deleteDisplayOrderTemp :: ------------ START DELETE PROCESS ------------ :: schedule " + scheduleId);
 		PreparedStatement pstmt=null;
 		Connection conn = null;
 		try
 		{
+			long jobId = displayOrderJob(scheduleId);
 			conn = getConnection();
-			String sql = "DELETE FROM gms3_dmt_el_gr_nm_dispord";
+			String sql = "DELETE FROM gms3_dmt_el_gr_nm_dispord WHERE DC_SCHEDULE_ID = ?";
 			pstmt = conn.prepareStatement(sql);
-			pstmt.executeUpdate();
+			pstmt.setLong(1, jobId);
+			int rows = pstmt.executeUpdate();
+			logger.info("deleteDisplayOrderTemp :: schedule " + jobId + " :: rows deleted :: " + rows);
 		}
 		catch(Exception e)
 		{
@@ -3676,5 +3688,14 @@ public class ScheduleDAO  extends DBConnectionHelper{
 		}
 		logger.info("deleteDisplayOrderTemp :: ------------ END DELETE PROCESS ------------");
 	}
-	
+
+	/** The schedule id the display order staging rows are kept under (DC_SCHEDULE_ID). */
+	private static long displayOrderJob(String scheduleId)
+	{
+		if(null==scheduleId || !scheduleId.trim().matches("[0-9]{1,18}"))
+		{
+			throw new IllegalArgumentException("display order staging rows :: schedule id missing or invalid :: " + scheduleId);
+		}
+		return Long.parseLong(scheduleId.trim());
+	}
 }

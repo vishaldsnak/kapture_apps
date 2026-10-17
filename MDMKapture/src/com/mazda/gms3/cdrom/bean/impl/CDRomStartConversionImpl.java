@@ -57,6 +57,7 @@ import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
 import com.mazda.gms3.mdm.utils.FileReadWriteUtil;
+import com.mazda.gms3.mdm.utils.KaptureLibraryPath;
 import com.mazda.gms3.mdm.utils.MessageProperties;
 import com.mazda.gms3.mdm.utils.Utilities;
 
@@ -282,26 +283,17 @@ public class CDRomStartConversionImpl {
 	 * root is a property somebody edits per environment (cdrom.image.server.path /
 	 * cdrom.pdf.server.path), and the path is whatever Kapture wrote into the src attribute.
 	 *
-	 * WHERE THE "/content" SEGMENT LIVES. The stored content src is "/library/MAZDA/..." - it does
-	 * NOT carry a "/content" prefix (verified against the migrated content store; every path ref is
-	 * plain "library/MAZDA"). Kapture SERVES those assets to a browser one context deeper, under
-	 * "/content/library/MAZDA/...", but that is the web URL, not the stored src. For CDRom, which
-	 * reads the files off disk, the "/content" segment is supplied by the ROOT PROPERTY: on the
-	 * server the root ends "/content", so root + src = ".../content" + "/library/MAZDA" =
-	 * ".../content/library/MAZDA" - a SINGLE "/content", no doubling. Do NOT "fix" this by dropping
-	 * "/content" from the root, and do NOT add a "/content" segment in code.
+	 * WHERE THE "/content" SEGMENT LIVES. On the server the root ends "/content". Older content src
+	 * is "/library/MAZDA/...", content sent by Job 10 / DMT is "/content/library/MAZDA/..."
+	 * (kapture.library.path.context) - both exist side by side. The context prefix is dropped
+	 * first (KaptureLibraryPath.withoutKaptureContext), so root + path is always
+	 * ".../content/library/MAZDA" - a SINGLE "/content". Do NOT drop "/content" from the root.
 	 *
-	 * THE PATH IS OTHERWISE UNTOUCHED - no context is added or stripped here. If the "/content"
-	 * segment ever has to be added or removed for a different environment, that belongs in the
-	 * property, not in code.
-	 *
-	 * NOTE two asset lookups still plain-concatenate instead of calling this helper - findOkAsset()
-	 * and copyImagesForDocument(). They rely on the root NOT carrying a trailing slash (else the
-	 * join yields a harmless "//"). Prefer routing new asset joins through here.
+	 * Every OK asset join goes through here (images, css, findOkAsset, copyImagesForDocument).
 	 */
 	private String resolveAssetPath(String assetRoot, String pathInContent) {
 		String root = (null == assetRoot ? "" : assetRoot.trim());
-		String path = (null == pathInContent ? "" : pathInContent.trim());
+		String path = (null == pathInContent ? "" : KaptureLibraryPath.withoutKaptureContext(pathInContent.trim()));
 		while (root.endsWith("/") || root.endsWith("\\")) {
 			if(isScheduleAborted()) { break; }
 			root = root.substring(0, root.length() - 1);
@@ -966,9 +958,8 @@ public class CDRomStartConversionImpl {
 		if (okAssetList != null && okAssetList.size() > 0) {
 			for (int i = 0; i < okAssetList.size(); i++) {
 				if(isScheduleAborted()) { break; }
-				String imagePath = ApplicationProperties
-						.getProperty("cdrom.image.server.path")
-						+ okAssetList.get(i);
+				String imagePath = resolveAssetPath(ApplicationProperties
+						.getProperty("cdrom.image.server.path"), okAssetList.get(i));
 				File image = new File(imagePath);
 				if (!image.exists()) {
 					return "N";
@@ -1200,7 +1191,9 @@ public class CDRomStartConversionImpl {
 					String fileLocation = root
 							.getElementsByTagName("DJVU_FILE_LOCATION").item(0)
 							.getTextContent();
-					document.setDJVUFileLocation(fileLocation);
+					// /content/library/... (Job 10 / DMT) -> /library/...: the disk joins in copyDocuments /
+					// copyPDFDocuments and the CD folder layout + links keep the library/... form
+					document.setDJVUFileLocation(KaptureLibraryPath.withoutKaptureContext(fileLocation));
 				}
 				if (root.getElementsByTagName("ATTACHMENT") != null
 						&& root.getElementsByTagName("ATTACHMENT").getLength() > 0) {
@@ -1361,6 +1354,9 @@ public class CDRomStartConversionImpl {
 				}
 				
 				// replace /dokweb from the library paths
+				// DMT window.js carries "/content/library/...", legacy ones "/library/..." - bring both
+				// to "/library/..." so the search strings below (built from DJVU_FILE_LOCATION) match
+				totalStr = KaptureLibraryPath.quotedAddressesWithoutKaptureContext(totalStr);
 				totalStr = totalStr.replaceAll(infoCenterWebContext, "");
 				totalStr = totalStr.replaceAll(htmlPathSearch, htmlReplace);
 				totalStr = totalStr.replaceAll(pdfPathSearch, pdfReplace);
@@ -1722,8 +1718,8 @@ public class CDRomStartConversionImpl {
 				int index = imagePath.lastIndexOf("/");
 				String newImagePath = "images" + imagePath.substring(index);
 				content = content.replace(imagePath, newImagePath);
-				String sourceImage = ApplicationProperties
-						.getProperty("cdrom.image.server.path") + imagePath;
+				String sourceImage = resolveAssetPath(ApplicationProperties
+						.getProperty("cdrom.image.server.path"), imagePath);
 				File source = new File(sourceImage);
 				try {
 					FileUtils.copyFileToDirectory(source, dest);

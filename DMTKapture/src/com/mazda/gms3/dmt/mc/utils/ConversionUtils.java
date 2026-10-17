@@ -3900,7 +3900,8 @@ public class ConversionUtils {
 		{
 			return false;
 		}
-		String h = href.trim();
+		// DMT sends the link with the kapture.library.path.context prefix (/content/library/...) - compared without it
+		String h = com.mazda.gms3.dmt.utils.OkAssetsWeb.withoutKaptureContext(href);
 		if(h.equals(entStyleHref()))
 		{
 			return true;
@@ -3987,7 +3988,8 @@ public class ConversionUtils {
 		{
 			return false;
 		}
-		String h = href.trim();
+		// DMT sends the link with the kapture.library.path.context prefix (/content/library/...) - compared without it
+		String h = com.mazda.gms3.dmt.utils.OkAssetsWeb.withoutKaptureContext(href);
 		if(h.equals(entStyleHrefMME()))
 		{
 			return true;
@@ -4075,7 +4077,8 @@ public class ConversionUtils {
 		{
 			return false;
 		}
-		String h = href.trim();
+		// DMT sends the link with the kapture.library.path.context prefix (/content/library/...) - compared without it
+		String h = com.mazda.gms3.dmt.utils.OkAssetsWeb.withoutKaptureContext(href);
 		if(h.equals(entStyleHrefMNAO()))
 		{
 			return true;

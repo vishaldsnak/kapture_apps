@@ -439,7 +439,7 @@ public class History extends HttpServlet {
 				// it, and clearing it would wipe the staging rows of a content load running at the same time
 				if(!AutomationConstants.SCHEDULE_TYPE_AUTOMATION.equals(scheduleType.trim()))
 				{
-					ScheduleDAO.deleteDisplayOrderTemp();
+					ScheduleDAO.deleteDisplayOrderTemp(scheduleId);
 				}
 				logger.info("abortConversionOperation :: Killing Thread Id {"+ threadId+"} for Schedule ::> " + scheduleId);
 				

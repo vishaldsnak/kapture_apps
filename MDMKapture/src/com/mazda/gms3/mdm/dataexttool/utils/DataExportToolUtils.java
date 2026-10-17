@@ -26,6 +26,7 @@ import com.mazda.gms3.mdm.dataexttool.vo.DataExportToolAttachmentDetails;
 import com.mazda.gms3.mdm.dataexttool.vo.DataExportToolInnerLinkDetails;
 import com.mazda.gms3.mdm.dataexttool.vo.DataExportToolItemDetails;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
+import com.mazda.gms3.mdm.utils.KaptureLibraryPath;
 import com.mazda.gms3.mdm.utils.FileReadWriteUtil;
 import com.mazda.gms3.mdm.utils.ParseXMLDoc;
 import com.mazda.gms3.mdm.utils.Utilities;
@@ -418,17 +419,15 @@ public class DataExportToolUtils {
 	 *
 	 * The two halves come from different places and neither can be relied on for its slashes: the
 	 * root is a property somebody edits per environment, and the path is whatever Kapture wrote
-	 * into the src or href. Kapture serves assets one context deeper than InfoManager did, so these
-	 * paths now start /content/library/MAZDA/... where they used to start /library/MAZDA/... , and
-	 * a plain concatenation only happens to work while exactly one side carries the slash.
-	 *
-	 * THE PATH IS OTHERWISE UNTOUCHED - no context is added or stripped here. If the /content/
-	 * segment ever has to be added or removed, that belongs in the property, not in code.
+	 * into the src or href. The root ends in the /content folder; older content src is
+	 * /library/MAZDA/..., content sent by Job 10 / DMT is /content/library/MAZDA/...
+	 * (kapture.library.path.context). The context prefix is dropped first
+	 * (KaptureLibraryPath.withoutKaptureContext), so both forms resolve to a single /content.
 	 */
 	private String resolveAssetPath(String assetRoot, String pathInContent)
 	{
 		String root = (null == assetRoot ? "" : assetRoot.trim());
-		String path = (null == pathInContent ? "" : pathInContent.trim());
+		String path = (null == pathInContent ? "" : KaptureLibraryPath.withoutKaptureContext(pathInContent.trim()));
 		while (root.endsWith("/") || root.endsWith("\\"))
 		{
 			root = root.substring(0, root.length() - 1);

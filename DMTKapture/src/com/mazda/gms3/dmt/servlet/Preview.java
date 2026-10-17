@@ -16,6 +16,7 @@ import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
 import com.mazda.gms3.dmt.preview.PreviewBuilder;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
+import com.mazda.gms3.dmt.utils.MessageProperties;
 import com.mazda.gms3.dmt.utils.PathUtil;
 import com.mazda.gms3.dmt.utils.Utilities;
 
@@ -103,11 +104,14 @@ public class Preview extends HttpServlet {
 			final String source = scheduleId.trim();
 			final String user = null == wslId ? "" : wslId;
 			long publishId;
-			synchronized (com.mazda.gms3.dmt.publish.PublishDAO.SCHEDULE_LOCK) {
-				com.mazda.gms3.dmt.publish.PublishDAO.Refusal refusal = com.mazda.gms3.dmt.publish.PublishDAO.refusal(source);
+			// the job rules are checked and the schedule created under one lock, shared with the other job types
+			synchronized (com.mazda.gms3.dmt.dao.JobRules.SCHEDULE_LOCK) {
+				java.util.List<com.mazda.gms3.dmt.publish.PublishDocument> docs = new java.util.ArrayList<com.mazda.gms3.dmt.publish.PublishDocument>();
+				com.mazda.gms3.dmt.publish.PublishDAO.Refusal refusal = com.mazda.gms3.dmt.publish.PublishDAO.refusal(source, docs);
 				if (null != refusal) {
 					answer.addProperty("ok", false);
-					answer.addProperty("message", refusal.message);
+					answer.addProperty("message", null != refusal.message ? refusal.message
+							: new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")).getMessage(refusal.rule.args, refusal.rule.key));
 					// the items other jobs are processing - shown as a table
 					com.google.gson.JsonArray busy = new com.google.gson.JsonArray();
 					for (String[] b : refusal.busy) {
@@ -122,8 +126,7 @@ public class Preview extends HttpServlet {
 					send(response, answer);
 					return;
 				}
-				publishId = com.mazda.gms3.dmt.publish.PublishDAO.createSchedule(source, user,
-						com.mazda.gms3.dmt.publish.PublishDAO.loadDocuments(source));
+				publishId = com.mazda.gms3.dmt.publish.PublishDAO.createSchedule(source, user, docs);
 			}
 			final String id = String.valueOf(publishId);
 			String name = com.mazda.gms3.dmt.publish.PublishDAO.scheduleName(publishId);

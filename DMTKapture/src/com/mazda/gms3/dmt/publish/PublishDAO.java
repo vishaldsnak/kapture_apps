@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncConstants;
+import com.mazda.gms3.dmt.dao.JobRules;
 import com.mazda.gms3.dmt.kapture.KaptureApiClient;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
@@ -39,14 +40,13 @@ public class PublishDAO {
 
 	private static Logger logger = LogManager.getLogger(PublishDAO.class);
 
-	/** The busy-items check and the schedule insert run under this lock (two clicks at once). */
-	public static final Object SCHEDULE_LOCK = new Object();
-
 	// ---- scheduling ----------------------------------------------------------------------------
 
 	/** Why a publish job cannot be scheduled: a message, and the items in use by other jobs (if that is the reason). */
 	public static class Refusal {
 		public final String message;
+		/** a job rule (JobRules) refused it - the message key and its arguments; message is then null */
+		public JobRules.Refusal rule;
 		/** {model folder, manual type, job name, CONVERSION / PUBLISH} */
 		public final List<String[]> busy = new ArrayList<String[]>();
 
@@ -56,7 +56,7 @@ public class PublishDAO {
 
 		@Override
 		public String toString() {
-			StringBuilder sb = new StringBuilder(message);
+			StringBuilder sb = new StringBuilder(null == message ? rule.key : message);
 			for (String[] b : busy) {
 				sb.append("\n").append(String.join(" | ", b));
 			}
@@ -65,12 +65,20 @@ public class PublishDAO {
 	}
 
 	/**
-	 * Why a publish job cannot be scheduled for this DMT job now; null when it can.
+	 * Why a publish job cannot be scheduled for this DMT job now; null when it can. Fills docs with the
+	 * documents to publish (loadDocuments), which createSchedule takes. Run it under JobRules.SCHEDULE_LOCK
+	 * together with createSchedule.
+	 *
+	 * JOB RULES (2026-10-16, JobRules): refused while an IPM Facelift VIN Update / Document Identification /
+	 * Master Data Syncing job is Pending or Processing, when the parallel jobs cap is reached, or when an item
+	 * of the job (locale + model folder + manual type + facelift folder + material folder) is in a Pending /
+	 * Processing Conversion or Publish job of any market.
 	 */
-	public static Refusal refusal(String sourceScheduleId) throws Exception {
+	public static Refusal refusal(String sourceScheduleId, List<PublishDocument> docs) throws Exception {
 		long source = Long.parseLong(sourceScheduleId.trim());
 		String pending = KaptureApiClient.require("schedule.status.pending.value");
 		String processing = KaptureApiClient.require("schedule.status.processing.value");
+		String name;
 		Connection conn = DBConnectionHelper.getConnection();
 		try {
 			PreparedStatement ps = conn.prepareStatement("SELECT DC_SCHEDULE_NAME, DC_STATUS FROM gms3_dmt_conv_schedule WHERE DC_SCHEDULE_ID = ?");
@@ -81,77 +89,48 @@ public class PublishDAO {
 				ps.close();
 				return new Refusal("Job " + source + " does not exist.");
 			}
-			String name = rs.getString(1);
+			name = rs.getString(1);
 			String status = rs.getString(2);
 			rs.close();
 			ps.close();
-			PublishMarket market = PublishMarket.ofConversionJob(name);
-			if (null == market) {
+			if (null == PublishMarket.ofConversionJob(name)) {
 				return new Refusal("Job " + source + " is not an MC, MME or MNAO conversion job.");
 			}
 			if (pending.equals(status) || processing.equals(status)) {
 				return new Refusal("Job " + name + " is still running.");
 			}
-			// the model + manual type folders of the job's documents
-			Map<String, String[]> mine = new LinkedHashMap<String, String[]>();
-			ps = conn.prepareStatement("SELECT DISTINCT pv_locale, pv_model_folder, pv_manual_type FROM gms3_dmt_preview_docs WHERE pv_schedule_id = ?"
-					+ " ORDER BY pv_model_folder, pv_manual_type");
-			ps.setLong(1, source);
-			rs = ps.executeQuery();
-			while (rs.next()) {
-				mine.put(itemKey(rs.getString(1), rs.getString(2), rs.getString(3)), new String[] { t(rs.getString(2)), t(rs.getString(3)) });
-			}
-			rs.close();
-			ps.close();
-			if (mine.isEmpty()) {
-				return new Refusal("Job " + name + " has no document left to publish.");
-			}
-			// none of them may be in a conversion or publish job that is pending / running: the same
-			// documents would be written and published at the same time
-			Map<String, String> conversions = runningItems(market.conversionPrefix());
-			Map<String, String> publishes = runningItems(market.publishPrefix());
-			Refusal refusal = new Refusal("This job cannot be published yet. Some of its content is being processed by other jobs."
-					+ " Publish again when those jobs have finished.");
-			for (Map.Entry<String, String[]> e : mine.entrySet()) {
-				if (publishes.containsKey(e.getKey())) {
-					refusal.busy.add(new String[] { e.getValue()[0], e.getValue()[1], publishes.get(e.getKey()), "PUBLISH" });
-				} else if (conversions.containsKey(e.getKey())) {
-					refusal.busy.add(new String[] { e.getValue()[0], e.getValue()[1], conversions.get(e.getKey()), "CONVERSION" });
-				}
-			}
-			if (!refusal.busy.isEmpty()) {
-				return refusal;
-			}
-			return null;
 		} finally {
 			conn.close();
 		}
-	}
-
-	/**
-	 * The items (model folder + manual type, per locale) of the jobs that are pending or running
-	 * and whose thread starts with threadPrefix: itemKey -> schedule name.
-	 */
-	public static Map<String, String> runningItems(String threadPrefix) throws Exception {
-		Map<String, String> items = new HashMap<String, String>();
-		Connection conn = DBConnectionHelper.getConnection();
-		try {
-			PreparedStatement ps = conn.prepareStatement("SELECT c.DC_LOCALE, c.DC_MODEL_FOLDER_NAME, c.DC_MANUAL_TYPE, s.DC_SCHEDULE_NAME"
-					+ " FROM gms3_dmt_conv_sch_criteria c JOIN gms3_dmt_conv_schedule s ON s.DC_SCHEDULE_ID = c.DC_SCHEDULE_ID"
-					+ " WHERE LOCATE(?, s.DC_SCH_THREAD_ID) = 1 AND s.DC_STATUS IN (?, ?)");
-			ps.setString(1, threadPrefix);
-			ps.setString(2, KaptureApiClient.require("schedule.status.pending.value"));
-			ps.setString(3, KaptureApiClient.require("schedule.status.processing.value"));
-			ResultSet rs = ps.executeQuery();
-			while (rs.next()) {
-				items.put(itemKey(rs.getString(1), rs.getString(2), rs.getString(3)), rs.getString(4));
-			}
-			rs.close();
-			ps.close();
-		} finally {
-			conn.close();
+		docs.addAll(loadDocuments(sourceScheduleId));
+		if (docs.isEmpty()) {
+			return new Refusal("Job " + name + " has no document left to publish.");
 		}
-		return items;
+		JobRules.Refusal rule = JobRules.contentRefusal(JobRules.active());
+		if (null != rule) {
+			Refusal refusal = new Refusal(null);
+			refusal.rule = rule;
+			return refusal;
+		}
+		// none of its items may be in a conversion or publish job that is pending / running: the same
+		// documents would be written and published at the same time
+		List<JobRules.Item> running = JobRules.runningContentItems();
+		Refusal refusal = new Refusal("This job cannot be published yet. Some of its content is being processed by other jobs."
+				+ " Publish again when those jobs have finished.");
+		Map<String, Boolean> seen = new HashMap<String, Boolean>();
+		for (PublishDocument d : docs) {
+			JobRules.Item item = new JobRules.Item(d.locale, d.modelFolder, d.manualType, d.faceliftFolder, d.materialFolder, null);
+			JobRules.Item busy = JobRules.busy(running, item);
+			if (null == busy || null != seen.put(item.toString().toLowerCase() + "|" + busy.scheduleName, Boolean.TRUE)) {
+				continue;
+			}
+			refusal.busy.add(new String[] { t(d.modelFolder), t(d.manualType) + (item.materialFolder.isEmpty() ? "" : " / " + item.materialFolder),
+					busy.scheduleName, JobRules.isPublishJob(busy.scheduleName) ? "PUBLISH" : "CONVERSION" });
+		}
+		if (!refusal.busy.isEmpty()) {
+			return refusal;
+		}
+		return null;
 	}
 
 	/**
@@ -166,11 +145,6 @@ public class PublishDAO {
 			throw new IllegalStateException("Job " + sourceScheduleId + " (" + name + ") is not an MC, MME or MNAO conversion job");
 		}
 		return market;
-	}
-
-	/** locale (ja-JP / ja_JP alike) + model folder + manual type, case-insensitive */
-	public static String itemKey(String locale, String modelFolder, String manualType) {
-		return (t(locale).replace('_', '-') + "|" + t(modelFolder) + "|" + t(manualType)).toLowerCase();
 	}
 
 	private static String t(String s) {

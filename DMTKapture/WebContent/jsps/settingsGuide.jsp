@@ -26,7 +26,7 @@
 				<h4>Overview</h4>
 				<p class="sg-lead">DMT loads master data and manual content from a network location into Kapture for the MC, MME and MNAO markets.</p>
 				<div class="sg-grid">
-					<div><div class="sg-card"><h6>Settings</h6><p>Your source network path. It is saved per user and cannot be changed while any job is Pending or Processing.</p></div></div>
+					<div><div class="sg-card"><h6>Settings</h6><p>Your source network path, saved per user. It can be changed at any time - a running job keeps the path it started with.</p></div></div>
 					<div><div class="sg-card"><h6>Schedule</h6><p><b>Folder Based Content Load</b> (conversion) and <b>IPM Facelift VIN Update</b> (facelift automation).</p></div></div>
 					<div><div class="sg-card"><h6>History</h6><p>Job status, item details, report download, abort, and the Preview link of a conversion job.</p></div></div>
 				</div>
@@ -52,7 +52,7 @@
 					<li><b>Publish</b><span>Publish from the job's Preview page. Follow the publish job on the History page.</span></li>
 				</ol>
 				<div class="sg-warn"><b>Facelift before conversion:</b> when Excel files are present in <code>Facelift_Content</code>, the conversion Go asks <span class="sg-msg">"The IPM Facelift VIN Update ... must be executed before the Conversion. Have you executed it?"</span> Answer Yes only after the facelift job has finished.</div>
-				<div class="sg-note"><b>One job at a time:</b> a conversion, facelift job, publish job or Master Data Syncing job cannot be scheduled while another one is Pending or Processing.</div>
+				<div class="sg-note"><b>Jobs run in parallel</b> (at most 5 Pending / Processing at once): conversions and publish jobs run side by side when they work on different rows; facelift (IPM Facelift VIN Update, Document Identification) and Master Data Syncing jobs run side by side too, but never together with a conversion or publish job. See Scheduling Rules.</div>
 			</div>
 
 			<!-- 3. FOLDERS -->
@@ -251,6 +251,7 @@ NewM_familia_van_ncp||WM||FL0001||E-W1J-7EC7_PDF||pdf||J_DTSNAMELIST_8.pdf||...|
 					<li><b>Old VIN deactivation</b><span>Only when the whole job succeeds, the old VIN ranges are made inactive in MDM (OLD_VIN_DEACTIVATION_REPORT). A range that is also a new range of the job is kept.</span></li>
 				</ol>
 				<div class="sg-warn"><b>After the facelift:</b> remove or archive the processed Excel files from <code>Facelift_Content</code>. While they are there, every conversion Go asks whether the facelift has been executed.</div>
+				<div class="sg-note"><b>Not together with content jobs:</b> Identify and the facelift job are refused while a conversion or publish job is Pending / Processing (and a conversion / publish is refused while they run). See Scheduling Rules.</div>
 			</div>
 
 			<!-- 8. MASTER DATA SYNCING -->
@@ -273,25 +274,34 @@ NewM_familia_van_ncp||WM||FL0001||E-W1J-7EC7_PDF||pdf||J_DTSNAMELIST_8.pdf||...|
 					<li>Reports: CATEGORY_TRANSACTIONS and CATEGORY_FAILURES in the job zip.</li>
 				</ul>
 				<div class="sg-warn"><b>Gate on the Schedule screen:</b> while categories of the selected locales are waiting for sync, an "Only Content" conversion is refused with <span class="sg-msg">"&lt;n&gt; Categories are still remaining for Syncing in Kapture for &lt;market&gt; Market ..."</span>. Run Master Data Syncing first or choose "Master Data with Content".</div>
+				<div class="sg-note"><b>Not together with content jobs:</b> Master Data Syncing is refused while a conversion or publish job is Pending / Processing, and the other way round. It can run beside facelift jobs and other syncing jobs. See Scheduling Rules.</div>
 			</div>
 
 			<!-- 9. SCHEDULING RULES -->
 			<div class="sg-panel" id="sg-rules">
 				<h4>Scheduling Rules</h4>
-				<p class="sg-lead">Checks made on the Schedule screen before a conversion can be scheduled.</p>
+				<p class="sg-lead">Checks made before a job can be scheduled - conversion (Schedule screen), publish (Preview), IPM Facelift VIN Update, Document Identification and Master Data Syncing.</p>
 				<table class="sg-table">
 					<tr><th style="width:200px">Check</th><th>Rule</th></tr>
 					<tr><td>Selection</td><td>Market is mandatory for Go; at least one row must be selected to Schedule.</td></tr>
-					<tr><td>One job at a time</td><td>Refused while another Conversion / IPM Facelift VIN Update / Master Data Syncing / Publish job is Pending or Processing.</td></tr>
-					<tr><td>Item already processing</td><td>A row (locale, model, manual type, facelift, material) already in a running job cannot be scheduled again.</td></tr>
-					<tr><td>Item being published</td><td>A row whose locale + model folder + manual type is in a running publish job is refused until that job finishes.</td></tr>
+					<tr><td>Job limit</td><td>At most 5 jobs (all types) can be Pending or Processing at the same time; the next one is refused until one finishes. Meta Data Validation is not counted.</td></tr>
+					<tr><td>Content vs master jobs</td><td><b>Content jobs</b> (Conversion MC / MME / MNAO, Publish) run in parallel with each other. <b>Master jobs</b> (IPM Facelift VIN Update, Document Identification, Master Data Syncing) run in parallel with each other. A content job is refused while a master job is Pending / Processing, and a master job is refused while a content job is.</td></tr>
+					<tr><td>Item already processing</td><td>A row (locale + model folder + manual type + facelift folder + material folder) can be in only one Pending / Processing conversion or publish job, in any market. A job without a facelift / material folder covers all of them, so it overlaps every row of that locale, model and manual type. Locales are compared without case and with <code>_</code> and <code>-</code> alike (<code>en_US</code> = <code>en-US</code>).</td></tr>
 					<tr><td>VIN + display order</td><td>A row with documents needs a VIN file and its display order file. Refused when: no VIN or display order file, only one of the two, VIN lines without proper VINs, or the display order file named in vin.txt is missing.</td></tr>
 					<tr><td>Material folders</td><td>Refused when none of the material folders named in the VIN file exists under the facelift folder.</td></tr>
 					<tr><td>Master data waiting</td><td>"Only Content" refused while categories of the selected locales wait for sync (see Master Data Syncing).</td></tr>
 					<tr><td>Facelift pending</td><td>Facelift Excel present: Go asks for confirmation that the facelift has been executed.</td></tr>
 					<tr><td>Publish</td><td>Refused while the conversion job is still running, when nothing is left to publish, or when its items are being processed by other jobs.</td></tr>
 				</table>
-				<div class="sg-note"><b>Network path changes</b> are refused while any job is Pending or Processing.</div>
+				<div class="sg-note"><b>Network path changes</b> are allowed at any time. Each job takes the path when it starts (a facelift job when it is scheduled), so jobs started from different paths can run side by side.</div>
+				<h5>Messages you may see</h5>
+				<ul>
+					<li>Job limit: <span class="sg-msg">"The job cannot be scheduled now - the limit of 5 jobs Pending / Processing at the same time is reached: &lt;jobs&gt; ..."</span></li>
+					<li>Conversion / publish while a master job runs: <span class="sg-msg">"The Conversion / Publish job cannot be scheduled now - an IPM Facelift VIN Update / Document Identification / Master Data Syncing job is Pending / Processing: &lt;jobs&gt; ..."</span></li>
+					<li>Master job while a content job runs: <span class="sg-msg">"The job cannot be scheduled now - a Conversion / Publish job is Pending / Processing: &lt;jobs&gt; ..."</span></li>
+					<li>Row overlap: <span class="sg-msg">"Row No.&lt;n&gt; is already Processing under - &lt;job&gt;."</span></li>
+				</ul>
+				<div class="sg-warn"><b>Jobs left Pending after a server restart</b> are not cleaned up automatically. They still count towards the limit and keep their rows busy - abort them from the History page.</div>
 			</div>
 
 			<!-- 10. NAMES / REPORTS / VALIDATION -->

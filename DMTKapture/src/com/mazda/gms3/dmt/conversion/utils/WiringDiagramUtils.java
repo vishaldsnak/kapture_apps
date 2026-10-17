@@ -197,7 +197,7 @@ public class WiringDiagramUtils {
 	}
 
 	/**
-	 * window.js (MC, already copied into OKAssets): every quoted "/library/..." address of an html or
+	 * window.js (MC / MME / MNAO - one shared html copy in mc.utils.XcopyUtil, already copied into OKAssets): every quoted "/library/..." address of an html or
 	 * pdf file it opens becomes "/content/library/..." (okassets.web.context), the address the browser
 	 * reaches OKAssets at. Relative addresses need nothing. Already prefixed addresses are left alone,
 	 * so a file processed twice is unchanged.

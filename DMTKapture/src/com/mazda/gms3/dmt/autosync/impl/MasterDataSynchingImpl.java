@@ -42,7 +42,7 @@ import com.mazda.gms3.dmt.vo.MarketLocaleMasterDataTypeMapping;
  * the notification e-mail. Only the target changed - the InfoManager client calls are replaced by the Kapture
  * category API, or - kapture.category.write.mode = DB - a direct write into the Kapture categories table
  * (see KaptureCategoryLocaleSync, KaptureCategoryStore). The locales of an item are independent of each other and are
- * processed in parallel (masterdata.sync.locale.threads), each worker with its own Kapture login in API mode.
+ * processed in parallel (masterdata.sync.locale.threads.db / .api by write mode), each worker with its own Kapture login in API mode.
  */
 public class MasterDataSynchingImpl extends Thread{
 
@@ -92,13 +92,15 @@ public class MasterDataSynchingImpl extends Thread{
 			// UPDATE JOB STATUS TO PROCESSING
 			transactionDAO.updateJobStatus(String.valueOf(schDetails.getScheduleId()), AutoSyncConstants.STATUS_PROCESSING, null);
 
-			int threads = KaptureApiClient.requireInt("masterdata.sync.locale.threads");
-			if(threads<1)
-			{
-				throw new IllegalStateException("masterdata.sync.locale.threads must be 1 or more, is " + threads);
-			}
 			// API: through the Kapture category API / DB: straight into the categories table (no Kapture login)
 			final boolean dbMode = KaptureCategoryStore.dbMode();
+			// workers per write mode: jobs run in parallel, so API mode keeps the Kapture sessions low
+			String threadsKey = dbMode ? "masterdata.sync.locale.threads.db" : "masterdata.sync.locale.threads.api";
+			int threads = KaptureApiClient.requireInt(threadsKey);
+			if(threads<1)
+			{
+				throw new IllegalStateException(threadsKey + " must be 1 or more, is " + threads);
+			}
 			logger.info("startSynching :: category write mode :: " + (dbMode ? KaptureCategoryStore.MODE_DB : KaptureCategoryStore.MODE_API)
 					+ " :: locale worker threads " + threads);
 			final String workerPrefix = schDetails.getThreadId() + "_L";

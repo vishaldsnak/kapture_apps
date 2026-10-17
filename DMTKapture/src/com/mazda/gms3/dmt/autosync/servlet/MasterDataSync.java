@@ -22,7 +22,6 @@ import com.mazda.gms3.dmt.autosync.vo.AutoSyncConstants;
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncScheduleDetails;
 import com.mazda.gms3.dmt.autosync.vo.AutoSyncScheduleItemDetails;
 import com.mazda.gms3.dmt.bean.UserAccessBean;
-import com.mazda.gms3.dmt.dao.ScheduleDAO;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
 import com.mazda.gms3.dmt.utils.ApplicationProperties;
@@ -37,9 +36,17 @@ public class MasterDataSync extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	
 	private Logger logger = LogManager.getLogger(MasterDataSync.class);
-	private MessageProperties msgProps= null;
-	
-	private String wslId=""; 
+	/*
+	 * PER REQUEST, NOT PER SERVLET (2026-10-16), as in Schedule. These were fields of the one servlet instance every
+	 * user shares, so a request could read another user's id or messages - jobs now run (and are scheduled) in
+	 * parallel. They are set at the start of doGet / doPost.
+	 */
+	private static final ThreadLocal<MessageProperties> MSGPROPS = new ThreadLocal<MessageProperties>();
+	private static final ThreadLocal<String> WSLID = new ThreadLocal<String>();
+
+	private static MessageProperties msgProps() { return MSGPROPS.get(); }
+	private static String wslId() { return WSLID.get(); }
+
 	private MasterDataSyncDAO masterDataDAO = new MasterDataSyncDAO();
     /**
      * @see HttpServlet#HttpServlet()
@@ -54,13 +61,14 @@ public class MasterDataSync extends HttpServlet {
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -68,7 +76,7 @@ public class MasterDataSync extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 			
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
@@ -125,13 +133,14 @@ public class MasterDataSync extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException 
 	{
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 			{
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -139,7 +148,7 @@ public class MasterDataSync extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute("DMT_LS_Locale")));
 		
 			MasterDataSyncBean sessionBean = getSessionBean(request);
 			
@@ -194,7 +203,11 @@ public class MasterDataSync extends HttpServlet {
 					/*
 					 * call SYNC Operation
 					 */
-					syncOperation(sessionBean);
+					// the job rules are checked and the schedule created under one lock, shared with the other job types
+					synchronized(com.mazda.gms3.dmt.dao.JobRules.SCHEDULE_LOCK)
+					{
+						syncOperation(sessionBean);
+					}
 				}
 				else if(sessionBean.getActionClicked().equals("REFRESH_ITEMS"))
 				{
@@ -535,12 +548,12 @@ public class MasterDataSync extends HttpServlet {
 	{
 		if(null==sessionBean.getMarketId() || "".equals(sessionBean.getMarketId()))
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.fields"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.fields"));
 			return false;
 		}
 		if(null==sessionBean.getSelectedCategories() || "".equals(sessionBean.getSelectedCategories()))
 		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item"));
 			return false;
 		}
 		return true;
@@ -580,7 +593,7 @@ public class MasterDataSync extends HttpServlet {
 			else
 			{
 				logger.info("deleteItem() :: Sr. No. for the item to be deleted is null. Failed to delete item.");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 
 		}
@@ -614,7 +627,7 @@ public class MasterDataSync extends HttpServlet {
 					 */
 					AutoSyncScheduleDetails details = new AutoSyncScheduleDetails();
 					details.setScheduleName(ApplicationProperties.getProperty("automation.sch.key")+sessionBean.getMarketId().trim().toUpperCase()+"_");
-					details.setUserId(wslId);
+					details.setUserId(wslId());
 					details.setScheduleTime(new Timestamp(new Date().getTime()));
 					details.setJobStatus(AutoSyncConstants.STATUS_PENDING);
 					details.setThreadId(ApplicationProperties.getProperty("automation.sch.key")+sessionBean.getMarketId().trim().toUpperCase()+"_");
@@ -678,7 +691,7 @@ public class MasterDataSync extends HttpServlet {
 						sessionBean.setItemsList(null);
 						sessionBean.setShowItemsBlock(false);
 						
-						sessionBean.setSuccessMessage(msgProps.addMessage("conversion.schedule.success",details.getScheduleName()));
+						sessionBean.setSuccessMessage(msgProps().addMessage("conversion.schedule.success",details.getScheduleName()));
 						
 						details = null;
 						/*
@@ -690,14 +703,14 @@ public class MasterDataSync extends HttpServlet {
 					{
 						logger.info("syncOperation :: Failed to create schedule for {"+sessionBean.getMarketId()+"} Market. Throwing Generic Error.");
 						// throw generic error
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.failure.master.data.synching.conversion"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.failure.master.data.synching.conversion"));
 					}
 					details=null;
 				}
 			}
 			else
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.mandatory.select.one.item"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.mandatory.select.one.item"));
 			}
 		}
 		catch(Exception e)
@@ -705,7 +718,7 @@ public class MasterDataSync extends HttpServlet {
 			logger.info("syncOperation :: Some Exception Occured while creating Schedule for {"+sessionBean.getMarketId()+"} Market. Throwing Generic Error.");
 			Utilities.printStackTraceToLogs(MasterDataSync.class.getName(), "syncOperation()", e);
 			// throw generic error
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 	
@@ -751,7 +764,7 @@ public class MasterDataSync extends HttpServlet {
 								{
 									Utilities.printStackTraceToLogs(MasterDataSync.class.getName(), "abortConversion()", e);
 									// no need of showing any error
-									logger.info(msgProps.getProperty("error.message.masterdatasync.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
+									logger.info(msgProps().getProperty("error.message.masterdatasync.already.finish")+" :: Proceed for updaitng Job Status in DATABASE.");
 								}
 								break;
 							}
@@ -760,12 +773,12 @@ public class MasterDataSync extends HttpServlet {
 					
 					if (threadFound == false) 
 					{
-						logger.info(msgProps.getProperty("error.message.masterdatasync.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+						logger.info(msgProps().getProperty("error.message.masterdatasync.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
 					}
 				} 
 				else
 				{
-					logger.info(msgProps.getProperty("error.message.masterdatasync.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
+					logger.info(msgProps().getProperty("error.message.masterdatasync.not.active")+" :: Proceed for updaitng Job Status in DATABASE.");
 				}
 				threadArray = null;
 				threadSet = null;
@@ -779,7 +792,7 @@ public class MasterDataSync extends HttpServlet {
 					MasterDataSyncTransactionDAO transDao = new MasterDataSyncTransactionDAO();
 					transDao.updateJobStatus(scheduleId, AutoSyncConstants.STATUS_ABORTED, AutoSyncConstants.STATUS_FAILURE);
 					transDao = null;
-					sessionBean.setSuccessMessage(msgProps.getProperty("abort.masterdatasync.success.message"));
+					sessionBean.setSuccessMessage(msgProps().getProperty("abort.masterdatasync.success.message"));
 					/*
 					 * re-call Transaction List
 					 */
@@ -789,19 +802,19 @@ public class MasterDataSync extends HttpServlet {
 				{
 					Utilities.printStackTraceToLogs(MasterDataSync.class.getName(), "abortConversionOperation()", e);
 					logger.info("abortConversionOperation :: Error while updating status for Schedule Id {"+scheduleId+"} in DATABASE.");
-					sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 				}
 			}
 			else
 			{
 				logger.info("abortConversionOperation :: Schedule Id & Thread Id from request as param are null. Throw Message");
-				sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			}
 		}
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(MasterDataSync.class.getName(), "abortConversionOperation()", e);
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.faiure"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 		}
 	}
 	
@@ -821,7 +834,7 @@ public class MasterDataSync extends HttpServlet {
 					boolean bool = masterDataDAO.deleteScheduleDetails(selRows);
 					if(bool==true)
 					{
-						sessionBean.setSuccessMessage(msgProps.getProperty("schedule.delete.success"));
+						sessionBean.setSuccessMessage(msgProps().getProperty("schedule.delete.success"));
 						/*
 						 * call getTransactionList
 						 */
@@ -829,18 +842,18 @@ public class MasterDataSync extends HttpServlet {
 					}
 					else
 					{
-						sessionBean.setErrorMessage(msgProps.getProperty("error.message.schedule.delete"));
+						sessionBean.setErrorMessage(msgProps().getProperty("error.message.schedule.delete"));
 					}
 				}
 				else
 				{
-					sessionBean.setErrorMessage(msgProps.getProperty("error.select.onerow.delete"));
+					sessionBean.setErrorMessage(msgProps().getProperty("error.select.onerow.delete"));
 				}
 				selRows=  null;
 			}
 			else
 			{
-				sessionBean.setErrorMessage(msgProps.getProperty("error.select.onerow.delete"));
+				sessionBean.setErrorMessage(msgProps().getProperty("error.select.onerow.delete"));
 			}
 		}
 		catch(Exception  e)
@@ -852,21 +865,23 @@ public class MasterDataSync extends HttpServlet {
 	private boolean validateConversion(MasterDataSyncBean sessionBean)
 	{
 		/*
-		 * check if there's any Pending / Processing Job - then do not allow to Schedule Conversion.
-		 * Date 19 November 2016
+		 * JOB RULES (2026-10-16, JobRules): refused while a Conversion / Publish job is Pending or Processing, or when the
+		 * parallel jobs cap is reached. Other Master Data Syncing / Facelift / Document Identification jobs may run.
 		 */
-		int count=0;
 		try 
 		{
-			count = ScheduleDAO.getPendingProcessingJobsCount();
+			com.mazda.gms3.dmt.dao.JobRules.Refusal refusal = com.mazda.gms3.dmt.dao.JobRules.masterRefusal(com.mazda.gms3.dmt.dao.JobRules.active());
+			if(null!=refusal)
+			{
+				sessionBean.setErrorMessage(msgProps().getMessage(refusal.args, refusal.key));
+				return false;
+			}
 		}
 		catch (Exception e) 
 		{
+			// the rules cannot be checked - nothing is scheduled
 			Utilities.printStackTraceToLogs(MasterDataSync.class.getName(), "validateConversion()", e);
-		}
-		if(count>0)
-		{
-			sessionBean.setErrorMessage(msgProps.getProperty("error.message.fail.master.data.synching"));
+			sessionBean.setErrorMessage(msgProps().getProperty("error.message.faiure"));
 			return false;
 		}
 		return true;

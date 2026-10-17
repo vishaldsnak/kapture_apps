@@ -68,6 +68,41 @@ public final class OkAssetsWeb {
 		return sb.toString();
 	}
 
+	/**
+	 * The reverse of forKapture for one path: /content/library/MAZDA/... -> /library/MAZDA/...
+	 * Used where a path that may already carry the kapture.library.path.context prefix is compared with
+	 * the /library/ path DMT builds (the stylesheet links the Kapture sanitizer keeps). Any other value,
+	 * or a blank context, is returned as it is.
+	 */
+	public static String withoutKaptureContext(String path) {
+		if (null == path) {
+			return null;
+		}
+		String p = path.trim();
+		String ctx = ApplicationProperties.getProperty("kapture.library.path.context");
+		if (null == ctx) {
+			throw new IllegalStateException("kapture.library.path.context is not set in application.properties");
+		}
+		ctx = ctx.trim().replace("\\", "/");
+		while (ctx.endsWith("/")) {
+			ctx = ctx.substring(0, ctx.length() - 1);
+		}
+		if ("".equals(ctx)) {
+			return p;
+		}
+		if (!ctx.startsWith("/")) {
+			ctx = "/" + ctx;
+		}
+		String library = KaptureApiClient.require("SERVER_LIBRARY_DIRECTORY").trim().replace("\\", "/");
+		while (library.startsWith("/")) {
+			library = library.substring(1);
+		}
+		if (!library.endsWith("/")) {
+			library = library + "/";
+		}
+		return p.toLowerCase().startsWith((ctx + "/" + library).toLowerCase()) ? p.substring(ctx.length()) : p;
+	}
+
 	/** okassets.web.context without a trailing slash (missing key = error). */
 	public static String context() {
 		String ctx = KaptureApiClient.require("okassets.web.context").replace("\\", "/");

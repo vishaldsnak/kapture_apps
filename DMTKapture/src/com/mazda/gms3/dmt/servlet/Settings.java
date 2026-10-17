@@ -10,7 +10,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.mazda.gms3.dmt.bean.SettingsBean;
 import com.mazda.gms3.dmt.bean.UserAccessBean;
-import com.mazda.gms3.dmt.dao.ScheduleDAO;
 import com.mazda.gms3.dmt.dao.SettingsDAO;
 import com.mazda.gms3.dmt.logging.LogManager;
 import com.mazda.gms3.dmt.logging.Logger;
@@ -26,8 +25,15 @@ public class Settings extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
 	static Logger logger = LogManager.getLogger(Settings.class);
-	static MessageProperties msgProps = null;
-	static String wslId = "";
+	/*
+	 * PER REQUEST, NOT PER SERVLET (2026-10-16), as in Schedule. These were static fields every user shares, so a
+	 * request could save its path under another user's id. They are set at the start of doGet / doPost.
+	 */
+	private static final ThreadLocal<MessageProperties> MSGPROPS = new ThreadLocal<MessageProperties>();
+	private static final ThreadLocal<String> WSLID = new ThreadLocal<String>();
+
+	private static MessageProperties msgProps() { return MSGPROPS.get(); }
+	private static String wslId() { return WSLID.get(); }
 
 	/**
 	 * @see HttpServlet#HttpServlet()
@@ -43,11 +49,12 @@ public class Settings extends HttpServlet {
 	protected void doGet(HttpServletRequest request,
 			HttpServletResponse response) throws ServletException, IOException {
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try {
 			if (ApplicationProperties.getProperty("wsl.check").equals("TRUE")) {
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -55,8 +62,8 @@ public class Settings extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute(
-					"DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute(
+					"DMT_LS_Locale")));
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
 			 */
@@ -77,7 +84,7 @@ public class Settings extends HttpServlet {
 			sessionBean.setShowUpdate(false);
 
 			sessionBean.setFieldDetails(new SettingDetails());
-			sessionBean.getFieldDetails().setUserId(wslId);
+			sessionBean.getFieldDetails().setUserId(wslId());
 			/*
 			 * call function to get Network Path on the basis of User Id
 			 */
@@ -101,11 +108,12 @@ public class Settings extends HttpServlet {
 	protected void doPost(HttpServletRequest request,
 			HttpServletResponse response) throws ServletException, IOException {
 		boolean useReqDis = true;
+		WSLID.set(""); MSGPROPS.remove();
 		try {
 			if (ApplicationProperties.getProperty("wsl.check").equals("TRUE")) {
 				// Get WSL ID From request Header and set in Variable
-				wslId = request.getHeader("iv-user");
-				if (null == wslId || "".equals(wslId)) {
+				WSLID.set(request.getHeader("iv-user"));
+				if (null == wslId() || "".equals(wslId())) {
 					/*
 					 * re direct to Error
 					 */
@@ -113,8 +121,8 @@ public class Settings extends HttpServlet {
 					useReqDis = false;
 				}
 			}
-			msgProps = new MessageProperties(request.getSession().getAttribute(
-					"DMT_LS_Locale"));
+			MSGPROPS.set(new MessageProperties(request.getSession().getAttribute(
+					"DMT_LS_Locale")));
 			/*
 			 * CHECK WHETHER USER HAS ACCESS TO THE APPLICATION OR NOT
 			 */
@@ -134,7 +142,7 @@ public class Settings extends HttpServlet {
 				sessionBean.setFieldDetails(new SettingDetails());
 			}
 			// set userId
-			sessionBean.getFieldDetails().setUserId(wslId);
+			sessionBean.getFieldDetails().setUserId(wslId());
 
 			if (null != request.getParameter("DMT_SET_ActionClicked")
 					&& !"".equals(request.getParameter("DMT_SET_ActionClicked"))) {
@@ -154,45 +162,38 @@ public class Settings extends HttpServlet {
 					 */
 					if (validate(sessionBean)) {
 						/*
-						 * CHECK IF THERE'S ANY JOB UNDER PROCESSING STATE DO
-						 * NOT ALLOW TO UPDATE THE PATH. DATE - 14TH NOVEMBER
-						 * 2016
+						 * THE PATH CAN BE SAVED WHILE JOBS RUN (2026-10-16): every job takes its path when it starts
+						 * (conversions read it at start, a Facelift job when it is scheduled), so jobs started from
+						 * different locations run side by side. Was refused while any job was Pending / Processing.
 						 */
-						int count = ScheduleDAO.getPendingProcessingJobsCount();
-						if (count <= 0) {
-							/*
-							 * call function to save / update networkPath
-							 */
-							boolean flag = SettingsDAO
-									.saveNetworkPath(sessionBean
-											.getFieldDetails());
-							if (flag == true) {
-								if (sessionBean.isShowSave()) {
-									sessionBean
-											.setSuccessMessage(msgProps
-													.addMessage(
-															"settings.save.success.message",
-															msgProps.getProperty("label.networkpath")));
-								} else if (sessionBean.isShowUpdate()) {
-									sessionBean
-											.setSuccessMessage(msgProps
-													.addMessage(
-															"settings.update.success.message",
-															msgProps.getProperty("label.networkpath")));
-								}
-
-								/*
-								 * call function to getNetwork Path again
-								 */
-								getSettingDetails(sessionBean);
-							} else {
-								sessionBean.setErrorMessage(msgProps
-										.getProperty("error.message.faiure"));
+						/*
+						 * call function to save / update networkPath
+						 */
+						boolean flag = SettingsDAO
+								.saveNetworkPath(sessionBean
+										.getFieldDetails());
+						if (flag == true) {
+							if (sessionBean.isShowSave()) {
+								sessionBean
+										.setSuccessMessage(msgProps()
+												.addMessage(
+														"settings.save.success.message",
+														msgProps().getProperty("label.networkpath")));
+							} else if (sessionBean.isShowUpdate()) {
+								sessionBean
+										.setSuccessMessage(msgProps()
+												.addMessage(
+														"settings.update.success.message",
+														msgProps().getProperty("label.networkpath")));
 							}
+
+							/*
+							 * call function to getNetwork Path again
+							 */
+							getSettingDetails(sessionBean);
 						} else {
-							sessionBean
-									.setErrorMessage(msgProps
-											.getProperty("error.message.fail.settings.sourcepath.update"));
+							sessionBean.setErrorMessage(msgProps()
+									.getProperty("error.message.faiure"));
 						}
 					}
 				} else if (request.getParameter("DMT_SET_ActionClicked")
@@ -283,7 +284,7 @@ public class Settings extends HttpServlet {
 				|| "".equals(sessionBean.getFieldDetails().getUserId())
 				|| null == sessionBean.getFieldDetails().getNetworkPath()
 				|| "".equals(sessionBean.getFieldDetails().getNetworkPath())) {
-			sessionBean.setErrorMessage(msgProps
+			sessionBean.setErrorMessage(msgProps()
 					.getProperty("error.message.mandatory.fields"));
 			return false;
 		}
@@ -292,9 +293,9 @@ public class Settings extends HttpServlet {
 				&& null != sessionBean.getFieldDetails().getUserId()
 				&& !"".equals(sessionBean.getFieldDetails().getUserId())) {
 			if (sessionBean.getFieldDetails().getUserId().trim().length() > 100) {
-				String data = msgProps.getProperty("label.userid") + ",100";
+				String data = msgProps().getProperty("label.userid") + ",100";
 				String[] id = data.split(",");
-				sessionBean.setErrorMessage(msgProps.getMessage(id,
+				sessionBean.setErrorMessage(msgProps().getMessage(id,
 						"error.length.greater.characters"));
 				data = null;
 				id = null;
@@ -306,10 +307,10 @@ public class Settings extends HttpServlet {
 				&& null != sessionBean.getFieldDetails().getNetworkPath()
 				&& !"".equals(sessionBean.getFieldDetails().getNetworkPath())) {
 			if (sessionBean.getFieldDetails().getNetworkPath().trim().length() > 300) {
-				String data = msgProps.getProperty("label.networkpath")
+				String data = msgProps().getProperty("label.networkpath")
 						+ ",300";
 				String[] id = data.split(",");
-				sessionBean.setErrorMessage(msgProps.getMessage(id,
+				sessionBean.setErrorMessage(msgProps().getMessage(id,
 						"error.length.greater.characters"));
 				data = null;
 				id = null;

@@ -363,10 +363,13 @@ public class CDRomDAO extends DBConnectionHelper {
 						if(null!=cdRomTableName && !"".equals(cdRomTableName))
 						{
 							checkCDRomExistsSql="SELECT DISTINCT dc_cd_manualtype_folder FROM "+cdRomTableName+" WHERE "
-									+ " TRIM(LOWER(dc_cd_txt_file_path)) LIKE '%"+faceLiftFolderPath.trim().toLowerCase()+"%'";
-							logger.info("getServiceContentList :: checkCDRomExistsSql :: > " + checkCDRomExistsSql);
-							stmt = conn.createStatement();
-							rs = stmt.executeQuery(checkCDRomExistsSql);
+									+ " LOCATE(?, TRIM(LOWER(dc_cd_txt_file_path))) > 0";
+							logger.info("getServiceContentList :: checkCDRomExistsSql :: > " + checkCDRomExistsSql + " :: folder > " + faceLiftFolderPath);
+							// path bound as a parameter (DMTKapture pattern) - a backslash path inside a LIKE literal matched nothing
+							PreparedStatement checkPstmt = conn.prepareStatement(checkCDRomExistsSql);
+							checkPstmt.setString(1, faceLiftFolderPath.trim().toLowerCase());
+							stmt = checkPstmt;
+							rs = checkPstmt.executeQuery();
 							while(rs.next())
 							{
 								String docType = rs.getString("dc_cd_manualtype_folder");
@@ -2876,11 +2879,14 @@ public class CDRomDAO extends DBConnectionHelper {
 						{
 							// CHECK IN OLD / NEW TABLE
 							getVINSql="SELECT DISTINCT dc_vin_carline_code, dc_vin_vds_code, dc_vin_vis_start_range "
-									+ " FROM "+vinTableName+" WHERE TRIM(LOWER(dc_vin_txt_file_path)) LIKE '%"+faceLiftFolderPath.trim().toLowerCase()+"%' "
+									+ " FROM "+vinTableName+" WHERE LOCATE(?, TRIM(LOWER(dc_vin_txt_file_path))) > 0 "
 									+ " GROUP BY dc_vin_carline_code, dc_vin_vds_code, dc_vin_vis_start_range";
-							logger.info("getApplicableVINList :: getVINSql :: > " + getVINSql);
-							stmt = conn.createStatement();
-							rs = stmt.executeQuery(getVINSql);
+							logger.info("getApplicableVINList :: getVINSql :: > " + getVINSql + " :: folder > " + faceLiftFolderPath);
+							// path bound as a parameter (DMTKapture pattern) - a backslash path inside a LIKE literal matched nothing
+							PreparedStatement vinPstmt = conn.prepareStatement(getVINSql);
+							vinPstmt.setString(1, faceLiftFolderPath.trim().toLowerCase());
+							stmt = vinPstmt;
+							rs = vinPstmt.executeQuery();
 							while(rs.next())
 							{
 								ApplicableVINList appVINDetails =new ApplicableVINList();
@@ -3121,19 +3127,26 @@ public class CDRomDAO extends DBConnectionHelper {
 				if(null!=secondFaceLiftFolderPath && !"".equals(secondFaceLiftFolderPath))
 				{
 					sql="SELECT DISTINCT dc_im_doc_id FROM "+tableName +" WHERE "
-							+ " TRIM(LOWER(dc_cd_txt_file_path)) LIKE'%"+faceLiftFolderPath.trim().toLowerCase()+"%' "
-							+ " OR TRIM(LOWER(dc_cd_txt_file_path)) LIKE'%"+secondFaceLiftFolderPath.trim().toLowerCase()+"%'";
+							+ " LOCATE(?, TRIM(LOWER(dc_cd_txt_file_path))) > 0 "
+							+ " OR LOCATE(?, TRIM(LOWER(dc_cd_txt_file_path))) > 0";
 				}
 				else
 				{
 					sql="SELECT DISTINCT dc_im_doc_id FROM "+tableName +" WHERE "
-							+ " TRIM(LOWER(dc_cd_txt_file_path)) LIKE'%"+faceLiftFolderPath.trim().toLowerCase()+"%'";
+							+ " LOCATE(?, TRIM(LOWER(dc_cd_txt_file_path))) > 0";
 				}
 
 
-				logger.info("fetchCDRomDataOnFaceLift :: Sql ################ :: > " + sql);
-				stmt = conn.createStatement();
-				rs = stmt.executeQuery(sql);
+				logger.info("fetchCDRomDataOnFaceLift :: Sql ################ :: > " + sql + " :: folder > " + faceLiftFolderPath + " / " + secondFaceLiftFolderPath);
+				// paths bound as parameters (DMTKapture pattern) - a backslash path inside a LIKE literal matched nothing
+				PreparedStatement txtPstmt = conn.prepareStatement(sql);
+				txtPstmt.setString(1, faceLiftFolderPath.trim().toLowerCase());
+				if(null!=secondFaceLiftFolderPath && !"".equals(secondFaceLiftFolderPath))
+				{
+					txtPstmt.setString(2, secondFaceLiftFolderPath.trim().toLowerCase());
+				}
+				stmt = txtPstmt;
+				rs = txtPstmt.executeQuery();
 				while(rs.next())
 				{
 					documentIdsList.add(rs.getString("dc_im_doc_id"));
@@ -3343,11 +3356,14 @@ public class CDRomDAO extends DBConnectionHelper {
 					if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath) && null!=documentTableName && !"".equals(documentTableName))
 					{
 						tempDocumentsList = new ArrayList<String>();
-						sql = "SELECT dc_im_doc_id FROM "+documentTableName+" WHERE TRIM(LOWER(dc_source_network_loc)) LIKE '"+faceLiftFolderPath.trim().trim().toLowerCase()+"%' AND "
+						sql = "SELECT dc_im_doc_id FROM "+documentTableName+" WHERE LOCATE(?, TRIM(LOWER(dc_source_network_loc))) = 1 AND "
 								+ "dc_doc_status='"+ApplicationProperties.getProperty("flag.value.active")+"' ";
-						logger.info("fetchCDRomDataOnFaceLift :: Get All Documents Sql :: >"+ sql);
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
+						logger.info("fetchCDRomDataOnFaceLift :: Get All Documents Sql :: >"+ sql + " :: folder > " + faceLiftFolderPath);
+						// path bound as a parameter (DMTKapture pattern) - a backslash path inside a LIKE literal matched nothing
+						PreparedStatement docsPstmt = conn.prepareStatement(sql);
+						docsPstmt.setString(1, faceLiftFolderPath.trim().toLowerCase());
+						stmt = docsPstmt;
+						rs = docsPstmt.executeQuery();
 						while(rs.next())
 						{
 							if(null!=rs.getString("dc_im_doc_id") && !"".equals(rs.getString("dc_im_doc_id")))
@@ -3681,10 +3697,13 @@ public class CDRomDAO extends DBConnectionHelper {
 					if(null!=faceLiftFolderPath && !"".equals(faceLiftFolderPath) && null!=documentTableName && !"".equals(documentTableName))
 					{
 						tempDocumentsList = new ArrayList<String>();
-						sql = "SELECT dc_im_doc_id FROM "+documentTableName+" WHERE dc_source_network_loc LIKE '"+faceLiftFolderPath+"%' AND dc_doc_status='"+ApplicationProperties.getProperty("flag.value.active")+"'";
-						logger.info("fetchCDRomDataOnBookCodes :: Get All Documents Sql :: >"+ sql);
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
+						sql = "SELECT dc_im_doc_id FROM "+documentTableName+" WHERE LOCATE(?, TRIM(LOWER(dc_source_network_loc))) = 1 AND dc_doc_status='"+ApplicationProperties.getProperty("flag.value.active")+"'";
+						logger.info("fetchCDRomDataOnBookCodes :: Get All Documents Sql :: >"+ sql + " :: folder > " + faceLiftFolderPath);
+						// path bound as a parameter (DMTKapture pattern) - a backslash path inside a LIKE literal matched nothing
+						PreparedStatement bookPstmt = conn.prepareStatement(sql);
+						bookPstmt.setString(1, faceLiftFolderPath.trim().toLowerCase());
+						stmt = bookPstmt;
+						rs = bookPstmt.executeQuery();
 						while(rs.next())
 						{
 							if(null!=rs.getString("dc_im_doc_id") && !"".equals(rs.getString("dc_im_doc_id")))

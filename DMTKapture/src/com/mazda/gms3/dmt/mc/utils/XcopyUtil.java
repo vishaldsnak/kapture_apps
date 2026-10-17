@@ -384,7 +384,7 @@ public class XcopyUtil {
 									jsContent = null;
 
 									/*
-									 * KAPTURE: the html and pdf addresses window.js opens are /library/...;
+									 * KAPTURE (MC / MME / MNAO alike): the html and pdf addresses window.js opens are /library/...;
 									 * the browser reaches OKAssets at /content/library/... - updated in place
 									 */
 									wiringDiagramUtils.prefixOkAssetsContextInWindowJS(testCheck);
