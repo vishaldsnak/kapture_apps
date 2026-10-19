@@ -491,7 +491,7 @@ public class SpecialCharactersUtils {
 		title = title.replace("&real;","„œ");
 		title = title.replace("&reals;","„");
 		title = title.replace("&rx;","„ž");
-		title = title.replace("&trade;","„¢");
+		title = title.replace("&trade;","™");
 		title = title.replace("&integers;","„¤");
 		title = title.replace("&ohm;","„¦");
 		title = title.replace("&mho;","„§");
@@ -1527,7 +1527,7 @@ public class SpecialCharactersUtils {
 		title = title.replace("&realine;","„›");
 		title = title.replace("&Re;","„œ");
 		title = title.replace("&Ropf;","„");
-		title = title.replace("&TRADE;","„¢");
+		title = title.replace("&TRADE;","™");
 		title = title.replace("&Zopf;","„¤");
 		title = title.replace("&zeetrf;","„¨");
 		title = title.replace("&Bernoullis;","„¬");
@@ -2522,7 +2522,7 @@ public class SpecialCharactersUtils {
 		title = title.replace("&#x0211C;","„œ");
 		title = title.replace("&#x0211D;","„");
 		title = title.replace("&#x0211E;","„ž");
-		title = title.replace("&#x02122;","„¢");
+		title = title.replace("&#x02122;","™");
 		title = title.replace("&#x02124;","„¤");
 		title = title.replace("&#x02126;","„¦");
 		title = title.replace("&#x02127;","„§");
@@ -3970,7 +3970,7 @@ public class SpecialCharactersUtils {
 		title = title.replace("&#8476;","„œ");
 		title = title.replace("&#8477;","„");
 		title = title.replace("&#8478;","„ž");
-		title = title.replace("&#8482;","„¢");
+		title = title.replace("&#8482;","™");
 		title = title.replace("&#8484;","„¤");
 		title = title.replace("&#8486;","„¦");
 		title = title.replace("&#8487;","„§");
