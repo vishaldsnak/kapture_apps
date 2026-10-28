@@ -2163,9 +2163,7 @@ public class Schedule extends HttpServlet {
 																					// d01.txt or CD00.txt or vin.txt
 																					if(dummyFile.isFile())
 																					{
-																						if(dummyFile.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.vin.ent")) && 
-																								!dummyFile.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.scm.vin.ent")) && 
-																								dummyFile.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
+																						if(com.mazda.gms3.dmt.utils.MetadataFiles.isVinFile(dummyFile.getName()))
 																						{
 																							vinFileFound = true;
 																							break;
@@ -2258,9 +2256,7 @@ public class Schedule extends HttpServlet {
 																						}
 																						modelFolderName = null;
 
-																						if(dummyFile.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.vin.ent")) && 
-																								!dummyFile.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.scm.vin.ent")) &&  
-																								dummyFile.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
+																						if(com.mazda.gms3.dmt.utils.MetadataFiles.isVinFile(dummyFile.getName()))
 																						{
 																							ArrayList<VinDetails> tempList = new ArrayList<VinDetails>();
 																							if(sessionBean.getMarketId().trim().toLowerCase().equals
@@ -3193,7 +3189,7 @@ public class Schedule extends HttpServlet {
 
 						if(childFile.exists() && childFile.isFile())
 						{
-							if(childFile.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.name.esicat")))
+							if(com.mazda.gms3.dmt.utils.MetadataFiles.isEsiCatFile(childFile.getName()))
 							{
 								/*
 								 * HERE CHECK IF MARKET IS MC - THEN READ THE ESI CAT FILE AS PER EXISTING FORMAT
@@ -3415,39 +3411,13 @@ public class Schedule extends HttpServlet {
 	 */
 	private boolean skipAttributesFile(String fileName)
 	{
-		if(null!=fileName && !"".equals(fileName))
-		{
-			String skipItems = ApplicationProperties.getProperty("skip.items.pattern");
-			StringTokenizer str = new StringTokenizer(skipItems,",");
-			while(str.hasMoreTokens())
-			{
-				String token = str.nextToken();
-				/*
-				 * IF TOKEN =D, E.G. DISPAYORDER TEXT FILE, THEN SKIP IT AND EXTENSION OF THE FILE ENDS WITH .TXT FILE
-				 * IF TOKEN =CD, E.G. DISPAYORDER TEXT FILE, THEN SKIP IT AND EXTENSION OF THE FILE ENDS WITH .TXT FILE
-				 */
-				if(token.equals("d") || token.trim().toLowerCase().equals("cd"))
-				{
-					// APPLICABLE FOR MC - CHECK FOR DISPLAY ORDER TEXT FILE / CD PROCESSING TEXT FILE
-					if(fileName.trim().toLowerCase().startsWith(token.trim().toLowerCase()) && 
-							fileName.trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
-					{
-						return true;
-					}
-				}
-				else
-				{
-					if(fileName.trim().toLowerCase().contains(token.trim().toLowerCase()))
-					{
-						return true;
-					}
-				}
-				token=null;
-			}
-			skipItems = null;
-			str = null;
-		}
-		return false;
+		/*
+		 * METADATA / ATTRIBUTE FILES ONLY, BY WHOLE NAME + EXTENSION (MetadataFiles): d / cd / esicat / vin
+		 * text files, delete.txt, leftmenu.txt, vin / vin_attribute ent files, window.js.
+		 * WAS skip.items.pattern MATCHED ANYWHERE IN THE NAME - A DOCUMENT LIKE RM100000001GVIN.html WAS
+		 * LEFT OUT OF THE COUNT ALTHOUGH THE CONVERSION PROCESSES IT.
+		 */
+		return com.mazda.gms3.dmt.utils.MetadataFiles.isMetadataFile(fileName);
 	}
 
 

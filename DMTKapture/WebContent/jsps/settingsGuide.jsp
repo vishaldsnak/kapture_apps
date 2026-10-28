@@ -127,6 +127,16 @@
 				<h4>Content Text Files</h4>
 				<p class="sg-lead">Fields are separated by <code>||</code>, one entry per line, each line ending with <code>;</code>.</p>
 
+				<h5>File names</h5>
+				<p>Text files are recognised by the start of the name and the extension (upper or lower case):</p>
+				<table class="sg-table">
+					<tr><th style="width:330px">File</th><th>Handling</th></tr>
+					<tr><td><code>vin*.txt</code>, <code>d*.txt</code>, <code>cd*.txt</code>, <code>scmvin*.txt</code>, <code>esicat.txt</code></td><td>Read as described below; never a document.</td></tr>
+					<tr><td><code>delete.txt</code>, <code>leftmenu.txt</code>, <code>vin*.ent</code>, <code>vin_attribute*.ent</code></td><td>Not used any more and ignored everywhere: not a document, not counted, not copied.</td></tr>
+					<tr><td><code>window.js</code></td><td>Not a document; copied with the wiring diagram files.</td></tr>
+				</table>
+				<p>A file whose name only contains one of these words is a normal document or file, e.g. <code>RM100000001GVIN.html</code>, <code>id0102q200vin.ent</code>, <code>window_resize.js</code>, <code>arrow_left.svg</code>.</p>
+
 				<h5>VIN file - facelift folder (<code>vin.txt</code>, <code>vin1.txt</code> ...)</h5>
 				<table class="sg-table">
 					<tr><th style="width:80px">Market</th><th style="width:60px">Fields</th><th>Layout</th></tr>

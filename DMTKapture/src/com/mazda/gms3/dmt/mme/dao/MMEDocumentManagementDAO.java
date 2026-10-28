@@ -760,7 +760,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "CREATE");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1081,7 +1081,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "UPDATE");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1367,7 +1367,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "DELETE");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1694,7 +1694,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "MODIFY");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -2439,7 +2439,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 											details = (DisplayOrderDetails)contentDetails.getApplicableDisplayOrderList().get(c);
 											details.setProcessingStatus("FAILURE");
 											details.setErrorCode("DISP003");
-											details.setErrorMessage("FAILED TO IDETNFIY IM DOCUMENT ID.");
+											details.setErrorMessage("FAILED TO IDENTIFY DOCUMENT ID.");
 											if(null==finalDisplayOrderList || finalDisplayOrderList.size()<=0)
 											{
 												finalDisplayOrderList = new ArrayList<DisplayOrderDetails>();
@@ -2591,8 +2591,9 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 													{
 														// SET PROCESSING STATUS AS FAILURE
 														details.setProcessingStatus("FAILURE");
-														details.setErrorCode(e.getMessage());
-														details.setErrorMessage(writer.toString());
+														// same code + text in all markets; the stack trace stays in DMT.log (printStackTraceToLogs)
+														details.setErrorCode("DSP010");
+														details.setErrorMessage("FAILED TO PERFORM DATABASE OPERATIONS FOR THE DISPLAY ORDER ROW. PLEASE CONTACT IT SUPPORT TEAM.");
 													}
 												}
 												details = null;
@@ -2674,8 +2675,9 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 						{
 							details = (DisplayOrderDetails)contentDetails.getApplicableDisplayOrderList().get(c);
 							details.setProcessingStatus("FAILURE");
-							details.setErrorCode(e.getMessage());
-							details.setErrorMessage(writer.toString());
+							// same code + text in all markets; the stack trace stays in DMT.log (printStackTraceToLogs)
+							details.setErrorCode("DSP010");
+							details.setErrorMessage("FAILED TO PERFORM DATABASE OPERATIONS FOR THE DISPLAY ORDER ROW. PLEASE CONTACT IT SUPPORT TEAM.");
 							if(null==finalDisplayOrderList || finalDisplayOrderList.size()<0)
 							{
 								finalDisplayOrderList = new ArrayList<DisplayOrderDetails>();
@@ -3769,7 +3771,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 					String errorMessage="";
 					if(null==details.getDocumentId() || "".equals(details.getDocumentId()))
 					{
-						errorMessage = "FAILED TO IDETNFIY IM DOCUMENT ID.";
+						errorMessage = "FAILED TO IDENTIFY DOCUMENT ID.";
 						logger.info("processCDDataInformation :: Failed to Identify Document Id for Source File Path :: > "+ details.getFilePath());
 					}
 					if(null==details.getCdProcessingSourceFileName() || "".equals(details.getCdProcessingSourceFileName()))
@@ -4168,7 +4170,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 					String errorMessage="";
 					if(null==details.getDocumentId() || "".equals(details.getDocumentId()))
 					{
-						errorMessage = "FAILED TO IDETNFIY IM DOCUMENT ID.";
+						errorMessage = "FAILED TO IDENTIFY DOCUMENT ID.";
 						logger.info("processCDDataInformation :: Failed to Identify Document Id for Source File Path :: > "+ details.getFilePath());
 					}
 					if(null==details.getCdProcessingSourceFileName() || "".equals(details.getCdProcessingSourceFileName()))
@@ -6504,7 +6506,7 @@ public class MMEDocumentManagementDAO  extends DBConnectionHelper{
 						details = (VinDetails)scmVINList.get(a);
 						details.setProcessingStatus("FAILURE");
 						details.setErrorCode("CDP004");
-						details.setErrorMessage("MODEL TYPE AS PARAMETER WAS NULL. FAILED TO IDENTIFY IM DOCUMENT TABLE NAME.");
+						details.setErrorMessage("MODEL TYPE AS PARAMETER WAS NULL. FAILED TO IDENTIFY DOCUMENT TABLE NAME.");
 						details = null;
 					}
 

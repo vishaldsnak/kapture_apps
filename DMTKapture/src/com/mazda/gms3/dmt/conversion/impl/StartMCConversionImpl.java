@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.gson.JsonObject;
+import com.mazda.gms3.dmt.kapture.KaptureApiClient;
 import com.mazda.gms3.dmt.kapture.KaptureArticle;
 import com.mazda.gms3.dmt.kapture.KaptureContentService;
 import com.mazda.gms3.dmt.kapture.KaptureLookupDAO;
@@ -342,9 +343,7 @@ public class StartMCConversionImpl {
 												File chF = (File)fcChildsList[m];
 												if(chF.exists() && chF.isFile())
 												{
-													if(chF.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.vin.ent")) && 
-															!chF.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.scm.vin.ent")) && 
-															chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
+													if(com.mazda.gms3.dmt.utils.MetadataFiles.isVinFile(chF.getName()))
 													{
 														// VIN TEXT FILE FOUND.
 														ArrayList<VinDetails> tempList = ConversionUtils.readVINTextFile(chF,"Y");
@@ -512,7 +511,6 @@ public class StartMCConversionImpl {
 									// DOCUMENT PROCESSING
 									startDocumentProcessing(itemDetails);
 									materialFolderContentList = null;
-									categoriesListForMaterialFolder = null;
 									mfDataPrepSuccessCount = 0;
 									mfDataPrepfailureCount = 0;
 									
@@ -525,6 +523,9 @@ public class StartMCConversionImpl {
 									// INNERLINKS PROCESSING
 									startProcessingInnerLinks(scheduleId, itemDetails);
 									mateialFolderDocumentsListForInnerLinks  = null;
+									// categories stay until the inner links pass is done: its Kapture update rewrites the whole article, so it
+									// must send the document categories / ESI categories again (resolveCategories maps through this list)
+									categoriesListForMaterialFolder = null;
 									
 									logger.info("startConversion :: INNERLINKS PROCESSING ENDED AT :: >"+ new Date());
 									
@@ -637,9 +638,7 @@ public class StartMCConversionImpl {
 											File chF = (File)fcChildsList[m];
 											if(chF.exists() && chF.isFile())
 											{
-												if(chF.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.vin.ent")) && 
-														!chF.getName().trim().toLowerCase().contains(ApplicationProperties.getProperty("file.scm.vin.ent")) && 
-														chF.getName().trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.txt")))
+												if(com.mazda.gms3.dmt.utils.MetadataFiles.isVinFile(chF.getName()))
 												{
 													// VIN TEXT FILE FOUND.
 													ArrayList<VinDetails> tempList = ConversionUtils.readVINTextFile(chF,"Y");
@@ -5509,19 +5508,33 @@ public class StartMCConversionImpl {
 				SelectItemDetails si  = null;
 				linkDetails = null;
 				contentDetails =  null;
-				// pass 0: fix the links of each document and queue it; then the queued documents are written
-				// in batches; pass 1: the result of each document, handled as before
+				// pass 0: fix the links of each document and queue it; pass 1, 2, ...: one chunk of the queued
+				// documents each (kapture.bulk.max.articles.per.request) - written to Kapture, the result of each
+				// document handled as before, then the chunk's counts added to the schedule, so the History page
+				// shows the progress instead of 0 / 0 / 0 until the material folder is done
 				List<ContentDetails> innerLinkUpdates = new ArrayList<ContentDetails>();
 				java.util.Set<ContentDetails> innerLinkUpdatesSaved = null;
-				for(int pass=0;pass<2;pass++)
+				List<ContentDetails> innerLinkPassDocs = mateialFolderDocumentsListForInnerLinks;
+				int innerLinkChunkSize = KaptureApiClient.requireInt("kapture.bulk.max.articles.per.request");
+				if(innerLinkChunkSize<=0)
 				{
-				if(pass==1)
-				{
-					innerLinkUpdatesSaved = updateDocumentsForInnerLinks(innerLinkUpdates);
+					throw new IllegalStateException("kapture.bulk.max.articles.per.request in application.properties must be greater than 0");
 				}
-				for(int a=0;a<mateialFolderDocumentsListForInnerLinks.size();a++)
+				// the total and the links mapped when the documents were written: shown now, the rest chunk by chunk
+				ScheduleDAO.updateInnerLinksCount(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), totalCount, successCount, failureCount);
+				int reportedSuccessCount = successCount;
+				int reportedFailureCount = failureCount;
+				for(int pass=0;pass==0 || (pass-1)*innerLinkChunkSize<innerLinkUpdates.size();pass++)
 				{
-					contentDetails = (ContentDetails)mateialFolderDocumentsListForInnerLinks.get(a);
+				if(pass>=1)
+				{
+					innerLinkPassDocs = new ArrayList<ContentDetails>(innerLinkUpdates.subList((pass-1)*innerLinkChunkSize,
+							Math.min(pass*innerLinkChunkSize, innerLinkUpdates.size())));
+					innerLinkUpdatesSaved = updateDocumentsForInnerLinks(innerLinkPassDocs);
+				}
+				for(int a=0;a<innerLinkPassDocs.size();a++)
+				{
+					contentDetails = (ContentDetails)innerLinkPassDocs.get(a);
 					if(null!=contentDetails.getInnerLinkFound() && contentDetails.getInnerLinkFound().equals("YES") 
 							&& null!=contentDetails.getInnerLinksList()  && contentDetails.getInnerLinksList().size()>0)
 					{
@@ -5781,7 +5794,7 @@ public class StartMCConversionImpl {
 								 */
 								contentDetails.setInnerLinkFound("YES");
 								contentDetails.setAllInnerLinksMapped("NO");
-								contentDetails.setInnerLinkMappingReason("FAILED TO UPDATE {"+contentDetails.getImDocumentId()+"} IN INFO MANAGER.");
+								contentDetails.setInnerLinkMappingReason("FAILED TO UPDATE {"+contentDetails.getImDocumentId()+"} IN KAPTURE.");
 								// SET INNERLINKS LIST TO NULL 
 								//										contentDetails.setInnerLinksList(null);
 								// add all innerLinks count for failureCount
@@ -5837,6 +5850,14 @@ public class StartMCConversionImpl {
 					}
 				}
 
+				if(pass>=1)
+				{
+					// this chunk's processed / failed inner links
+					ScheduleDAO.updateInnerLinksCount(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()), 0, successCount-reportedSuccessCount, failureCount-reportedFailureCount,
+							totalCount, successCount, failureCount);
+					reportedSuccessCount = successCount;
+					reportedFailureCount = failureCount;
+				}
 				}
 
 				/*
@@ -5849,7 +5870,9 @@ public class StartMCConversionImpl {
 				/*
 				 * UPDATE TOTAL, PROCESSED & FAILED INNER LINKS COUNT FOR SCHEDULE ID & ITEM ID
 				 */
-				ScheduleDAO.updateInnerLinksCount(contentDetails.getScheduleId(), contentDetails.getItemId(), totalCount, successCount, failureCount);
+				// what the chunks have not added yet (the total is already in)
+				ScheduleDAO.updateInnerLinksCount(contentDetails.getScheduleId(), contentDetails.getItemId(), 0, successCount-reportedSuccessCount, failureCount-reportedFailureCount,
+						totalCount, successCount, failureCount);
 			}
 		}
 		catch(Exception e)

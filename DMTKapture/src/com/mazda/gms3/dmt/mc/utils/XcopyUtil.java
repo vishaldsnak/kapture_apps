@@ -57,6 +57,11 @@ public class XcopyUtil {
 			String materialFolderName, String movementType,
 			ContentDetails contentDetails, WiringDiagramUtils wiringDiagramUtils) {
 		boolean updateFailureCount = false;
+		// delete.txt / leftmenu.txt / vin and vin_attribute ent files are not OKAssets files (MetadataFiles)
+		if (null != sourceFile && sourceFile.isFile() && com.mazda.gms3.dmt.utils.MetadataFiles.isIgnoredFile(sourceFile.getName())) {
+			logger.info("copyFilesToServer :: metadata file not copied :: " + sourceFile.getName());
+			return;
+		}
 		try {
 			boolean proceedFurther = false;
 			if (null != XCOPY_FLAG && !"".equals(XCOPY_FLAG)
@@ -787,7 +792,8 @@ public class XcopyUtil {
 				{
 					if(htmlFiles[a].isFile())
 					{
-						if(!htmlFiles[a].getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("thumbs.db.file")))
+						if(!htmlFiles[a].getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("thumbs.db.file"))
+								&& !com.mazda.gms3.dmt.utils.MetadataFiles.isIgnoredFile(htmlFiles[a].getName()))
 						{
 							/*
 							 * call function to add File to Processing List
@@ -1039,6 +1045,10 @@ public class XcopyUtil {
 	 * at once. A failed copy is known from the copy itself - no second look at the S3 mount.
 	 */
 	public void copyFileKeepingSourcePath(File sourceFile, File destinationDirectory, ContentDetails contentDetails) {
+		if (null != sourceFile && sourceFile.isFile() && com.mazda.gms3.dmt.utils.MetadataFiles.isIgnoredFile(sourceFile.getName())) {
+			logger.info("copyFileKeepingSourcePath :: metadata file not copied :: " + sourceFile.getName());
+			return;
+		}
 		boolean copied = false;
 		String destination = PathUtil.winPath(destinationDirectory);
 		try {

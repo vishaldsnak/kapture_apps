@@ -115,6 +115,15 @@ CHECK = [
     ["B4", "External links http(s)://", "All HTML content",
      "<a href=\"https://...\">", "Untouched", "Untouched", "Untouched - opens normally", "No", "", "", "", ""],
     ["B5", "Anchors #name", "All HTML content", "<a href=\"#x\">", "Untouched", "Untouched", "Untouched", "No", "", "", "", ""],
+    ["B6", "Dead links: href=\"javascript:void(0)\" / \"#\" / \"\"", "All markets, all HTML / ENT content",
+     "<a class=\"ewd_mlink\" href=\"javascript:void(0)\">text<span class=\"invisible\">ewd_type=...</span></a> (MC familia van e-WD links: 4,953 in 559 files); <a href=\"#\">; <a href=\"\">",
+     "javascript:void(0) treated as an inner link: <locale>\\...\\html\\javascript:void(0) (never mapped)",
+     "href=\"#\" - a dead link, NOT tracked as an inner link (no INNER_LINKS_REPORT row, no lookup); text and spans kept. "
+     "Anchors #name (B5), javascript:openAnotherTab (B1 / B2) and real links are unchanged.",
+     "Dead link", "YES (user rule 2026-10-24)",
+     "mc/utils/ConversionUtils.isDeadLinkHref + prepareInnerLinkPaths (used by MC, MME and MNAO)",
+     "1) INNER_LINKS_REPORT.xlsx: no ...\\javascript:void(0) rows\n2) Kapture document: href=\"#\"\n3) no Kapture 400 \"Potentially malicious input\"",
+     "OK", "MC Dev 5750: 5,012 familia van documents refused by Kapture (javascript: in the rewritten href) -> fixed; 5757: 5,017 / 5,017 loaded, 0 javascript rows."],
 
     # ---- C. WD JS files in OKAssets ----
     ["C1", "window.js", "WD HTML_MC (html folder, Flash pages)",
@@ -169,6 +178,18 @@ CHECK = [
      "Served at /content/library/...",
      "Root only", "StartMCConversionImpl.startProcessingOKAssets; XcopyUtil.copyFilesToServer",
      "Files present at the physical path; transaction report OKAssets counts", "", "OEM content: see E4."],
+    ["D4", "Metadata / attribute files (by name START + extension, case-insensitive)", "All markets - Schedule counts, conversion, OKAssets copy",
+     "vin*.txt, d*.txt (not delete.txt), cd*.txt, scmvin*.txt, esicat.txt; delete.txt, leftmenu.txt, vin*.ent, vin_attribute*.ent; window.js",
+     "Schedule count skipped any file whose name CONTAINED Vin / Delete / left / window / esicat (skip.items.pattern) - the conversion did not, "
+     "so Total < Processed (e.g. RM100000001GVIN.html)",
+     "vin*.txt / d*.txt / cd*.txt / scmvin*.txt / esicat.txt: metadata, never a document. delete.txt / leftmenu.txt / vin*.ent / vin_attribute*.ent: "
+     "ignored everywhere (not a document, not counted, not copied to OKAssets). window.js (exact): not a document, still copied (C1). "
+     "Names that only CONTAIN a word are normal: RM100000001GVIN.html, id0102q200vin.ent, window_resize.js, arrow_left.svg.",
+     "-", "YES (user rule 2026-10-24)",
+     "utils/MetadataFiles (keys file.vin.ent, file.scm.vin.ent, file.name.displayorder, file.name.cdprocessing, file.name.esicat, file.name.delete, "
+     "file.leftment.txt, file.name.window.js, extension.txt / .ent); servlet/Schedule.skipAttributesFile; Start*ConversionImpl vin.txt detection; "
+     "mc/utils + conversion/utils XcopyUtil. skip.items.pattern removed.",
+     "History / Item Details: DOCUMENTS Total = Processed + Failed (MC Dev 5757 familia van HTML was 5016 / 5017)", "", ""],
 ]
 
 # ---------------------------------------------------------------------------------------------
@@ -503,9 +524,9 @@ MNAO_ROWS = [
      "MNAO only", "db/dmtgt_mnao_pre_deployment.sql (section 8 = checks)", "Section 8 of the script: every count 0", None,
      "Local kapture_dc 2026-10-06: 15m28s, section 8 all 0. OKAssets folders are restructured manually on the server (R2)."],
     ["N4", "VIN files", "vin.ent + vin_attribute.ent",
-     "vin.txt, vin1.txt ... in the facelift folder (file.vin.ent + .txt, not scmvin); a line applies when manual + FL + material match; 11 fields incl. model and year (a line with fewer fields is a VIN file issue)",
+     "vin*.txt in the facelift folder (name starts with vin, ends .txt - D4; scmvin*.txt is the MME SCM file); a line applies when manual + FL + material match; 11 fields incl. model and year (a line with fewer fields is a VIN file issue)",
      "Yes (MNAO reader readVINTextFileForMNAO)", "mc/utils/ConversionUtils.readVINTextFileForMNAO",
-     "vin.txt of BT-50 WM FL0012 (2 lines) read; a 10-field line is reported, not loaded", None, "vin.ent / vin_attribute.ent are no longer read (user 2026-10-06)."],
+     "vin.txt of BT-50 WM FL0012 (2 lines) read; a 10-field line is reported, not loaded", None, "vin.ent / vin_attribute.ent are no longer read (user 2026-10-06); since 2026-10-24 vin*.ent / vin_attribute*.ent are ignored everywhere (D4)."],
     ["N5", "Display order files", "-",
      "d01.txt, d02.txt ... (file.name.displayorder, not delete); a document takes the display order file its vin.txt line names - matched on the complete file name, exactly as MC / MME",
      "Yes", "same comparison as StartMCConversionImpl / StartMMEConversionImpl (getDisplayOrderSourceFileName equals getDisplayOrderTextFileName)",

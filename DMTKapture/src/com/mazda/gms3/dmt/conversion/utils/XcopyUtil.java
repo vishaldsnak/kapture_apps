@@ -54,6 +54,11 @@ public class XcopyUtil {
 	public void copyFilesToServer(File sourceFile,String localeFolderName, String channelFolderName,
 			 String modelFolderName, String manualTypeFolderName, String yearFolderName, String movementType, ContentDetails contentDetails, WiringDiagramUtils wiringDiagramUtils) {
 		boolean updateFailureCount=false;
+		// delete.txt / leftmenu.txt / vin and vin_attribute ent files are not OKAssets files (MetadataFiles)
+		if (null != sourceFile && sourceFile.isFile() && com.mazda.gms3.dmt.utils.MetadataFiles.isIgnoredFile(sourceFile.getName())) {
+			logger.info("copyFilesToServer :: metadata file not copied :: " + sourceFile.getName());
+			return;
+		}
 		try {
 			boolean proceedFurther = false;
 			if (null != XCOPY_FLAG && !"".equals(XCOPY_FLAG) && XCOPY_FLAG.toLowerCase().equals("y")) 
@@ -435,7 +440,8 @@ public class XcopyUtil {
 				{
 					if(htmlFiles[a].isFile())
 					{
-						if(!htmlFiles[a].getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("thumbs.db.file")))
+						if(!htmlFiles[a].getName().trim().toLowerCase().equals(ApplicationProperties.getProperty("thumbs.db.file"))
+								&& !com.mazda.gms3.dmt.utils.MetadataFiles.isIgnoredFile(htmlFiles[a].getName()))
 						{
 							/*
 							 * call function to add File to Processing List

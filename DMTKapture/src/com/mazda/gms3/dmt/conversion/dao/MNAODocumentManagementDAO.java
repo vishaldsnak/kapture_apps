@@ -849,7 +849,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "CREATE");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1217,7 +1217,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "MODIFY");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1615,7 +1615,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 					errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 					errorMap.put("CHANNEL", contentDetails.getChannelName());
 					errorMap.put("ERROR_CODE", "DBEXP002");
-					errorMap.put("ERROR_MESSAGE", "UNABLE TO LOCATE RECORD FOR IM_DOCUMENT_ID IN DATABASE.");
+					errorMap.put("ERROR_MESSAGE", "UNABLE TO LOCATE RECORD FOR DOCUMENT_ID IN DATABASE.");
 					errorMap.put("RECORD_ID", contentDetails.getImContentType());
 					errorMap.put("OPERATION_TYPE", "MODIFY");
 					errorMap.put("DOCUMENT_LOCATION", contentDetails.getFileAbsolutePath());
@@ -1665,7 +1665,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "MODIFY");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -1951,7 +1951,7 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				errorMap.put("LOCALE", ApplicationProperties.getProperty(contentDetails.getLocale().trim().toLowerCase()));
 				errorMap.put("CHANNEL", contentDetails.getChannelName());
 				errorMap.put("ERROR_CODE", "DBEXP001");
-				errorMap.put("ERROR_MESSAGE", "IM_DOCUMENT_ID AS PARAMETER IS NULL.");
+				errorMap.put("ERROR_MESSAGE", "DOCUMENT_ID AS PARAMETER IS NULL.");
 				errorMap.put("RECORD_ID", contentDetails.getImContentType());
 				errorMap.put("OPERATION_TYPE", "DELETE");
 				errorMap.put("DOCUMENT_LOCATION", contentDetails.getFilePath());
@@ -2236,155 +2236,6 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 				if(null!=vinMasterList && vinMasterList.size()>0)
 				{
 					/*
-					 * DATE CHANGE 17 SEPT 2026
-					 * IF PROCESSING LOCALE IS EN_US 
-					 * 	THEN FETCH MODEL FOR EN_CA LOCALE AS WELL ON THE BASIS OF WMI CODE, AND CARLINE CODE
-					 * AND CHECK IF IT IS ALREADY ADDED - THEN DO NOTHING
-					 * ELSE ADD A NEW ROW WITH CARLINE NAME AND CODE - DO NOTHING WITH WMI, VDS, VIS RANGES - AS THIS MODEL YEAR NEEDS TO BE MAPPED
-					 * NOT THE VIN RANGES
-					 */
-					String checkLocForENCA = langCode;
-					checkLocForENCA = checkLocForENCA.replace("-", "_");
-					String enCaLocale=ApplicationProperties.getProperty("en-ca");
-					if(null!=enCaLocale && !"".equals(enCaLocale))
-					{
-						enCaLocale = enCaLocale.replace("_", "-");
-						boolean enCAOpApplicable=false;
-						if(checkLocForENCA.trim().toLowerCase().equals(ApplicationProperties.getProperty("en-us").trim().toLowerCase()))
-						{
-							// enCA Locale Operation Applicable
-							enCAOpApplicable = true;
-						}
-						
-						if(enCAOpApplicable==true)
-						{
-							sql=null;
-							List<VINEntFileDetails> tempCAModelsList = new ArrayList<VINEntFileDetails>();
-							for(int a=0;a<vinMasterList.size();a++)
-							{
-								VINEntFileDetails details = (VINEntFileDetails)vinMasterList.get(a);
-								if(null!=details.getVinWMI() && !"".equals(details.getVinWMI()) && null!=details.getVinCarline() && !"".equals(details.getVinCarline()))
-								{
-									sql="SELECT MDM_CRLN_NAME_ENG_LANG FROM gms3_mdm_carline_codes WHERE MDM_CRLN_WMI_CODE='"+details.getVinWMI()+"' "
-											+ " AND MDM_CRLN_CODE='"+details.getVinCarline()+"' AND MDM_CRLN_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"' "
-											+ "AND MDM_ML_LANG_CODE='"+enCaLocale+"'";
-									stmt = conn.createStatement();
-									rs = stmt.executeQuery(sql);
-									VINEntFileDetails tDetails = null;
-									while(rs.next())
-									{
-										tDetails = new VINEntFileDetails();
-										if(null!=rs.getString("MDM_CRLN_NAME_ENG_LANG") && !"".equals(rs.getString("MDM_CRLN_NAME_ENG_LANG")))
-										{
-											tDetails.setModelCode(rs.getString("MDM_CRLN_NAME_ENG_LANG"));
-										}
-										// set rest of the VIN Details as is
-										tDetails.setVinWMI(details.getVinWMI());
-										tDetails.setVinCarline(details.getVinCarline());
-										tDetails.setVinVDS(details.getVinVDS());
-										tDetails.setVinStartRange(details.getVinStartRange());
-										tDetails.setVinEndRange(details.getVinEndRange());
-										tDetails.setLangCodeForYearRange(enCaLocale);
-										tempCAModelsList.add(tDetails);
-										tDetails = null;
-									}
-									rs.close();rs=null;
-									stmt.close();stmt=null;
-									sql = null;
-									tDetails = null;
-								}
-								details = null;
-							}
-							
-							/*
-							 * NOW ITERATE AND VERIFY IF THE MODEL EXISTS - THEN DO NOT ADD ELSE ADD TO VIN MASTER LIST
-							 * The new en_CA rows are collected in finalENCaModelsList and added to vinMasterList only
-							 * after the check, so they are compared with the en_US rows only (same fix as legacy PROD).
-							 */
-							List<VINEntFileDetails> finalENCaModelsList = new ArrayList<VINEntFileDetails>();
-							if(null!=tempCAModelsList && tempCAModelsList.size()>0)
-							{
-								VINEntFileDetails tDetails = null;
-								VINEntFileDetails checkDetails = null;
-								for(int re=0;re<tempCAModelsList.size();re++)
-								{
-									tDetails = (VINEntFileDetails) tempCAModelsList.get(re);
-									if(null!=tDetails.getModelCode() && !"".equals(tDetails.getModelCode()) && 
-											null!=tDetails.getVinWMI() && !"".equals(tDetails.getVinWMI()) && 
-											null!=tDetails.getVinVDS() && !"".equals(tDetails.getVinVDS()) && 
-											null!=tDetails.getVinCarline() && !"".equals(tDetails.getVinCarline()) && 
-											null!=tDetails.getVinStartRange() && !"".equals(tDetails.getVinStartRange()) && 
-											null!=tDetails.getVinEndRange() && !"".equals(tDetails.getVinEndRange()))
-									{
-										boolean addToVINMaster=true;
-										if(null!=vinMasterList && vinMasterList.size()>0)
-										{
-											checkDetails = null;
-											for(int wrt=0;wrt<vinMasterList.size();wrt++)
-											{
-												checkDetails = (VINEntFileDetails)vinMasterList.get(wrt);
-												if(null!=checkDetails.getModelCode() && !"".equals(checkDetails.getModelCode()) && 
-														null!=checkDetails.getVinWMI() && !"".equals(checkDetails.getVinWMI()) && 
-														null!=checkDetails.getVinVDS() && !"".equals(checkDetails.getVinVDS()) && 
-														null!=checkDetails.getVinCarline() && !"".equals(checkDetails.getVinCarline()) && 
-														null!=checkDetails.getVinStartRange() && !"".equals(checkDetails.getVinStartRange()) && 
-														null!=checkDetails.getVinEndRange() && !"".equals(checkDetails.getVinEndRange()))
-												{
-													if(tDetails.getModelCode().trim().toLowerCase().equals(checkDetails.getModelCode().trim().toLowerCase()) &&
-															tDetails.getVinWMI().trim().toLowerCase().equals(checkDetails.getVinWMI().trim().toLowerCase()) &&
-															tDetails.getVinVDS().trim().toLowerCase().equals(checkDetails.getVinVDS().trim().toLowerCase()) &&
-															tDetails.getVinCarline().trim().toLowerCase().equals(checkDetails.getVinCarline().trim().toLowerCase()) &&
-															tDetails.getVinStartRange().trim().toLowerCase().equals(checkDetails.getVinStartRange().trim().toLowerCase()) &&
-															tDetails.getVinEndRange().trim().toLowerCase().equals(checkDetails.getVinEndRange().trim().toLowerCase()))
-													{
-														addToVINMaster = false;
-														break;
-													}
-												}
-												checkDetails = null;
-											}
-											checkDetails = null;
-										}
-										
-										if(addToVINMaster==true)
-										{
-											VINEntFileDetails newTDetails = new VINEntFileDetails();
-											newTDetails.setModelCode(tDetails.getModelCode());
-											// set rest of the VIN Details as is
-											newTDetails.setVinWMI(tDetails.getVinWMI());
-											newTDetails.setVinCarline(tDetails.getVinCarline());
-											newTDetails.setVinVDS(tDetails.getVinVDS());
-											newTDetails.setVinStartRange(tDetails.getVinStartRange());
-											newTDetails.setVinEndRange(tDetails.getVinEndRange());
-											newTDetails.setLangCodeForYearRange(tDetails.getLangCodeForYearRange());
-											finalENCaModelsList.add(newTDetails);
-											newTDetails = null;
-										}
-									}
-									tDetails = null;
-								}
-								tDetails = null;
-								checkDetails = null;
-							}
-							tempCAModelsList = null;
-
-							if(null!=finalENCaModelsList && finalENCaModelsList.size()>0)
-							{
-								if(null==vinMasterList || vinMasterList.size()<=0)
-								{
-									vinMasterList = new ArrayList<VINEntFileDetails>();
-								}
-								vinMasterList.addAll(finalENCaModelsList);
-							}
-							finalENCaModelsList = null;
-						}
-					}
-					checkLocForENCA = null;
-					enCaLocale = null;
-					
-					
-					
-					/*
 					 * iterate VIN Master List and identify Year from each VDS on the basis of 7th position character
 					 */
 					sql = null;
@@ -2433,6 +2284,316 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 							}
 						}
 					}
+					
+					/*
+					 * DATE CHANGE 17 SEPT 2026
+					 * IF PROCESSING LOCALE IS EN_US 
+					 * 	THEN FETCH MODEL FOR EN_CA LOCALE AS WELL ON THE BASIS OF WMI CODE, AND CARLINE CODE
+					 * AND CHECK IF IT IS ALREADY ADDED - THEN DO NOTHING
+					 * ELSE ADD A NEW ROW WITH CARLINE NAME AND CODE - DO NOTHING WITH WMI, VDS, VIS RANGES - AS THIS MODEL YEAR NEEDS TO BE MAPPED
+					 * NOT THE VIN RANGES
+					 * 
+					 * DATE CHANGE = 23 OCT 2026
+					 * ONCE THE EXACT MODEL YEAR OF EACH EN_US MODEL IS IDENTIFIED - THEN START PROCESSING 
+					 * 	FOR EN_CA LOCALE CHECK
+					 * 
+					 * IF PROCESSING LOCALE IS EN_US
+					 * 	THEN 
+					 * 		CHECK WMI+CARLINE_CODE+MODEL NAME - EXISTS FOR EN_CA LOCALE
+					 * 			IF YES - SKIP ADDING ANY EN_CA MODEL MAPPING
+					 * 			IF NO - 
+					 * 				CHECK FOR VIN+WMI & FETCH MODELS + YEAR RANGES
+					 * 				NOW - FOR THE PROCESSING ROW OF EN_US CHECK MAPPED MODEL YEAR
+					 * 					IF MAPPED MODEL YEAR OF EN_US IS FOUND - 
+					 * 						- CHECK THE SAME MODEL YEAR EXISTS IN EN_CA MODEL YEAR RANGE
+					 * 							- IF YES - THEN ADD THIS EN_CA CARLINE MODEL WITH EN_US MAPPED YEAR AS IT EXISTS IN EN_CA MODEL YEAR RANGE
+					 * 							- IF NO - THEN SKIP ADDING THIS EN_CA CARLINE MODEL
+					 *					IF MAPPED MODEL YEAR OF EN_US IS NOT FOUND
+					 *						- IN THIS CASE WHEN PERFORMING processModelYearCategories IN CATEGORY UTILS - ALL YEARS OF IDENTIFIED EN_US YEAR RANGE ARE ADDED 
+					 *							AS MAPPED MODEL YEAR
+					 *							- NOW CHECK EACH EN_US YEAR OF EN_US YEAR RANGE - EXISTS IN EN_CA YEAR RANGE
+					 *								- IF YES - THEN ADD EN_CA CARLINE MODEL WITH EN_US IDENTIFIED YEAR RANGE
+					 *								- IF NO - THEN DO NOT ADD 	 
+					 */
+					String checkLocForENCA = langCode;
+					checkLocForENCA = checkLocForENCA.replace("-", "_");
+					String enCaLocale=ApplicationProperties.getProperty("en-ca");
+					if(null!=enCaLocale && !"".equals(enCaLocale))
+					{
+						enCaLocale = enCaLocale.replace("_", "-");
+						boolean enCAOpApplicable=false;
+						if(checkLocForENCA.trim().toLowerCase().equals(ApplicationProperties.getProperty("en-us").trim().toLowerCase()))
+						{
+							// enCA Locale Operation Applicable
+							enCAOpApplicable = true;
+						}
+						if(enCAOpApplicable==true)
+						{
+							sql=null;
+							List<VINEntFileDetails> tempCAModelsList = new ArrayList<VINEntFileDetails>();
+							for(int a=0;a<vinMasterList.size();a++)
+							{
+								VINEntFileDetails details = (VINEntFileDetails)vinMasterList.get(a);
+								if(null!=details.getVinWMI() && !"".equals(details.getVinWMI()) && 
+										null!=details.getVinCarline() && !"".equals(details.getVinCarline()) && 
+										null!=details.getModelCode() && !"".equals(details.getModelCode()))
+								{
+									sql="SELECT MDM_CRLN_NAME_ENG_LANG FROM gms3_mdm_carline_codes WHERE MDM_CRLN_WMI_CODE='"+details.getVinWMI()+"' "
+											+ " AND MDM_CRLN_CODE='"+details.getVinCarline()+"' AND "
+													+ " MDM_CRLN_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"' "
+											+ "AND MDM_ML_LANG_CODE='"+enCaLocale+"' AND MDM_CRLN_NAME_ENG_LANG='"+details.getModelCode()+"'";
+									stmt = conn.createStatement();
+									rs = stmt.executeQuery(sql);
+									VINEntFileDetails tDetails = null;
+									boolean recordExists = false;
+									while(rs.next())
+									{
+										logger.info("getMasterVinDetailsList :: EN_CA Model CHECK :: "+ details.getModelCode()+"/"+details.getVinCarline()+"/"+details.getVinWMI()+". Exists in BOTH EN_US & EN_CA. Skip EN_CA Model Mapping for it.");
+										recordExists = true;
+										break;
+									}
+									rs.close();rs=null;
+									stmt.close();stmt=null;
+									sql = null;
+									
+									if(recordExists==false)
+									{
+										logger.info("getMasterVinDetailsList :: EN_CA Model CHECK :: "+ details.getModelCode()+"/"+details.getVinCarline()+"/"+details.getVinWMI()+". EN_US Model Does not Exists in EN_CA. Check for CARLINE CODE+ WMI CODE.");
+										/*
+										 * COMBINATION OF MODEL+CARLINE CODE+ WMI CODE DOES NOT EXIST
+										 */
+										
+										/*
+										 * CHECK IF MAPPED YEAR IS NOT AVAILABLE - 
+										 * 		THEN FETCH EN_US CARLINE YEAR RANGE
+										 */
+										int yearToCheck=0;
+										int enUStartYear=0;
+										int enUSEndYear=0;
+										if(null!=details.getModelYear() && !"".equals(details.getModelYear()))
+										{
+											try
+											{
+												yearToCheck = new Integer(details.getModelYear()).intValue();
+											}catch(Exception er) {
+												Utilities.printStackTraceToLogs(MNAODocumentManagementDAO.class.getName(), "getMasterVinDetailsList()", er);
+											}
+										}
+										else
+										{
+											sql="SELECT MDM_CRLN_YEAR_START,MDM_CRLN_YEAR_END FROM gms3_mdm_carline_codes WHERE MDM_CRLN_WMI_CODE='"+details.getVinWMI()+"' "
+													+ " AND MDM_CRLN_CODE='"+details.getVinCarline()+"' AND "
+															+ " MDM_CRLN_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"'  "
+													+ "AND MDM_ML_LANG_CODE='"+details.getLangCodeForYearRange().replace("_", "-")+"' AND MDM_CRLN_NAME_ENG_LANG='"+details.getModelCode()+"'";
+											stmt = conn.createStatement();
+											rs = stmt.executeQuery(sql);
+											if(rs.next())
+											{
+												enUStartYear = rs.getInt("MDM_CRLN_YEAR_START");
+												enUSEndYear = rs.getInt("MDM_CRLN_YEAR_END");
+											}
+											rs.close();rs=null;
+											stmt.close();stmt=null;
+											sql=null;
+										}
+										
+										// NOW PROCEED FOR FETCHING EN_CA MODELS.
+										sql="SELECT MDM_CRLN_NAME_ENG_LANG, MDM_CRLN_YEAR_START,MDM_CRLN_YEAR_END FROM gms3_mdm_carline_codes WHERE MDM_CRLN_WMI_CODE='"+details.getVinWMI()+"' "
+												+ " AND MDM_CRLN_CODE='"+details.getVinCarline()+"' AND "
+														+ " MDM_CRLN_FLAG='"+ApplicationProperties.getProperty("flag.value.active")+"'  "
+												+ "AND MDM_ML_LANG_CODE='"+enCaLocale+"'";
+										stmt = conn.createStatement();
+										rs = stmt.executeQuery(sql);
+										int enCAStartYear = 0;
+										int enCAEndYear = 0;		
+										while(rs.next())
+										{
+											enCAStartYear = rs.getInt("MDM_CRLN_YEAR_START");
+											enCAEndYear  = rs.getInt("MDM_CRLN_YEAR_END");
+											
+											if(enCAStartYear> 0 && enCAEndYear>0)
+											{
+												if(yearToCheck > 0)
+												{
+													logger.info("getMasterVinDetailsList :: EN_CA Model Check ::  Mapped Year ("+yearToCheck+") for EN_US is Available. Check If it Exists in EN_CA Model Year Range.");
+													if((enCAStartYear <= yearToCheck) && (yearToCheck <= enCAEndYear))
+													{
+														// EN_US MAPPED YEAR - EXISTS IN EN_CA YEAR RANGE
+														
+														tDetails = new VINEntFileDetails();
+														if(null!=rs.getString("MDM_CRLN_NAME_ENG_LANG") && !"".equals(rs.getString("MDM_CRLN_NAME_ENG_LANG")))
+														{
+															tDetails.setModelCode(rs.getString("MDM_CRLN_NAME_ENG_LANG"));
+														}
+														// set rest of the VIN Details as is
+														tDetails.setVinWMI(details.getVinWMI());
+														tDetails.setVinCarline(details.getVinCarline());
+														tDetails.setVinVDS(details.getVinVDS());
+														tDetails.setVinStartRange(details.getVinStartRange());
+														tDetails.setVinEndRange(details.getVinEndRange());
+														tDetails.setLangCodeForYearRange(enCaLocale);
+														tDetails.setModelYear(details.getModelYear());
+														tempCAModelsList.add(tDetails);
+														logger.info("getMasterVinDetailsList :: EN_CA Model Check ::  Mapped Year ("+yearToCheck+") for EN_US is Lie in EN_CA Model Range. Proceed for Adding EN_CA Model :: >"+ tDetails.getModelCode());
+														tDetails = null;
+													}
+												}
+												else
+												{
+													logger.info("getMasterVinDetailsList :: EN_CA Model Check ::  Mapped Year for EN_US is NOT Available. Check all EN_US Model Year Ranges in EN_CA Model Year Range & Identify which one exists in EN_CA, only those will be allowed.");
+													if(enUStartYear > 0 && enUSEndYear > 0)
+													{
+														// PROCEED ONLY WHEN EN US YEAR RANGES ARE AVAILABLE
+													
+												        // Calculate overlap boundaries
+												        int overlapStart = Math.max(enUStartYear, enCAStartYear);
+												        int overlapEnd = Math.min(enUSEndYear, enCAEndYear);
+
+												        ArrayList<String> rangesList = new ArrayList<>();
+
+												        // Collect all years within the overlapping range
+												        for (int year = overlapStart; year <= overlapEnd; year++) {
+												        	rangesList.add(String.valueOf(year));
+												        }
+												        
+												        logger.info("getMasterVinDetailsList :: EN_CA Model Check :: Identified Applicable Year Ranges are :: " + rangesList);
+												        
+												        // MAP EN_CA MODEL WITH IDENTIFIED RANGES LIST
+												        if(null!=rangesList && rangesList.size()>0)
+												        {
+												        	tDetails = new VINEntFileDetails();
+															if(null!=rs.getString("MDM_CRLN_NAME_ENG_LANG") && !"".equals(rs.getString("MDM_CRLN_NAME_ENG_LANG")))
+															{
+																tDetails.setModelCode(rs.getString("MDM_CRLN_NAME_ENG_LANG"));
+															}
+															// set rest of the VIN Details as is
+															tDetails.setVinWMI(details.getVinWMI());
+															tDetails.setVinCarline(details.getVinCarline());
+															tDetails.setVinVDS(details.getVinVDS());
+															tDetails.setVinStartRange(details.getVinStartRange());
+															tDetails.setVinEndRange(details.getVinEndRange());
+															tDetails.setLangCodeForYearRange(enCaLocale);
+															// set rangesList here
+															tDetails.setRangesList(rangesList);
+															tempCAModelsList.add(tDetails);
+															tDetails = null;
+												        }
+												        rangesList = null;
+												        overlapStart=  0;
+												        overlapEnd = 0;
+													}
+												}
+											}
+											enCAStartYear=0;
+											enCAEndYear  =0;
+										}
+										rs.close();rs=null;
+										stmt.close();stmt=null;
+										sql = null;
+										tDetails = null;
+										enCAStartYear=0;
+										enCAEndYear  =0;
+										yearToCheck = 0;
+										enUStartYear=0;
+										enUSEndYear=0;
+									}
+								}
+								details = null;
+							}
+							
+							/*
+							 * NOW ITERATE AND VERIFY IF THE MODEL EXISTS - THEN DO NOT ADD ELSE ADD TO VIN MASTER LIST
+							 * The new en_CA rows are collected in finalENCaModelsList and added to vinMasterList only
+							 * after the check, so they are compared with the en_US rows only (same fix as legacy PROD).
+							 */
+							List<VINEntFileDetails> finalENCaModelsList = new ArrayList<VINEntFileDetails>();
+							if(null!=tempCAModelsList && tempCAModelsList.size()>0)
+							{
+								VINEntFileDetails tDetails = null;
+								VINEntFileDetails checkDetails = null;
+								for(int re=0;re<tempCAModelsList.size();re++)
+								{
+									tDetails = (VINEntFileDetails) tempCAModelsList.get(re);
+									if(null!=tDetails.getModelCode() && !"".equals(tDetails.getModelCode()) && 
+											null!=tDetails.getVinWMI() && !"".equals(tDetails.getVinWMI()) && 
+											null!=tDetails.getVinVDS() && !"".equals(tDetails.getVinVDS()) && 
+											null!=tDetails.getVinCarline() && !"".equals(tDetails.getVinCarline()) && 
+											null!=tDetails.getVinStartRange() && !"".equals(tDetails.getVinStartRange()) && 
+											null!=tDetails.getVinEndRange() && !"".equals(tDetails.getVinEndRange()))
+									{
+										boolean addToVINMaster=true;
+										if(null!=vinMasterList && vinMasterList.size()>0)
+										{
+											checkDetails = null;
+											for(int wrt=0;wrt<vinMasterList.size();wrt++)
+											{
+												checkDetails = (VINEntFileDetails)vinMasterList.get(wrt);
+												if(null!=checkDetails.getModelCode() && !"".equals(checkDetails.getModelCode()) && 
+														null!=checkDetails.getVinWMI() && !"".equals(checkDetails.getVinWMI()) && 
+														null!=checkDetails.getVinVDS() && !"".equals(checkDetails.getVinVDS()) && 
+														null!=checkDetails.getVinCarline() && !"".equals(checkDetails.getVinCarline()) && 
+														null!=checkDetails.getVinStartRange() && !"".equals(checkDetails.getVinStartRange()) && 
+														null!=checkDetails.getVinEndRange() && !"".equals(checkDetails.getVinEndRange()))
+												{
+													if(tDetails.getModelCode().trim().toLowerCase().equals(checkDetails.getModelCode().trim().toLowerCase()) && 
+															tDetails.getVinWMI().trim().toLowerCase().equals(checkDetails.getVinWMI().trim().toLowerCase()) &&	
+															tDetails.getVinVDS().trim().toLowerCase().equals(checkDetails.getVinVDS().trim().toLowerCase()) && 
+															tDetails.getVinCarline().trim().toLowerCase().equals(checkDetails.getVinCarline().trim().toLowerCase()) &&
+															tDetails.getVinStartRange().trim().toLowerCase().equals(checkDetails.getVinStartRange().trim().toLowerCase()) &&
+															tDetails.getVinEndRange().trim().toLowerCase().equals(checkDetails.getVinEndRange().trim().toLowerCase()))
+													{
+														addToVINMaster = false;
+														break;
+													}
+												}
+												checkDetails = null;
+											}
+											checkDetails = null;
+										}
+										
+										if(addToVINMaster == true)
+										{
+											VINEntFileDetails newTDetails = new VINEntFileDetails();
+											newTDetails.setModelCode(tDetails.getModelCode());
+											// set rest of the VIN Details as is
+											newTDetails.setVinWMI(tDetails.getVinWMI());
+											newTDetails.setVinCarline(tDetails.getVinCarline());
+											newTDetails.setVinVDS(tDetails.getVinVDS());
+											newTDetails.setVinStartRange(tDetails.getVinStartRange());
+											newTDetails.setVinEndRange(tDetails.getVinEndRange());
+											newTDetails.setLangCodeForYearRange(tDetails.getLangCodeForYearRange());
+											// add Model Year & Ranges List as well
+											newTDetails.setModelYear(tDetails.getModelYear());
+											newTDetails.setRangesList(tDetails.getRangesList());
+											
+//											if(null==vinMasterList || vinMasterList.size()<=0)
+//											{
+//												vinMasterList = new ArrayList<VINEntFileDetails>();
+//											}
+											finalENCaModelsList.add(newTDetails);
+											newTDetails = null;
+										}
+									}
+									tDetails = null;
+								}
+								tDetails = null;
+								checkDetails = null;
+							}
+							tempCAModelsList = null;
+							
+							if(null!=finalENCaModelsList && finalENCaModelsList.size()>0)
+							{
+								if(null==vinMasterList || vinMasterList.size()<=0)
+								{
+									vinMasterList = new ArrayList<VINEntFileDetails>();
+								}
+								vinMasterList.addAll(finalENCaModelsList);
+							}
+							finalENCaModelsList = null;
+						}
+					}
+					checkLocForENCA = null;
+					enCaLocale = null;
 				}
 			}
 			else
@@ -3130,8 +3291,9 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 					for(com.mazda.gms3.dmt.mc.vo.DisplayOrderDetails d : rows)
 					{
 						d.setProcessingStatus("FAILURE");
-						d.setErrorCode("DSP002");
-						d.setErrorMessage("NO ACTIVE DOCUMENT FOUND IN THE DATABASE FOR THE DISPLAY ORDER ROW.");
+						// same code + text as MC / MME (MCDocumentManagementDAO, MMEDocumentManagementDAO) for a row whose document has no id
+						d.setErrorCode("DISP003");
+						d.setErrorMessage("FAILED TO IDENTIFY DOCUMENT ID.");
 						processed.add(d);
 					}
 					continue;
@@ -3265,8 +3427,9 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 					for(com.mazda.gms3.dmt.mc.vo.DisplayOrderDetails d : cd.getApplicableDisplayOrderList())
 					{
 						d.setProcessingStatus("FAILURE");
+						// same code + text in all markets; the stack trace stays in DMT.log (printStackTraceToLogs)
 						d.setErrorCode("DSP010");
-						d.setErrorMessage("FAILED TO SAVE THE VIEW CONTENT ROWS OF THE DISPLAY ORDER ROW: "+e.getMessage());
+						d.setErrorMessage("FAILED TO PERFORM DATABASE OPERATIONS FOR THE DISPLAY ORDER ROW. PLEASE CONTACT IT SUPPORT TEAM.");
 						processed.add(d);
 					}
 				}
@@ -3293,6 +3456,24 @@ public class MNAODocumentManagementDAO extends DBConnectionHelper{
 		catch(Exception e)
 		{
 			Utilities.printStackTraceToLogs(MNAODocumentManagementDAO.class.getName(), "saveDisplayOrderDetails()", e);
+			// as MC / MME: every row not reported yet fails with the same code + text (the stack trace stays in DMT.log)
+			for(ContentDetails cd : (null==documentsList ? new ArrayList<ContentDetails>() : documentsList))
+			{
+				if(null==cd.getApplicableDisplayOrderList())
+				{
+					continue;
+				}
+				for(com.mazda.gms3.dmt.mc.vo.DisplayOrderDetails d : cd.getApplicableDisplayOrderList())
+				{
+					if(!processed.contains(d))
+					{
+						d.setProcessingStatus("FAILURE");
+						d.setErrorCode("DSP010");
+						d.setErrorMessage("FAILED TO PERFORM DATABASE OPERATIONS FOR THE DISPLAY ORDER ROW. PLEASE CONTACT IT SUPPORT TEAM.");
+						processed.add(d);
+					}
+				}
+			}
 		}
 		finally
 		{

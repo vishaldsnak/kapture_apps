@@ -2675,6 +2675,17 @@ public class ScheduleDAO  extends DBConnectionHelper{
 	
 	public static boolean updateInnerLinksCount(String scheduleId, String itemId, long totalCount, long processedCount, long failedCount) 
 	{
+		return updateInnerLinksCount(scheduleId, itemId, totalCount, processedCount, failedCount, totalCount, processedCount, failedCount);
+	}
+
+	/*
+	 * THE SCHEDULE ROW ADDS totalCount / processedCount / failedCount (ALL MATERIAL FOLDERS OF THE SCHEDULE);
+	 * THE ITEM ROW IS SET TO THE FOLDER'S RUNNING COUNTS itemTotalCount / itemProcessedCount / itemFailedCount
+	 * (THE INNER LINKS PROGRESS IS WRITTEN CHUNK BY CHUNK, SO BOTH ROWS ARE WRITTEN MORE THAN ONCE PER FOLDER)
+	 */
+	public static boolean updateInnerLinksCount(String scheduleId, String itemId, long totalCount, long processedCount, long failedCount,
+			long itemTotalCount, long itemProcessedCount, long itemFailedCount) 
+	{
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2756,9 +2767,9 @@ public class ScheduleDAO  extends DBConnectionHelper{
 							+ " DC_PROCESSED_INRLKS_COUNT = ?,DC_FAILED_INRLKS_COUNT = ?"
 							+ " WHERE DC_CRITERIA_ID=?";
 						pstmt = conn.prepareStatement(updateItemsCountSql);
-						pstmt.setLong(1, totalCount);
-						pstmt.setLong(2, processedCount);
-						pstmt.setLong(3, failedCount);
+						pstmt.setLong(1, itemTotalCount);
+						pstmt.setLong(2, itemProcessedCount);
+						pstmt.setLong(3, itemFailedCount);
 						pstmt.setLong(4, new Long(itemId).longValue());
 						pstmt.executeUpdate();
 						pstmt.close();

@@ -3527,6 +3527,18 @@ public class ConversionUtils {
 	 * @param contentDetails
 	 * @return
 	 */
+	/** javascript:void(0) (any spacing, optional ;), # or blank - a link that goes nowhere */
+	private static final java.util.regex.Pattern DEAD_LINK_HREF = java.util.regex.Pattern.compile("^(#|javascript\\s*:\\s*void\\s*\\(\\s*0?\\s*\\)\\s*;?)?$", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+	/**
+	 * True for an href that is a dead link: javascript:void(0), # or blank.
+	 * @param hrefAttr
+	 * @return
+	 */
+	public static boolean isDeadLinkHref(String hrefAttr)
+	{
+		return null==hrefAttr || DEAD_LINK_HREF.matcher(hrefAttr.trim()).matches();
+	}
 	public static ContentDetails prepareInnerLinkPaths(ContentDetails contentDetails)
 	{
 		logger.info("prepareInnerLinkPaths :: ------------------ STARTS ------------------ ");
@@ -3565,8 +3577,19 @@ public class ConversionUtils {
 						 * BY THE SAME RULES AS THE BULK CONTENT IMPORT JOB - OTHER_MANUAL_LINK_RULES IN application.properties.
 						 * THE REPORT SHOWS BOTH (SOURCE + KAPTURE LINK); THE DATABASE KEEPS THE SOURCE LINK.
 						 */
-						OtherManualLinkRules.Rule otherManualRule = (null!=hrefAttr && !"".equals(hrefAttr.trim())) ? OtherManualLinkRules.get().match(hrefAttr) : null;
-						if(null!=otherManualRule)
+						/*
+						 * DEAD LINKS (ALL MARKETS) - href="javascript:void(0)" / href="#" / href=""
+						 * ARE NOT INNER LINKS: SET href="#" AND DO NOT TRACK THEM.
+						 * (javascript:void(0) WAS PREFIXED WITH THE FOLDER PATH AS AN INNER LINK -
+						 * KAPTURE REJECTS ANY CONTENT CONTAINING javascript:)
+						 */
+						boolean deadLink = aElement.hasAttr("href") && isDeadLinkHref(hrefAttr);
+						OtherManualLinkRules.Rule otherManualRule = (!deadLink && null!=hrefAttr && !"".equals(hrefAttr.trim())) ? OtherManualLinkRules.get().match(hrefAttr) : null;
+						if(deadLink)
+						{
+							aElement.attr("href", "#");
+						}
+						else if(null!=otherManualRule)
 						{
 							String kaptureLink = OtherManualLinkRules.get().apply(otherManualRule, hrefAttr);
 							aElement.attr("href", kaptureLink);

@@ -283,7 +283,7 @@ public class PrintReportsUtil {
 				Cell errorMessageCell = headerRow.createCell(11);
 				errorMessageCell.setCellValue("ERROR_MESSAGE");
 				Cell imDocumentIdCell = headerRow.createCell(12);
-				imDocumentIdCell.setCellValue("IM_DOCUMENT_ID");
+				imDocumentIdCell.setCellValue("DOCUMENT_ID");
 				Cell destinationPathCell = headerRow.createCell(13);
 				destinationPathCell.setCellValue("DESTINATION_PATH");
 				Cell dateTimeStampCell = headerRow.createCell(14);
@@ -338,7 +338,7 @@ public class PrintReportsUtil {
 						}
 
 						Cell cell2 = row.createCell(2);
-						cell2.setCellValue("INFOMANAGER_FAILURE");
+						cell2.setCellValue("KAPTURE_FAILURE");
 
 						Cell cell3 = row.createCell(3);
 						if (null != con.getLocale() && !"".equals(con.getLocale())) 
@@ -3835,7 +3835,7 @@ public class PrintReportsUtil {
 					Row headerRow = mySheet.createRow(0);
 					Cell headCell=null;
 					String headers="FILE PATH,FILE NAME,LOCALE,MODEL FOLDER NAME,MANUALTYPE,FACELIFT FOLDER,MATERIAL FOLDER,"
-							+ "INNERLINK PATH,IM DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
+							+ "INNERLINK PATH,DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
 					String[] tokens=headers.split(",");
 					for(int a=0;a<tokens.length;a++)
 					{
@@ -3863,7 +3863,7 @@ public class PrintReportsUtil {
 
 						if(null==jsDetails.getInnerLinkDocumentId() || "".equals(jsDetails.getInnerLinkDocumentId()))
 						{
-							jsDetails.setErrorMessage("Failed to identify IM Document Id.");
+							jsDetails.setErrorMessage("Failed to identify Document Id.");
 						}
 						// increment rowCount by 1
 						rowCount++;
@@ -4026,7 +4026,7 @@ public class PrintReportsUtil {
 					Row headerRow = mySheet.createRow(0);
 					Cell headCell=null;
 					String headers="FILE PATH,FILE NAME,LOCALE,MODEL FOLDER NAME,MANUALTYPE,FACELIFT FOLDER,MATERIAL FOLDER,"
-							+ "INNERLINK PATH,IM DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
+							+ "INNERLINK PATH,DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
 					String[] tokens=headers.split(",");
 					for(int a=0;a<tokens.length;a++)
 					{
@@ -4056,7 +4056,7 @@ public class PrintReportsUtil {
 
 						if(null==jsDetails.getInnerLinkDocumentId() || "".equals(jsDetails.getInnerLinkDocumentId()))
 						{
-							jsDetails.setErrorMessage("Failed to identify IM Document Id.");
+							jsDetails.setErrorMessage("Failed to identify Document Id.");
 						}
 						// increment rowCount by 1
 						rowCount++;
@@ -4219,7 +4219,7 @@ public class PrintReportsUtil {
 					Row headerRow = mySheet.createRow(0);
 					Cell headCell=null;
 					String headers="FILE PATH,FILE NAME,LOCALE,MODEL FOLDER NAME,MANUALTYPE,FACELIFT FOLDER,MATERIAL FOLDER,"
-							+ "INNERLINK PATH,IM DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
+							+ "INNERLINK PATH,DOCUMENT ID,IC PATH,STATUS,ERROR MESSAGE";
 					String[] tokens=headers.split(",");
 					for(int a=0;a<tokens.length;a++)
 					{
@@ -4249,7 +4249,7 @@ public class PrintReportsUtil {
 
 						if(null==jsDetails.getInnerLinkDocumentId() || "".equals(jsDetails.getInnerLinkDocumentId()))
 						{
-							jsDetails.setErrorMessage("Failed to identify IM Document Id.");
+							jsDetails.setErrorMessage("Failed to identify Document Id.");
 						}
 						// increment rowCount by 1
 						rowCount++;
@@ -4609,7 +4609,7 @@ public class PrintReportsUtil {
 					Row headerRow = mySheet.createRow(0);
 					Cell headCell=null;
 					String headers="MANUAL TYPE FOLDER,FACELIFT FOLDER,MATERIAL FOLDER,PROCESSING STATUS,LOCALE,CARLINE CODE,MODEL NAME,WMI CODE,VDS CODE,"
-							+ "VIS START RANGE,VIS END RANGE,IM_DOCUMENT_ID,DOC_SOURCE_LOC,DOC_FILE_NAME,DOC_TITLE,ERROR CODE,ERROR MESSAGE";
+							+ "VIS START RANGE,VIS END RANGE,DOCUMENT_ID,DOC_SOURCE_LOC,DOC_FILE_NAME,DOC_TITLE,ERROR CODE,ERROR MESSAGE";
 					String[] tokens=headers.split(",");
 					for(int a=0;a<tokens.length;a++)
 					{
@@ -4643,7 +4643,8 @@ public class PrintReportsUtil {
 						dataString+=mappingDetails.getDocTitle()+"<TOK_SPERATOR>";
 						dataString+=mappingDetails.getErrorCode()+"<TOK_SPERATOR>"+mappingDetails.getErrorMessage()+"<TOK_SPERATOR>";
 
-						if(null!=mappingDetails.getProcessingStatus() && mappingDetails.getProcessingStatus().equals(AutomationConstants.STATUS_SUCCESS))
+						// SCM VIN rows carry "SUCCESS" (MMEDocumentManagementDAO), not AutomationConstants "Success"
+						if(ReportsSummaryDetails.STATUS_SUCCESS.equalsIgnoreCase(mappingDetails.getProcessingStatus()))
 						{
 							processedCount++;
 						}

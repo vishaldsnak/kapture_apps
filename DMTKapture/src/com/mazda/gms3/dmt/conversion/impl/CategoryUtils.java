@@ -446,8 +446,22 @@ public class CategoryUtils {
 						 * HERE INSTEAD OF IDENTIFYING YEAR RANGES FOR MODEL ON THE BASIS OF CONTENT LOCALE
 						 * USE LOCALE MAPPED WITH CARLINE IDENTIFED WHEN MASTER VIN LIST WAS FETCHED
 						 * E.G INSTEAD OF contentDetails.getLocale() USE
+						 *
+						 * DATE CHANGE - 23 OCT 2026
+						 * CHECK IF LANG CODE IS EN_CA - THEN USE RANGES LSIT IN POJO OBJECT
+						 * ELSE NORMAL FLOW
 						 */
-						ArrayList<String> rangeList = mnaoDocumentDAO.getModelYearRangesList(details.getLangCodeForYearRange(), details.getVinCarline(), details.getVinWMI(), details.getModelCode());
+
+						ArrayList<String> rangeList = new ArrayList<String>();
+						if(details.getLangCodeForYearRange().trim().toLowerCase().replace("-", "_").equals(ApplicationProperties.getProperty("en-ca").trim().toLowerCase()))
+						{
+							rangeList =details.getRangesList();
+						}
+						else
+						{
+							rangeList = mnaoDocumentDAO.getModelYearRangesList(details.getLangCodeForYearRange(), details.getVinCarline(), details.getVinWMI(), details.getModelCode());
+						}
+
 						if(null!=rangeList && rangeList.size()>0)
 						{
 							for(int u=0;u<rangeList.size();u++)

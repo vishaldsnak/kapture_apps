@@ -1,5 +1,7 @@
 package com.mazda.gms3.dmt.vo;
 
+import java.util.ArrayList;
+
 public class VINEntFileDetails {
 
 	private String fileName= null;
@@ -34,6 +36,14 @@ public class VINEntFileDetails {
 	private String filePath=null;
 	private String lineType=null;
 	
+	private ArrayList<String> rangesList = null;
+	
+	public ArrayList<String> getRangesList() {
+		return rangesList;
+	}
+	public void setRangesList(ArrayList<String> rangesList) {
+		this.rangesList = rangesList;
+	}
 	public String getLangCodeForYearRange() {
 		return langCodeForYearRange;
 	}
