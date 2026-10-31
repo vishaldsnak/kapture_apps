@@ -569,8 +569,16 @@ public class CDRomDAO extends DBConnectionHelper {
 							bean.setValue(rs.getString("dc_manual_name").trim());
 							// MANUAL CODE REF KEY
 							bean.setExtraAttribute(lb.getKey());
-							// add to serviceContentList
-							serviceContent.add(bean);
+							// add to serviceContentList - one manual type under two view content names is ONE manual, or the CD extracts it twice
+							boolean alreadyListed = false;
+							for(LabelBean listed : serviceContent)
+							{
+								alreadyListed = alreadyListed || listed.getKey().equals(bean.getKey());
+							}
+							if(!alreadyListed)
+							{
+								serviceContent.add(bean);
+							}
 							bean = null;
 						}
 						getManualTypeSql=  null;
@@ -1196,6 +1204,7 @@ public class CDRomDAO extends DBConnectionHelper {
 		Statement stmt = null;
 		ResultSet rs = null;
 		String sql = "";
+		boolean byDate = false;
 		try {
 			conn = getConnection();
 			if (StringUtils.isBlank(scheduleId)) {
@@ -1205,7 +1214,13 @@ public class CDRomDAO extends DBConnectionHelper {
 				sql="SELECT * FROM gms3_mdm_cdrom_schedule where cd_schedule_name not like 'MDM_CDROM_SC_%'  ";
 				if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
 				{
-					sql = sql+" AND DATE_FORMAT(cd_schedule_tmstp,'%Y-%m-%d') BETWEEN '"+fromDate+"' AND '"+toDate+"' ";
+					/*
+					 * compared as timestamps through the driver (DMTKapture ScheduleDAO pattern) - DATE_FORMAT on
+					 * the stored value compared the database's clock with the application's date, so a job
+					 * scheduled late in the day fell on the next date and was missing from History.
+					 */
+					byDate = true;
+					sql = sql+" AND cd_schedule_tmstp >= ? AND cd_schedule_tmstp < ? ";
 				}
 				sql = sql+" ORDER BY cd_schedule_id DESC ";
 			} else {
@@ -1217,8 +1232,19 @@ public class CDRomDAO extends DBConnectionHelper {
 
 				sql = "SELECT * FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="+scheduleId;
 			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
+			PreparedStatement ps = conn.prepareStatement(sql);
+			stmt = ps;
+			if(byDate)
+			{
+				java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("yyyy-MM-dd");
+				day.setLenient(false);
+				java.util.Calendar to = java.util.Calendar.getInstance();
+				to.setTime(day.parse(toDate.trim()));
+				to.add(java.util.Calendar.DATE, 1);
+				ps.setTimestamp(1, new java.sql.Timestamp(day.parse(fromDate.trim()).getTime()));
+				ps.setTimestamp(2, new java.sql.Timestamp(to.getTimeInMillis()));
+			}
+			rs = ps.executeQuery();
 			while (rs.next()) {
 				CDRomScheduleDetails schDetails = new CDRomScheduleDetails();
 				schDetails.setSrNo(schedueList.size() + 1);
@@ -1390,6 +1416,7 @@ public class CDRomDAO extends DBConnectionHelper {
 
 	public boolean updateScheduleStatus(String scheduleId, String status)
 			throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		try {
@@ -1483,6 +1510,16 @@ public class CDRomDAO extends DBConnectionHelper {
 	 * Returns FALSE on any error: a failed status read must never abort a healthy run.
 	 */
 	public static boolean isAborted(String scheduleId)
+	{
+		long opStarted = System.currentTimeMillis();
+		try {
+			return isAbortedRead(scheduleId);
+		} finally {
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - abort check", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - opStarted, 0L);
+		}
+	}
+
+	private static boolean isAbortedRead(String scheduleId)
 	{
 		boolean aborted = false;
 		Connection conn = null;
@@ -1664,6 +1701,38 @@ public class CDRomDAO extends DBConnectionHelper {
 		return count;
 	}
 
+	/**
+	 * THE CD JOBS (data extract) PENDING / PROCESSING NOW, by schedule name - for the parallel jobs cap
+	 * (cdrom.max.parallel.jobs). The selection-criteria jobs share the table and are left out, as in
+	 * the History list (MDM_CDROM_SC_ names).
+	 */
+	public static List<String> getActiveExtractionJobs() throws Exception {
+		List<String> names = new ArrayList<String>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn = getConnection();
+			pstmt = conn.prepareStatement("SELECT cd_schedule_name FROM gms3_mdm_cdrom_schedule"
+					+ " WHERE cd_sch_status IN (?, ?) AND cd_schedule_name NOT LIKE 'MDM_CDROM_SC_%' ORDER BY cd_schedule_id");
+			pstmt.setString(1, ApplicationProperties.getProperty("schedule.status.pending.value"));
+			pstmt.setString(2, ApplicationProperties.getProperty("schedule.status.processing.value"));
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				names.add(rs.getString(1));
+			}
+		} finally {
+			if (null != rs)
+				rs.close();
+			if (null != pstmt)
+				pstmt.close();
+			if (null != conn)
+				conn.close();
+		}
+		logger.info("getActiveExtractionJobs :: Pending / Processing CD jobs :: " + names);
+		return names;
+	}
+
 	public static Long createSchedule(CDRomScheduleDetails schDetails)
 			throws SQLException {
 		Long scheduleId = null;
@@ -1799,420 +1868,149 @@ public class CDRomDAO extends DBConnectionHelper {
 		return scheduleId;
 	}
 
-	public boolean updateFailureCount(String scheduleId, int failedDoc,
-			String docType) throws SQLException {
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			if (null != scheduleId && !"".equals(scheduleId)) {
-				long count = 0;
-				conn = getConnection();
-				String getExistingCount = "SELECT cd_failed_docs_count FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue();
-				pstmt = conn.prepareStatement(getExistingCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					count = rs.getLong("cd_failed_docs_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingCount = null;
+	/*
+	 * RUNNING COUNTS, BUFFERED PER JOB. Every document and every image used to bump its counters
+	 * with SELECT + UPDATE on the schedule row and again on the item row - 4 round trips, ~1.5 s on
+	 * MC Dev, per document AND per image. Each CD job creates its own CDRomDAO (CDRomScheduleServlet),
+	 * so the deltas are kept on this instance - parallel jobs never share them - and written as
+	 * "col = col + ?" at most every COUNT_FLUSH_INTERVAL_MS, and always before a status change, a
+	 * count read or the zip step (flushCounts). History lags the job by a few seconds at most.
+	 * The old item-row SELECT was also missing a space ("...=848AND ..."), so item counts never moved.
+	 */
+	private static final long COUNT_FLUSH_INTERVAL_MS = 3000L;
+	private final java.util.LinkedHashMap<String, Long> pendingCounts = new java.util.LinkedHashMap<String, Long>();
+	private long lastCountFlush = System.currentTimeMillis();
 
-				count = count + failedDoc;
-				String updateCountSql = "UPDATE gms3_mdm_cdrom_schedule SET cd_failed_docs_count =? WHERE cd_schedule_id=?";
-				pstmt = conn.prepareStatement(updateCountSql);
-				pstmt.setLong(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateCountSql = null;
-
-				if (null != docType && !"".equals(docType)
-						&& !"0".equals(docType)) {
-					long itemFailureCount = 0;
-					String getExistingItemsCount = "SELECT cd_failed_docs_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
-							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
-					pstmt = conn.prepareStatement(getExistingItemsCount);
-					rs = pstmt.executeQuery();
-					if (rs.next()) {
-						itemFailureCount = rs.getLong("cd_failed_docs_count");
-					}
-					rs.close();
-					rs = null;
-					pstmt.close();
-					pstmt = null;
-					getExistingItemsCount = null;
-
-					itemFailureCount = itemFailureCount + failedDoc;
-					String updateItemsCountSql = "UPDATE gms3_mdm_cdrom_sch_items SET cd_failed_docs_count =? WHERE cd_schedule_id=? AND cd_manual_type_code=?";
-					pstmt = conn.prepareStatement(updateItemsCountSql);
-					pstmt.setLong(1, itemFailureCount);
-					pstmt.setLong(2, new Long(scheduleId).longValue());
-					pstmt.setString(3, docType);
-					pstmt.executeUpdate();
-					pstmt.close();
-					pstmt = null;
-					updateItemsCountSql = null;
-				}
-			} else {
-				logger.info("updateFailureCount :: Schedule id as Parameter is null.");
-				return false;
-			}
-		} catch (Exception e) {
-			logger.info("updateFailureCount :: ################ Exception ################");
-			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
-					"updateFailureCount()", e);
-			logger.info("updateFailureCount :: ################ Exception ################");
+	private synchronized boolean addCount(String scheduleId, String docType, String column, long delta, String caller) {
+		if (null == scheduleId || "".equals(scheduleId)) {
+			logger.info(caller + " :: Schedule id as Parameter is null.");
 			return false;
-		} finally {
-			if (null != conn)
-				conn.close();
-			if (null != pstmt)
-				pstmt.close();
-			if (null != rs)
-				rs.close();
+		}
+		String type = (null != docType && !"".equals(docType) && !"0".equals(docType)) ? docType : "";
+		String key = scheduleId.trim() + "\u0001" + type + "\u0001" + column;
+		Long current = pendingCounts.get(key);
+		pendingCounts.put(key, Long.valueOf((null == current ? 0L : current.longValue()) + delta));
+		if (System.currentTimeMillis() - lastCountFlush >= COUNT_FLUSH_INTERVAL_MS) {
+			return flushCounts();
 		}
 		return true;
+	}
+
+	/** Writes every buffered count: one UPDATE per schedule row, one per item row. */
+	public synchronized boolean flushCounts() {
+		lastCountFlush = System.currentTimeMillis();
+		if (pendingCounts.isEmpty()) {
+			return true;
+		}
+		java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Long>> scheduleRows = new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Long>>();
+		java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Long>> itemRows = new java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Long>>();
+		for (java.util.Map.Entry<String, Long> e : pendingCounts.entrySet()) {
+			String[] k = e.getKey().split("\u0001", -1);
+			addTo(scheduleRows, k[0], k[2], e.getValue());
+			if (!"".equals(k[1])) {
+				addTo(itemRows, k[0] + "\u0001" + k[1], k[2], e.getValue());
+			}
+		}
+		pendingCounts.clear();
+		Connection conn = null;
+		boolean ok = true;
+		long opStarted = System.currentTimeMillis();
+		try {
+			conn = getConnection();
+			for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, Long>> row : scheduleRows.entrySet()) {
+				ok &= runIncrement(conn, "gms3_mdm_cdrom_schedule", row.getValue(), Long.parseLong(row.getKey()), null);
+			}
+			for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, Long>> row : itemRows.entrySet()) {
+				String[] k = row.getKey().split("\u0001", -1);
+				ok &= runIncrement(conn, "gms3_mdm_cdrom_sch_items", row.getValue(), Long.parseLong(k[0]), k[1]);
+			}
+		} catch (Exception e) {
+			logger.info("flushCounts :: ################ Exception ################");
+			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(), "flushCounts()", e);
+			logger.info("flushCounts :: ################ Exception ################");
+			ok = false;
+		} finally {
+			if (null != conn) {
+				try { conn.close(); } catch (Exception ignore) { }
+			}
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - History count update (buffered, every 3 s)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - opStarted, 0L);
+		}
+		return ok;
+	}
+
+	private static void addTo(java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Long>> rows, String rowKey, String column, Long delta) {
+		java.util.LinkedHashMap<String, Long> cols = rows.get(rowKey);
+		if (null == cols) {
+			cols = new java.util.LinkedHashMap<String, Long>();
+			rows.put(rowKey, cols);
+		}
+		Long current = cols.get(column);
+		cols.put(column, Long.valueOf((null == current ? 0L : current.longValue()) + delta.longValue()));
+	}
+
+	private static boolean runIncrement(Connection conn, String table, java.util.LinkedHashMap<String, Long> cols, long scheduleId, String docType) {
+		StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
+		int n = 0;
+		for (String column : cols.keySet()) {
+			sql.append(n++ == 0 ? "" : ", ").append(column).append(" = COALESCE(").append(column).append(", 0) + ?");
+		}
+		sql.append(" WHERE cd_schedule_id = ?");
+		if (null != docType) {
+			sql.append(" AND cd_manual_type_code = ?");
+		}
+		PreparedStatement pstmt = null;
+		try {
+			pstmt = conn.prepareStatement(sql.toString());
+			int i = 1;
+			for (Long delta : cols.values()) {
+				pstmt.setLong(i++, delta.longValue());
+			}
+			pstmt.setLong(i++, scheduleId);
+			if (null != docType) {
+				pstmt.setString(i++, docType);
+			}
+			pstmt.executeUpdate();
+			return true;
+		} catch (Exception e) {
+			logger.info("runIncrement :: failed :: > " + sql + " :: " + cols);
+			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(), "runIncrement()", e);
+			return false;
+		} finally {
+			if (null != pstmt) {
+				try { pstmt.close(); } catch (Exception ignore) { }
+			}
+		}
+	}
+
+	public boolean updateFailureCount(String scheduleId, int failedDoc,
+			String docType) throws SQLException {
+		return addCount(scheduleId, docType, "cd_failed_docs_count", failedDoc, "updateFailureCount");
 	}
 
 	public boolean updateOKAssetFailureCount(String scheduleId,
 			String docType) throws SQLException {
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			if (null != scheduleId && !"".equals(scheduleId)) {
-				long count = 0;
-				conn = getConnection();
-				String getExistingCount = "SELECT cd_failed_okast_count FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue();
-				pstmt = conn.prepareStatement(getExistingCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					count = rs.getLong("cd_failed_okast_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingCount = null;
-
-				// increment by 1
-				count = count + 1;
-				String updateCountSql = "UPDATE gms3_mdm_cdrom_schedule SET cd_failed_okast_count =? WHERE cd_schedule_id=?";
-				pstmt = conn.prepareStatement(updateCountSql);
-				pstmt.setLong(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateCountSql = null;
-
-				if (null != docType && !"".equals(docType)
-						&& !"0".equals(docType)) {
-					long itemFailureCount = 0;
-					String getExistingItemsCount = "SELECT cd_failed_okast_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
-							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
-					pstmt = conn.prepareStatement(getExistingItemsCount);
-					rs = pstmt.executeQuery();
-					if (rs.next()) {
-						itemFailureCount = rs.getLong("cd_failed_okast_count");
-					}
-					rs.close();
-					rs = null;
-					pstmt.close();
-					pstmt = null;
-					getExistingItemsCount = null;
-
-					// increment by 1
-					itemFailureCount = itemFailureCount + 1;
-					String updateItemsCountSql = "UPDATE gms3_mdm_cdrom_sch_items SET cd_failed_okast_count =? WHERE cd_schedule_id=? AND cd_manual_type_code=?";
-					pstmt = conn.prepareStatement(updateItemsCountSql);
-					pstmt.setLong(1, itemFailureCount);
-					pstmt.setLong(2, new Long(scheduleId).longValue());
-					pstmt.setString(3, docType);
-					pstmt.executeUpdate();
-					pstmt.close();
-					pstmt = null;
-					updateItemsCountSql = null;
-				}
-			} else {
-				logger.info("updateOKAssetFailureCount :: Schedule id as Parameter is null.");
-				return false;
-			}
-		} catch (Exception e) {
-			logger.info("updateOKAssetFailureCount :: ################ Exception ################");
-			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
-					"updateOKAssetFailureCount()", e);
-			logger.info("updateOKAssetFailureCount :: ################ Exception ################");
-			return false;
-		} finally {
-			if (null != conn)
-				conn.close();
-			if (null != pstmt)
-				pstmt.close();
-			if (null != rs)
-				rs.close();
-		}
-		return true;
+		return addCount(scheduleId, docType, "cd_failed_okast_count", 1, "updateOKAssetFailureCount");
 	}
 
 	public boolean updateOKAssetProcessingCount(String scheduleId,
 			String docType, int okAssetCount) throws SQLException {
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			if (null != scheduleId && !"".equals(scheduleId)) {
-				long count = 0;
-				conn = getConnection();
-				String getExistingCount = "SELECT cd_processed_okast_count FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue();
-				pstmt = conn.prepareStatement(getExistingCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					count = rs.getLong("cd_processed_okast_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingCount = null;
-
-				// increment by 1
-				count = count + okAssetCount;
-				String updateCountSql = "UPDATE gms3_mdm_cdrom_schedule SET cd_processed_okast_count =? WHERE cd_schedule_id=?";
-				pstmt = conn.prepareStatement(updateCountSql);
-				pstmt.setLong(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateCountSql = null;
-
-				if (null != docType && !"".equals(docType)
-						&& !"0".equals(docType)) {
-					long itemCount = 0;
-					String getExistingItemsCount = "SELECT cd_processed_okast_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
-							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
-					pstmt = conn.prepareStatement(getExistingItemsCount);
-					rs = pstmt.executeQuery();
-					if (rs.next()) {
-						itemCount = rs.getLong("cd_processed_okast_count");
-					}
-					rs.close();
-					rs = null;
-					pstmt.close();
-					pstmt = null;
-					getExistingItemsCount = null;
-
-					// increment by 1
-					itemCount = itemCount + okAssetCount;
-					String updateItemsCountSql = "UPDATE gms3_mdm_cdrom_sch_items SET cd_processed_okast_count =? WHERE cd_schedule_id=? AND cd_manual_type_code=?";
-					pstmt = conn.prepareStatement(updateItemsCountSql);
-					pstmt.setLong(1, itemCount);
-					pstmt.setLong(2, new Long(scheduleId).longValue());
-					pstmt.setString(3, docType);
-					pstmt.executeUpdate();
-					pstmt.close();
-					pstmt = null;
-					updateItemsCountSql = null;
-				}
-
-			} else {
-				logger.info("updateOKAssetProcessingCount :: Schedule id as Parameter is null.");
-				return false;
-			}
-		} catch (Exception e) {
-			logger.info("updateOKAssetProcessingCount :: ################ Exception ################");
-			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
-					"updateOKAssetProcessingCount()", e);
-			logger.info("updateOKAssetProcessingCount :: ################ Exception ################");
-			return false;
-		} finally {
-			if (null != conn)
-				conn.close();
-			if (null != pstmt)
-				pstmt.close();
-			if (null != rs)
-				rs.close();
-		}
-		return true;
+		return addCount(scheduleId, docType, "cd_processed_okast_count", okAssetCount, "updateOKAssetProcessingCount");
 	}
 
 	public boolean updateProcessingCount(String scheduleId,
 			int passedDoc, String docType) throws SQLException {
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			if (null != scheduleId && !"".equals(scheduleId)) {
-				long count = 0;
-				conn = getConnection();
-				String getExistingCount = "SELECT cd_processed_docs_count FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue();
-				pstmt = conn.prepareStatement(getExistingCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					count = rs.getLong("cd_processed_docs_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingCount = null;
-
-				count = count + passedDoc;
-				String updateCountSql = "UPDATE gms3_mdm_cdrom_schedule SET cd_processed_docs_count =? WHERE cd_schedule_id=?";
-				pstmt = conn.prepareStatement(updateCountSql);
-				pstmt.setLong(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateCountSql = null;
-
-				if (null != docType && !"".equals(docType)
-						&& !"0".equals(docType)) {
-					long itemCount = 0;
-					String getExistingItemsCount = "SELECT cd_processed_docs_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
-							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
-					pstmt = conn.prepareStatement(getExistingItemsCount);
-					rs = pstmt.executeQuery();
-					if (rs.next()) {
-						itemCount = rs.getLong("cd_processed_docs_count");
-					}
-					rs.close();
-					rs = null;
-					pstmt.close();
-					pstmt = null;
-					getExistingItemsCount = null;
-
-					itemCount = itemCount + passedDoc;
-					String updateItemsCountSql = "UPDATE gms3_mdm_cdrom_sch_items SET cd_processed_docs_count =? WHERE cd_schedule_id=? AND cd_manual_type_code=?";
-					pstmt = conn.prepareStatement(updateItemsCountSql);
-					pstmt.setLong(1, itemCount);
-					pstmt.setLong(2, new Long(scheduleId).longValue());
-					pstmt.setString(3, docType);
-					pstmt.executeUpdate();
-					pstmt.close();
-					pstmt = null;
-					updateItemsCountSql = null;
-				}
-
-			} else {
-				logger.info("updateProcessingCount :: Schedule id as Parameter is null.");
-				return false;
-			}
-		} catch (Exception e) {
-			logger.info("updateProcessingCount :: ################ Exception ################");
-			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
-					"updateProcessingCount()", e);
-			logger.info("updateProcessingCount :: ################ Exception ################");
-			return false;
-		} finally {
-			if (null != conn)
-				conn.close();
-			if (null != pstmt)
-				pstmt.close();
-			if (null != rs)
-				rs.close();
-		}
-		return true;
+		return addCount(scheduleId, docType, "cd_processed_docs_count", passedDoc, "updateProcessingCount");
 	}
 
 	public boolean upadteScheduleDocCount(String scheduleId,
 			int docCount, String docType) throws SQLException {
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			if (null != scheduleId && !"".equals(scheduleId)) {
-				long count = 0;
-				conn = getConnection();
-				String getExistingCount = "SELECT cd_total_docs_count FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue();
-				pstmt = conn.prepareStatement(getExistingCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					count = rs.getLong("cd_total_docs_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingCount = null;
-
-				// increment by 1
-				count = count + docCount;
-				String updateCountSql = "UPDATE gms3_mdm_cdrom_schedule SET cd_total_docs_count =? WHERE cd_schedule_id=?";
-				pstmt = conn.prepareStatement(updateCountSql);
-				pstmt.setLong(1, count);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateCountSql = null;
-			}
-			if (null != docType && !"".equals(docType) && !"0".equals(docType)) {
-				long itemCount = 0;
-				String getExistingItemsCount = "SELECT cd_total_docs_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
-						+ new Long(scheduleId).longValue()
-						+ "AND cd_manual_type_code='" + docType + "'";
-				pstmt = conn.prepareStatement(getExistingItemsCount);
-				rs = pstmt.executeQuery();
-				if (rs.next()) {
-					itemCount = rs.getLong("cd_total_docs_count");
-				}
-				rs.close();
-				rs = null;
-				pstmt.close();
-				pstmt = null;
-				getExistingItemsCount = null;
-
-				// increment by 1
-				itemCount = itemCount + docCount;
-				String updateItemsCountSql = "UPDATE gms3_mdm_cdrom_sch_items SET cd_total_docs_count =? WHERE cd_schedule_id=? AND cd_manual_type_code=?";
-				pstmt = conn.prepareStatement(updateItemsCountSql);
-				pstmt.setLong(1, itemCount);
-				pstmt.setLong(2, new Long(scheduleId).longValue());
-				pstmt.setString(3, docType);
-				pstmt.executeUpdate();
-				pstmt.close();
-				pstmt = null;
-				updateItemsCountSql = null;
-			} else {
-				logger.info("upadteScheduleDocCount :: Schedule id as Parameter is null.");
-				return false;
-			}
-		} catch (Exception e) {
-			logger.info("upadteScheduleDocCount :: ################ Exception ################");
-			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
-					"upadteScheduleDocCount()", e);
-			logger.info("upadteScheduleDocCount :: ################ Exception ################");
-			return false;
-		} finally {
-			if (null != conn)
-				conn.close();
-			if (null != pstmt)
-				pstmt.close();
-			if (null != rs)
-				rs.close();
-		}
-		return true;
+		return addCount(scheduleId, docType, "cd_total_docs_count", docCount, "upadteScheduleDocCount");
 	}
 
 	public boolean updateInnerLinksCount(String scheduleId,
 			int innerLinkCount, String docType)
 					throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2280,6 +2078,7 @@ public class CDRomDAO extends DBConnectionHelper {
 	public boolean updateOKAssetCount(String scheduleId,
 			int okAssetCount, String docType)
 					throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2315,7 +2114,7 @@ public class CDRomDAO extends DBConnectionHelper {
 					long itemCount = 0;
 					String getExistingItemsCount = "SELECT cd_total_okast_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
 							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
+							+ " AND cd_manual_type_code='" + docType + "'";
 					pstmt = conn.prepareStatement(getExistingItemsCount);
 					rs = pstmt.executeQuery();
 					if (rs.next()) {
@@ -2362,6 +2161,7 @@ public class CDRomDAO extends DBConnectionHelper {
 	public boolean updateInnerLinkAndOKAssetCount(String scheduleId,
 			int okAssetCount, int innerLinkCount, String docType)
 					throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2401,7 +2201,7 @@ public class CDRomDAO extends DBConnectionHelper {
 					long itemCount = 0;
 					String getExistingItemsCount = "SELECT cd_total_okast_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
 							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
+							+ " AND cd_manual_type_code='" + docType + "'";
 					pstmt = conn.prepareStatement(getExistingItemsCount);
 					rs = pstmt.executeQuery();
 					if (rs.next()) {
@@ -2447,6 +2247,17 @@ public class CDRomDAO extends DBConnectionHelper {
 	}
 
 	public boolean updateCurrentProcessingStatus(String scheduleId,
+			String status, String docType) throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
+		long opStarted = System.currentTimeMillis();
+		try {
+			return updateCurrentProcessingStatusWrite(scheduleId, status, docType);
+		} finally {
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - History status update", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - opStarted, 0L);
+		}
+	}
+
+	private boolean updateCurrentProcessingStatusWrite(String scheduleId,
 			String status, String docType) throws SQLException {
 		Connection conn = null;
 		PreparedStatement pstmt = null;
@@ -2516,6 +2327,7 @@ public class CDRomDAO extends DBConnectionHelper {
 
 	public boolean updateProcessedInnerLinksCount(String scheduleId,
 			int innerLinkcount, String docType) throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2551,7 +2363,7 @@ public class CDRomDAO extends DBConnectionHelper {
 					long itemCount = 0;
 					String getExistingItemsCount = "SELECT cd_processed_inrlks_count FROM gms3_mdm_cdrom_sch_items WHERE cd_schedule_id="
 							+ new Long(scheduleId).longValue()
-							+ "AND cd_manual_type_code='" + docType + "'";
+							+ " AND cd_manual_type_code='" + docType + "'";
 					pstmt = conn.prepareStatement(getExistingItemsCount);
 					rs = pstmt.executeQuery();
 					if (rs.next()) {
@@ -2667,6 +2479,7 @@ public class CDRomDAO extends DBConnectionHelper {
 
 	public void updateZipFileName(String zipFileName, String scheduleId)
 			throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		Connection conn = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -2727,6 +2540,7 @@ public class CDRomDAO extends DBConnectionHelper {
 	}
 
 	public int getFailureCount(Long scheduleID) throws SQLException {
+		flushCounts(); // buffered running counts first - see addCount
 		int count = 0;
 		Statement stmt = null;
 		Connection conn = null;
@@ -2976,24 +2790,27 @@ public class CDRomDAO extends DBConnectionHelper {
 		return applicableVinList;
 	}
 
+	/** Document ids per VIN-list query (getApplicableVINList) */
+	private static final int VIN_LOOKUP_CHUNK = 500;
+
+	/**
+	 * THE VIN RANGES (vds code + vis start) OF THE CD's DOCUMENTS - distinct, first seen first.
+	 * 2026-10-30: one query per VIN_LOOKUP_CHUNK documents instead of one per document (5,182 queries x ~365 ms
+	 * = 31 min 30 s on MC Dev, job 851). Same table, same filters, same distinct + order as before: the rows are
+	 * read per chunk, then taken in the order of documentsList (rows of one document in the order the DB returns).
+	 */
 	public ArrayList<ApplicableVINList> getApplicableVINList(ArrayList<String> documentsList,String modelName, String carlineCode, String wmiCode, String language) throws SQLException
 	{
 		ArrayList<ApplicableVINList> applicableVinList = new ArrayList<ApplicableVINList>();
 		Connection conn = null;
-		Statement stmt =null;
+		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try
 		{
 			if(null!=documentsList && documentsList.size()>0)
 			{
-				String sql="";
-				String documentId="";
-				conn = getConnection();
-				ApplicableVINList details = null;
-				ApplicableVINList exist = null;
-				boolean addToList = true;
 				String tableName=null;
-				if(language.replace("-", "_").trim().toLowerCase().equals(ApplicationProperties.getProperty("ja_jp").trim().toLowerCase()) || 
+				if(language.replace("-", "_").trim().toLowerCase().equals(ApplicationProperties.getProperty("ja_jp").trim().toLowerCase()) ||
 						language.replace("-", "_").trim().toLowerCase().equals(ApplicationProperties.getProperty("en_jp").trim().toLowerCase()))
 				{
 					// MC MARKET LOCALE
@@ -3004,66 +2821,92 @@ public class CDRomDAO extends DBConnectionHelper {
 					// MME MARKET LOCALE
 					tableName="gms3_vc_mme_vin_dtl_"+Utilities.tableLocale(language);
 				}
+				// distinct document ids, in list order
+				java.util.LinkedHashSet<String> documentIds = new java.util.LinkedHashSet<String>();
 				for(int a=0;a<documentsList.size();a++)
 				{
-					documentId = String.valueOf(documentsList.get(a));
-					if(null!=documentId && !"".equals(documentId))
+					String documentId = String.valueOf(documentsList.get(a));
+					if(null!=documentsList.get(a) && !"".equals(documentId.trim()))
 					{
-						sql = "SELECT DISTINCT vc_vin_vds_code, vc_vin_vis_start_range FROM "+tableName+" "
-								+ "WHERE vc_vin_document_id='"+documentId.trim()+"' AND vc_vin_carline_code='"+carlineCode.trim()+"' "
-										+ "AND vc_vin_model='"+modelName.trim()+"' AND vc_vin_wmi_code='"+wmiCode.trim()+"'";
-						stmt = conn.createStatement();
-						rs = stmt.executeQuery(sql);
-						while(rs.next())
-						{
-							addToList = true;
-							details = new ApplicableVINList();
-							details.setCarlineCode(carlineCode);
-//							details.setWmiCode("-");
-							details.setWmiCode(wmiCode);
-							details.setVdsCode(rs.getString("vc_vin_vds_code"));
-							details.setVisStartRange(rs.getString("vc_vin_vis_start_range"));
-
-							if(null!=applicableVinList && applicableVinList.size()>0)
-							{
-								exist = null;
-								for(int r=0;r<applicableVinList.size();r++)
-								{
-									exist = (ApplicableVINList)applicableVinList.get(r);
-									if(null!=exist.getCarlineCode() && !"".equals(exist.getCarlineCode()) && null!=exist.getWmiCode() && !"".equals(exist.getWmiCode()) 
-											&& null!=exist.getVdsCode() && !"".equals(exist.getVdsCode()) && null!=exist.getVisStartRange() && !"".equals(exist.getVisStartRange()) 
-											&& null!=details.getCarlineCode() && !"".equals(details.getCarlineCode()) && null!=details.getWmiCode() && !"".equals(details.getWmiCode()) && 
-											null!=details.getVdsCode() && !"".equals(details.getVdsCode()) && null!=details.getVisStartRange() && !"".equals(details.getVisStartRange()))
-									{
-										if(exist.getCarlineCode().trim().toLowerCase().equals(details.getCarlineCode().trim().toLowerCase()) && 
-												exist.getWmiCode().trim().toLowerCase().equals(details.getWmiCode().trim().toLowerCase()) && 
-												exist.getVdsCode().trim().toLowerCase().equals(details.getVdsCode().trim().toLowerCase()) && 
-												exist.getVisStartRange().trim().toLowerCase().equals(details.getVisStartRange().trim().toLowerCase()))
-										{
-											addToList = false;
-											break;
-										}
-									}
-									exist = null;
-								}
-								exist = null;
-							}
-
-
-							if(addToList==true)
-							{
-								if(null!=details.getCarlineCode() && !"".equals(details.getCarlineCode()) &&  null!=details.getWmiCode() && !"".equals(details.getWmiCode()) && 
-										null!=details.getVdsCode() && !"".equals(details.getVdsCode()) && null!=details.getVisStartRange() && !"".equals(details.getVisStartRange()))
-								{
-									applicableVinList.add(details);
-								}
-							}
-							details = null;
-						}
-						stmt.close();stmt = null;
-						rs.close();rs= null;
+						documentIds.add(documentId.trim());
 					}
 				}
+				// rows per document (lower case key - the = of the old query was case-insensitive too)
+				java.util.Map<String, List<String[]>> rowsByDocument = new java.util.HashMap<String, List<String[]>>();
+				List<String> ids = new ArrayList<String>(documentIds);
+				long started = System.currentTimeMillis();
+				int queries = 0;
+				conn = getConnection();
+				for(int from=0;from<ids.size();from+=VIN_LOOKUP_CHUNK)
+				{
+					List<String> chunk = ids.subList(from, Math.min(ids.size(), from+VIN_LOOKUP_CHUNK));
+					StringBuilder marks = new StringBuilder();
+					for(int m=0;m<chunk.size();m++)
+					{
+						marks.append(m==0 ? "?" : ",?");
+					}
+					String sql = "SELECT DISTINCT vc_vin_document_id, vc_vin_vds_code, vc_vin_vis_start_range FROM "+tableName+" "
+							+ "WHERE vc_vin_document_id IN ("+marks+") AND vc_vin_carline_code=? "
+							+ "AND vc_vin_model=? AND vc_vin_wmi_code=?";
+					pstmt = conn.prepareStatement(sql);
+					int p = 1;
+					for(String id : chunk)
+					{
+						pstmt.setString(p++, id);
+					}
+					pstmt.setString(p++, carlineCode.trim());
+					pstmt.setString(p++, modelName.trim());
+					pstmt.setString(p++, wmiCode.trim());
+					rs = pstmt.executeQuery();
+					queries++;
+					while(rs.next())
+					{
+						String key = String.valueOf(rs.getString("vc_vin_document_id")).trim().toLowerCase();
+						List<String[]> rows = rowsByDocument.get(key);
+						if(null==rows)
+						{
+							rows = new ArrayList<String[]>();
+							rowsByDocument.put(key, rows);
+						}
+						rows.add(new String[] { rs.getString("vc_vin_vds_code"), rs.getString("vc_vin_vis_start_range") });
+					}
+					rs.close();rs= null;
+					pstmt.close();pstmt = null;
+				}
+				// distinct (carline, wmi, vds, vis) - carline + wmi are the same for every row, compared ignoring case as before
+				java.util.Set<String> seen = new java.util.HashSet<String>();
+				for(String id : ids)
+				{
+					List<String[]> rows = rowsByDocument.get(id.toLowerCase());
+					if(null==rows)
+					{
+						continue;
+					}
+					for(String[] row : rows)
+					{
+						String vdsCode = row[0];
+						String visStart = row[1];
+						if(null==vdsCode || "".equals(vdsCode) || null==visStart || "".equals(visStart)
+								|| null==carlineCode || "".equals(carlineCode) || null==wmiCode || "".equals(wmiCode))
+						{
+							continue;
+						}
+						if(!seen.add(vdsCode.trim().toLowerCase()+"\u0001"+visStart.trim().toLowerCase()))
+						{
+							continue;
+						}
+						ApplicableVINList details = new ApplicableVINList();
+						details.setCarlineCode(carlineCode);
+						details.setWmiCode(wmiCode);
+						details.setVdsCode(vdsCode);
+						details.setVisStartRange(visStart);
+						applicableVinList.add(details);
+					}
+				}
+				logger.info("getApplicableVINList :: " + ids.size() + " documents, " + queries + " queries, " + applicableVinList.size()
+						+ " VIN ranges in " + (System.currentTimeMillis() - started) + " ms");
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - applicable VIN list (batched, " + VIN_LOOKUP_CHUNK + " documents per query)",
+						com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - started, 0L);
 				tableName = null;
 			}
 			else
@@ -3076,10 +2919,10 @@ public class CDRomDAO extends DBConnectionHelper {
 			Utilities.printStackTraceToLogs(CDRomDAO.class.getName(), "getApplicableVINList()", e);
 		}
 		finally {
-			if (null != stmt)
-				stmt.close();
 			if (null != rs)
 				rs.close();
+			if (null != pstmt)
+				pstmt.close();
 			if (null != conn)
 				conn.close();
 		}
@@ -3176,6 +3019,75 @@ public class CDRomDAO extends DBConnectionHelper {
 			faceLiftFolderPath = null;
 		}
 		return documentIdsList;
+	}
+
+	/**
+	 * DOCUMENTS THAT HAVE CD DATA - same rule as the old per-document check (a row in any of the given
+	 * cd_data tables with dc_sequence_no NOT NULL and dc_cd_id > 0), but asked with one IN (...) query per
+	 * table per chunk instead of one query per document. Input order and duplicates are kept, ids trimmed.
+	 */
+	private static final int CD_DATA_CHECK_CHUNK = 500;
+
+	private static ArrayList<String> keepDocumentsWithCDData(Connection conn, List<String> documentIds, String[] cdDataTables) throws SQLException
+	{
+		java.util.Set<String> withCDData = new java.util.HashSet<String>();
+		java.util.LinkedHashSet<String> distinctIds = new java.util.LinkedHashSet<String>();
+		for(String id : documentIds)
+		{
+			if(null!=id && !"".equals(id.trim()))
+			{
+				distinctIds.add(id.trim());
+			}
+		}
+		List<String> ids = new ArrayList<String>(distinctIds);
+		for(String table : cdDataTables)
+		{
+			for(int from=0; from<ids.size(); from+=CD_DATA_CHECK_CHUNK)
+			{
+				List<String> chunk = ids.subList(from, Math.min(from+CD_DATA_CHECK_CHUNK, ids.size()));
+				StringBuilder sql = new StringBuilder("SELECT DISTINCT dc_im_doc_id FROM ").append(table.trim())
+						.append(" WHERE dc_sequence_no IS NOT NULL AND dc_cd_id > 0 AND dc_im_doc_id IN (");
+				for(int i=0;i<chunk.size();i++)
+				{
+					sql.append(i==0 ? "?" : ",?");
+				}
+				sql.append(")");
+				PreparedStatement pstmt = null;
+				ResultSet rs = null;
+				try
+				{
+					pstmt = conn.prepareStatement(sql.toString());
+					for(int i=0;i<chunk.size();i++)
+					{
+						pstmt.setString(i+1, chunk.get(i));
+					}
+					rs = pstmt.executeQuery();
+					while(rs.next())
+					{
+						if(null!=rs.getString(1))
+						{
+							// MySQL '=' matched case-insensitively - compare the same way
+							withCDData.add(rs.getString(1).trim().toLowerCase());
+						}
+					}
+				}
+				finally
+				{
+					if(null!=rs) rs.close();
+					if(null!=pstmt) pstmt.close();
+				}
+			}
+		}
+		ArrayList<String> kept = new ArrayList<String>();
+		for(String id : documentIds)
+		{
+			if(null!=id && withCDData.contains(id.trim().toLowerCase()))
+			{
+				kept.add(id.trim());
+			}
+		}
+		logger.info("keepDocumentsWithCDData :: Documents with CD data :: > " + kept.size() + " of " + documentIds.size());
+		return kept;
 	}
 
 	public static ArrayList<String> fetchCDRomDataOnFaceLift(String manualTypeRefKey,String manualTypeName,String modelName,String carlineCode,String wmiCode, String vdsCode, String vinRange,String language) throws SQLException
@@ -3399,33 +3311,9 @@ public class CDRomDAO extends DBConnectionHelper {
 							
 							tok = tableNames.split(",");
 							docFound = false;;
-							for(int a=0;a<tempDocumentsList.size();a++)
-							{
-								for(int b=0;b<tok.length;b++)
-								{
-									docFound= false;
-									sql = "SELECT dc_cd_id FROM "+tok[b]+" WHERE dc_im_doc_id='"+tempDocumentsList.get(a).toString().trim()+"' AND dc_sequence_no IS NOT NULL";
-									//							logger.info("fetchCDRomDataOnFaceLift :: Veifying CD Data for Document SQL :: > "+ sql);
-									stmt = conn.createStatement();
-									rs = stmt.executeQuery(sql);
-									if(rs.next())
-									{
-										if(rs.getLong("dc_cd_id")>0)
-										{
-											// add document to documentsList
-											docFound=  true;
-										}
-									}
-									stmt.close();stmt = null;
-									rs.close();rs= null;
-									sql  =null;
-									if(docFound==true)
-									{
-										documentIdsList.add(tempDocumentsList.get(a).toString().trim());
-										break;
-									}
-								}
-							}
+							// ONE SET QUERY PER CD DATA TABLE instead of one query per document - per-statement
+							// latency on MC Dev (~360 ms) made 1,851 e-WD documents take 11 minutes on Next.
+							documentIdsList.addAll(keepDocumentsWithCDData(conn, tempDocumentsList, tok));
 						}
 					}
 					tableNames=  null;
@@ -3946,34 +3834,8 @@ public class CDRomDAO extends DBConnectionHelper {
 						tableNames+=",gms3_dmt_"+Utilities.tableLocale(language)+"_cd_data";
 					}
 					String[] tok = tableNames.split(",");
-					boolean docFound = false;;
-					for(int a=0;a<tempDocumentsList.size();a++)
-					{
-						for(int b=0;b<tok.length;b++)
-						{
-							docFound= false;
-							sql = "SELECT dc_cd_id FROM "+tok[b]+" WHERE dc_im_doc_id='"+tempDocumentsList.get(a).toString().trim()+"' AND dc_sequence_no IS NOT NULL";
-							//							logger.info("fetchCDRomDataOnBookCodes :: Veifying CD Data for Document SQL :: > "+ sql);
-							stmt = conn.createStatement();
-							rs = stmt.executeQuery(sql);
-							if(rs.next())
-							{
-								if(rs.getLong("dc_cd_id")>0)
-								{
-									// add document to documentsList
-									docFound=  true;
-								}
-							}
-							stmt.close();stmt = null;
-							rs.close();rs= null;
-							sql  =null;
-							if(docFound==true)
-							{
-								documentIdsList.add(tempDocumentsList.get(a).toString().trim());
-								break;
-							}
-						}
-					}
+					// ONE SET QUERY PER CD DATA TABLE instead of one query per document (MC Dev latency)
+					documentIdsList.addAll(keepDocumentsWithCDData(conn, tempDocumentsList, tok));
 					tableNames=  null;
 					tok = null;
 				}
@@ -4622,20 +4484,38 @@ public class CDRomDAO extends DBConnectionHelper {
 		Statement stmt = null;
 		ResultSet rs = null;
 		String sql = "";
+		boolean byDate = false;
 		try {
 			conn = getConnection();
 			if (StringUtils.isBlank(scheduleId)) {
 				sql="SELECT * FROM gms3_mdm_cdrom_schedule where cd_schedule_name like 'MDM_CDROM_SC_%'  ";
 				if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
 				{
-					sql = sql+" AND DATE_FORMAT(cd_schedule_tmstp,'%Y-%m-%d') BETWEEN '"+fromDate+"' AND '"+toDate+"' ";
+					/*
+					 * compared as timestamps through the driver (DMTKapture ScheduleDAO pattern) - DATE_FORMAT on
+					 * the stored value compared the database's clock with the application's date, so a job
+					 * scheduled late in the day fell on the next date and was missing from History.
+					 */
+					byDate = true;
+					sql = sql+" AND cd_schedule_tmstp >= ? AND cd_schedule_tmstp < ? ";
 				}
 				sql = sql+" ORDER BY cd_schedule_id DESC ";
 			} else {
 				sql = "SELECT * FROM gms3_mdm_cdrom_schedule WHERE cd_schedule_id="+scheduleId;
 			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
+			PreparedStatement ps = conn.prepareStatement(sql);
+			stmt = ps;
+			if(byDate)
+			{
+				java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("yyyy-MM-dd");
+				day.setLenient(false);
+				java.util.Calendar to = java.util.Calendar.getInstance();
+				to.setTime(day.parse(toDate.trim()));
+				to.add(java.util.Calendar.DATE, 1);
+				ps.setTimestamp(1, new java.sql.Timestamp(day.parse(fromDate.trim()).getTime()));
+				ps.setTimestamp(2, new java.sql.Timestamp(to.getTimeInMillis()));
+			}
+			rs = ps.executeQuery();
 			while (rs.next()) {
 				CDRomScheduleDetails schDetails = new CDRomScheduleDetails();
 				schDetails.setSrNo(schedueList.size() + 1);

@@ -51,4 +51,34 @@ public class ApplicationProperties {
 		}
 		return value;
 	}
+
+	/** A REQUIRED value - no default in code: a missing or blank key throws. Returned trimmed. */
+	public static String requireProperty(String key) {
+		String value = getProperty(key);
+		if (null == value || "".equals(value.trim())) {
+			throw new IllegalStateException("application.properties :: required key {" + key + "} is missing or blank.");
+		}
+		return value.trim();
+	}
+
+	/**
+	 * A REQUIRED whole number of at least 1 - no default in code: a missing, blank, non-numeric or
+	 * zero / negative value throws, so a wrong env file stops the step instead of running on a guess.
+	 */
+	public static int requirePositiveInt(String key) {
+		String value = getProperty(key);
+		if (null == value || "".equals(value.trim())) {
+			throw new IllegalStateException("application.properties :: required key {" + key + "} is missing or blank.");
+		}
+		int number;
+		try {
+			number = Integer.parseInt(value.trim());
+		} catch (NumberFormatException e) {
+			throw new IllegalStateException("application.properties :: key {" + key + "} = {" + value + "} is not a whole number.");
+		}
+		if (number < 1) {
+			throw new IllegalStateException("application.properties :: key {" + key + "} = {" + value + "} must be 1 or more.");
+		}
+		return number;
+	}
 }

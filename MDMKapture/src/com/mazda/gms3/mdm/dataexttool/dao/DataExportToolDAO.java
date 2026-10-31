@@ -25,6 +25,21 @@ public class DataExportToolDAO extends DBConnectionHelper{
 
 	private static Logger logger = LogManager.getLogger(DataExportToolDAO.class);
 
+	/**
+	 * DATE FILTER - [start of fromDate, start of the day after toDate), bound as timestamps through
+	 * the driver (DMTKapture ScheduleDAO pattern). DATE_FORMAT on the stored value compared the
+	 * database's clock with the application's date, so a row late in the day fell on the next date
+	 * and was missing until To Date was moved a day on.
+	 */
+	private static Timestamp[] dayRange(String fromDate, String toDate) throws java.text.ParseException {
+		java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("yyyy-MM-dd");
+		day.setLenient(false);
+		java.util.Calendar to = java.util.Calendar.getInstance();
+		to.setTime(day.parse(toDate.trim()));
+		to.add(java.util.Calendar.DATE, 1);
+		return new Timestamp[] { new Timestamp(day.parse(fromDate.trim()).getTime()), new Timestamp(to.getTimeInMillis()) };
+	}
+
 	public static ArrayList<DataExportToolItemDetails> getDocumentsMatrixList(List<String> localesList, List<CarlineDetails> modelsList, String fromDate, String toDate)
 	{
 		ArrayList<DataExportToolItemDetails> itemsList = null;
@@ -79,11 +94,18 @@ public class DataExportToolDAO extends DBConnectionHelper{
 										+ " AND vc_my_document_type!='TECHNICAL_INFORMATION'";
 								if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
 								{
-									sql+=" AND DATE_FORMAT(vc_my_doc_last_modified_date,'%Y-%m-%d') BETWEEN '"+fromDate+"' AND '"+toDate+"' ";
+									sql+=" AND vc_my_doc_last_modified_date >= ? AND vc_my_doc_last_modified_date < ? ";
 								}
 								logger.info("getDocumentsMatrixList :: sql :: >"+ sql);
-								stmt = conn.createStatement();
-								rs = stmt.executeQuery(sql);
+								PreparedStatement datePstmt = conn.prepareStatement(sql);
+								if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
+								{
+									Timestamp[] range = dayRange(fromDate, toDate);
+									datePstmt.setTimestamp(1, range[0]);
+									datePstmt.setTimestamp(2, range[1]);
+								}
+								stmt = datePstmt;
+								rs = datePstmt.executeQuery();
 								while(rs.next())
 								{
 									details = new DataExportToolItemDetails();
@@ -252,11 +274,18 @@ public class DataExportToolDAO extends DBConnectionHelper{
 											+ " AND  vc_my_locale='"+locale+"' AND vc_my_model='"+model+"'  ";
 									if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
 									{
-										sql+=" AND DATE_FORMAT(vc_my_doc_last_modified_date,'%Y-%m-%d') BETWEEN '"+fromDate+"' AND '"+toDate+"' ";
+										sql+=" AND vc_my_doc_last_modified_date >= ? AND vc_my_doc_last_modified_date < ? ";
 									}
 									logger.info("getDocumentsMatrixList :: Sql :: > "+ sql);
-									stmt = conn.createStatement();
-									rs = stmt.executeQuery(sql);
+									PreparedStatement datePstmt = conn.prepareStatement(sql);
+									if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
+									{
+										Timestamp[] range = dayRange(fromDate, toDate);
+										datePstmt.setTimestamp(1, range[0]);
+										datePstmt.setTimestamp(2, range[1]);
+									}
+									stmt = datePstmt;
+									rs = datePstmt.executeQuery();
 									while(rs.next())
 									{
 										details = new DataExportToolItemDetails();
@@ -487,6 +516,36 @@ public class DataExportToolDAO extends DBConnectionHelper{
 		return itemsList;
 	}
 	
+	/**
+	 * THE MNAO Data Export JOBS PENDING / PROCESSING NOW, by schedule name - for the parallel jobs cap
+	 * (dataexttool.max.parallel.jobs, 2026-10-30, as CD Creation and DMT).
+	 */
+	public static List<String> getActiveJobs() throws Exception {
+		List<String> names = new ArrayList<String>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn = getConnection();
+			pstmt = conn.prepareStatement("SELECT mde_sch_name FROM gms3_mdm_mde_tool_sch WHERE mde_sch_processing_status IN (?, ?) ORDER BY mde_sch_id");
+			pstmt.setString(1, ScheduleConstants.STATUS_PENDING);
+			pstmt.setString(2, ScheduleConstants.STATUS_PROCESSING);
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				names.add(rs.getString(1));
+			}
+		} finally {
+			if (null != rs)
+				rs.close();
+			if (null != pstmt)
+				pstmt.close();
+			if (null != conn)
+				conn.close();
+		}
+		logger.info("getActiveJobs :: Pending / Processing MNAO Data Export jobs :: " + names);
+		return names;
+	}
+
 	public static Long createSchedule(DataExportToolScheduleDetails schDetails)
 	{
 		Long scheduleId=null;

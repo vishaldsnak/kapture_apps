@@ -67,13 +67,15 @@ public class CDRomZipUtils {
 	public boolean zipIt(String zipFile) {
     	logger.info("CDROMZipUtils zipIt starts here ");
     	boolean bool = true;
-        byte[] buffer = new byte[1024];
+        // 64 KB reads + a 1 MB buffered zip file - the zip lives on the /s3kapture mount, where every
+        // small write is its own round trip (ZipOutputStream alone writes in 512 byte pieces)
+        byte[] buffer = new byte[64 * 1024];
         String source = new File(SOURCE_FOLDER).getName();
         FileOutputStream fos = null;
         ZipOutputStream zos = null;
         try {
             fos = new FileOutputStream(zipFile);
-            zos = new ZipOutputStream(fos);
+            zos = new ZipOutputStream(new java.io.BufferedOutputStream(fos, 1024 * 1024));
 
             FileInputStream in = null;
 
@@ -81,13 +83,18 @@ public class CDRomZipUtils {
             	if(null!=abortCheck && abortCheck.isAborted()) { break; }
                 ZipEntry ze = new ZipEntry(source + File.separator + file);
                 zos.putNextEntry(ze);
+                long opStarted = System.currentTimeMillis();
+                long entryBytes = 0L;
                 try {
                     in = new FileInputStream(SOURCE_FOLDER + File.separator + file);
                     int len;
                     while ((len = in .read(buffer)) > 0) {
                     	if(null!=abortCheck && abortCheck.isAborted()) { break; }
                         zos.write(buffer, 0, len);
+                        entryBytes += len;
                     }
+                    com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("Zip - add one file (read + compress + write)",
+                            com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, entryBytes);
                 }
                 catch(Exception ext)
                 {

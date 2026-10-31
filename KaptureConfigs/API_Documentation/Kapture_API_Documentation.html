@@ -1,0 +1,1071 @@
+<title>Kapture API Reference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: fixed reference rail + single reading column; samples sit under each API. */
+:root{--bg:#f4f6f7;--panel:#ffffff;--fg:#17242b;--muted:#566872;--line:#d6dee2;--accent:#0b6e76;--accent-soft:#dcedee;--code-bg:#eef2f3;
+--get:#1b5fa8;--post:#1c7a4b;--put:#9a6200;--patch:#6b45a8;--delete:#b3362e;
+--sans:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;--mono:"IBM Plex Mono",Consolas,"Courier New",monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181c;--panel:#172227;--fg:#e4ecef;--muted:#9db0b9;--line:#2c3b42;--accent:#5cc4cc;--accent-soft:#1c3438;--code-bg:#0c1316;
+--get:#7ab4f0;--post:#6ccf9c;--put:#e6b35c;--patch:#bb9bf0;--delete:#f08a82;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10181c;--panel:#172227;--fg:#e4ecef;--muted:#9db0b9;--line:#2c3b42;--accent:#5cc4cc;--accent-soft:#1c3438;--code-bg:#0c1316;
+--get:#7ab4f0;--post:#6ccf9c;--put:#e6b35c;--patch:#bb9bf0;--delete:#f08a82;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans);margin:0}
+.wrap{display:grid;grid-template-columns:230px minmax(0,1fr);gap:32px;max-width:1240px;margin:0 auto;padding-block:28px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+aside{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);align-self:start;display:grid;gap:14px;max-height:calc(100vh - 40px);overflow:auto}
+aside .brand{font-weight:700;font-size:16px;line-height:1.3}
+aside ul{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+aside a{display:block;color:var(--fg);text-decoration:none;padding:5px 8px;border-radius:5px;font-size:14px}
+aside a:hover,aside a:focus-visible{background:var(--accent-soft)}
+#q{width:100%;padding:8px 10px;font:inherit;font-size:14px;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px}
+#hits{font-size:12.5px;color:var(--muted);min-height:18px}
+main{min-width:0;display:grid;gap:40px}
+h1{font-size:30px;line-height:1.2;margin:0 0 8px;text-wrap:balance}
+h2{font-size:22px;margin:0 0 4px;text-wrap:balance}
+h3{font-size:17px;margin:0}
+.lead{color:var(--muted);margin:0 0 16px;max-width:68ch}
+.intro p{max-width:68ch;margin:0 0 10px}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child th,tr:last-child td{border-bottom:0}
+thead th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+tbody th{font-weight:500}
+td a,th a{color:var(--accent)}
+td.on{color:var(--post);font-weight:600;text-align:center}td.off{text-align:center}
+.verb{display:inline-block;min-width:60px;text-align:center;font:600 12px/1.7 var(--mono);border:1px solid currentColor;border-radius:4px;padding:0 6px}
+.v-get{color:var(--get)}.v-post{color:var(--post)}.v-put{color:var(--put)}.v-patch{color:var(--patch)}.v-delete{color:var(--delete)}
+code{font-family:var(--mono);font-size:.92em}
+.rules{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.rules li{max-width:72ch}.rules b{font-weight:600}
+.api{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin-top:16px;display:grid;gap:10px;min-width:0;scroll-margin-top:16px}
+.api header{display:grid;gap:6px;grid-template-columns:1fr auto;align-items:baseline}
+.api .line{grid-column:1/-1;margin:0;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;min-width:0}
+.path{word-break:break-all;min-width:0}
+.jobtag{font-size:12.5px;color:var(--muted)}
+.purpose{margin:0;max-width:72ch}
+.who-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lbl{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.who{font-size:12.5px;background:var(--accent-soft);padding:1px 8px;border-radius:4px}
+.params{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:2px 12px;margin:0;font-size:14px}
+.params dt{color:var(--muted)}.params dd{margin:0}
+.notes{margin:0;padding-left:18px;display:grid;gap:3px;font-size:14.5px}
+.samples{display:grid;gap:10px;min-width:0}
+.sample{margin:0;min-width:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+figcaption{display:flex;gap:10px;align-items:center;padding:5px 10px;font-size:13px;font-weight:600;background:var(--panel);border-bottom:1px solid var(--line)}
+.src{font-weight:400;color:var(--muted);font-size:12px}
+.copy{margin-left:auto;font:inherit;font-size:12px;color:var(--accent);background:none;border:1px solid var(--line);border-radius:4px;padding:1px 8px;cursor:pointer}
+pre{margin:0;padding:10px 12px;max-height:340px;overflow:auto;background:var(--code-bg);font:12.8px/1.5 var(--mono)}
+pre code{font-size:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+[hidden]{display:none!important}
+footer{color:var(--muted);font-size:13px}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr);gap:18px}aside{position:static;max-height:none}aside ul{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}}
+</style>
+<div class="wrap">
+<aside>
+<div class="brand">Kapture API Reference</div>
+<label for="q" class="lbl">Search all APIs</label>
+<input id="q" type="search" placeholder="publish, 409, MDM ...">
+<div id="hits" aria-live="polite"></div>
+<nav aria-label="Sections"><ul>
+<li><a href="#index">All APIs</a></li><li><a href="#rules">Rules for every call</a></li><li><a href="#terms">Key terms</a></li><li><a href="#session">Login</a></li><li><a href="#bulk">Bulk article import</a></li><li><a href="#single">Single-document APIs</a></li><li><a href="#category">Categories</a></li><li><a href="#activity">Workflow history, case links, recommendations</a></li>
+<li><a href="#matrix">Who calls what</a></li><li><a href="#unused">Available, not used</a></li><li><a href="#open">Open with Kapture</a></li>
+</ul></nav>
+</aside>
+<main>
+<div class="intro general" id="top">
+<h1>Kapture API Reference</h1>
+<p>24 Kapture endpoints across the migration jobs and web applications, each with its request, response and failure shapes. As of 2026-10-30.</p>
+<p>Paths sit under <code>/kauthor-api</code>; the old <code>/Kapture-Author</code> context is a 404. Every call except login sends <code>Authorization: Bearer &lt;token&gt;</code>. Each sample shows where it came from. Passwords, tokens and personal details are replaced with placeholders.</p>
+<div class="tablebox"><table><thead><tr><th>Environment</th><th>kapture.api.base</th></tr></thead><tbody><tr><td>SC Dev</td><td><code>https://mgssdev.kapturekm.com</code></td></tr><tr><td>MC Dev</td><td><code>http://oclut0124:8883</code></td></tr><tr><td>MC QA</td><td><code>http://oclut0142:8891</code></td></tr><tr><td>PROD</td><td><code>To be confirmed</code></td></tr></tbody></table></div>
+</div>
+<section class="general" id="index"><h2>All APIs</h2><div class="tablebox"><table><thead><tr><th>Method</th><th>Path</th><th>What it does</th></tr></thead><tbody><tr><td><span class="verb v-post">POST</span></td><td><a href="#cms-check"><code>/cms-check</code></a></td><td>Login</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#bulk-create"><code>/api/v1/bulk-article-import</code></a></td><td>Bulk create</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#bulk-update"><code>/api/v1/bulk-article-import/updates</code></a></td><td>Bulk update</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#bulk-translate"><code>/api/v1/bulk-article-import/translations</code></a></td><td>Bulk translate</td></tr><tr><td><span class="verb v-get">GET</span></td><td><a href="#bulk-job"><code>/api/v1/bulk-article-import/jobs/{jobId}?page=0&amp;size=100</code></a></td><td>Job report</td></tr><tr><td><span class="verb v-get">GET</span></td><td><a href="#bulk-job-article"><code>/api/v1/bulk-article-import/jobs/{jobId}/articles/{articleId}?locale=</code></a></td><td>Job result for one article</td></tr><tr><td><span class="verb v-get">GET</span></td><td><a href="#bulk-corr"><code>/api/v1/bulk-article-import/jobs/by-correlation/{correlationId}?page=0&amp;size=100</code></a></td><td>Recover a job by correlation id</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#temp-upload"><code>/api/temp-attachment/upload</code></a></td><td>Temp attachment upload</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#add-article"><code>/add-article-tab?contentId=</code></a></td><td>Create article</td></tr><tr><td><span class="verb v-put">PUT</span></td><td><a href="#update-article"><code>/update-article-tab?contentId=</code></a></td><td>Update article</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#save-translate"><code>/save-translate-article?contentId=</code></a></td><td>Save translation</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#publish-article"><code>/publish-article</code></a></td><td>Publish article</td></tr><tr><td><span class="verb v-get">GET</span></td><td><a href="#latest-article"><code>/latest-article/{articleId}/{contentId}/{locale}</code></a></td><td>Read latest article</td></tr><tr><td><span class="verb v-get">GET</span></td><td><a href="#display-article"><code>/display-Article?articleId=&amp;contentId=&amp;articleVersion=&amp;articleState=&amp;locale=</code></a></td><td>Read a named version</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#apply-actions"><code>/author/bulk/apply-actions</code></a></td><td>Bulk publish</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#unpublish"><code>/unpublish-this-versions</code></a></td><td>Unpublish</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#add-category"><code>/add-categoryMgt?locale=</code></a></td><td>Create category</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#update-category"><code>/updateCategoryByCatRef?categoryRef=&amp;locale=</code></a></td><td>Update category</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#add-comments"><code>/add-article-comments</code></a></td><td>Add history entry</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#add-case"><code>/addCase/{articleId}</code></a></td><td>Add case link</td></tr><tr><td><span class="verb v-delete">DELETE</span></td><td><a href="#delete-case"><code>/deleteCase/{id}</code></a></td><td>Delete case link</td></tr><tr><td><span class="verb v-post">POST</span></td><td><a href="#reco-create"><code>/api/recommendations</code></a></td><td>Create recommendation</td></tr><tr><td><span class="verb v-patch">PATCH</span></td><td><a href="#reco-update"><code>/api/recommendations/{id}</code></a></td><td>Update recommendation</td></tr><tr><td><span class="verb v-patch">PATCH</span></td><td><a href="#reco-reject"><code>/api/recommendations/reject/{id}</code></a></td><td>Reject recommendation</td></tr></tbody></table></div></section>
+<section class="general" id="rules"><h2>Rules for every call</h2><ul class="rules"><li><b>A 2xx is not success.</b> Bulk answers 200 with COMPLETED_WITH_ERRORS. Single writes can answer HTTP 200 with status &quot;500&quot; in the body. Read the per-record status, and read back anything load-bearing.</li><li><b>Writes replace the whole row.</b> On update-article-tab and publish-article, an omitted field becomes NULL.</li><li><b>Read shape is not write shape.</b> The read returns numbers for versions, slash dates, and an object for one-entry lists. Convert before writing.</li><li><b>Refkeys travel with names.</b> A nameless entry is accepted, then renders as undefined.</li><li><b>Never resend a timed-out bulk POST.</b> Reconcile by correlation id or k_article.</li><li><b>Retry the request, not the record.</b> 429, 5xx and no answer are request failures; retry with backoff. A failed record inside a 200 waits for the next run. Job 11 does not retry 500.</li><li><b>Strip markup before sending.</b> script, meta, iframe, object, embed, link, on* handlers, and javascript: or vbscript: URLs are rejected by the sanitizer.</li><li><b>Rate limit.</b> 100 requests per minute per client IP and exact path. 429 returns Retry-After: 60.</li></ul></section>
+<section class="general" id="terms"><h2>Key terms</h2><div class="tablebox"><table><tbody><tr><th scope='row'><code>contentId</code></th><td>The channel id from k_content_type (by documentid_prefix). It differs per environment. Never hard-code it.</td></tr><tr><th scope='row'><code>articleId</code></th><td>The document id, such as SI1123.</td></tr><tr><th scope='row'><code>id</code></th><td>k_article primary key. Differs per version. Not the articleId.</td></tr><tr><th scope='row'><code>primaryLocale</code></th><td>The master&#x27;s locale.</td></tr><tr><th scope='row'><code>translatedLocale / translateLocale</code></th><td>With d on masters and reads; without d on translation writes.</td></tr><tr><th scope='row'><code>pubFlag</code></th><td>Per-record publish intent.</td></tr><tr><th scope='row'><code>articleState</code></th><td>On update: a lookup key holding the current state, not a target.</td></tr></tbody></table></div></section>
+<section class="grp" id="session"><h2>Login</h2><p class="lead">Every call needs the Bearer token from this one call.</p><article class="api" id="cms-check" data-s="login /kauthor-api/cms-check job 4 job 9 job 10 job 11 dmt mdm post"><header><h3>Login</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/cms-check</code></p></header><p class="purpose">Returns the session token and the logged-in user&#x27;s profile.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 4</span><span class="who">Job 9</span><span class="who">Job 10</span><span class="who">Job 11</span><span class="who">DMT</span><span class="who">MDM</span></div><dl class="params"><dt>Header</dt><dd>Content-Type: application/json</dd></dl><ul class="notes"><li>The token is at response.userSessionToken, not at data.</li><li>A 2xx with no token is a failed login. DMT and Job 10 stop there.</li><li>The profile is at response.userCmsRoles[0]. createdBy / modifiedBy = firstName + lastName, never the e-mail.</li><li>uploadedBy on attachments = userPkId.</li><li>A saved sample token runs 2 hours (iat to exp). On 401, log in once and retry.</li><li>Java 8 callers must force TLS 1.2/1.3 with -Dhttps.protocols and -Djdk.tls.client.protocols.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;email&quot;: &quot;&lt;service-account-email&gt;&quot;,
+  &quot;appType&quot;: &quot;kauthor&quot;,
+  &quot;publicIp&quot;: &quot;&lt;caller host or IP&gt;&quot;,
+  &quot;userAgent&quot;: &quot;chrome&quot;,
+  &quot;password&quot;: &quot;&lt;from application.properties&gt;&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;...&quot;,
+  &quot;response&quot;: {
+    &quot;userSessionToken&quot;: &quot;&lt;JWT&gt;&quot;,
+    &quot;userCmsRoles&quot;: [
+      {
+        &quot;userPkId&quot;: &quot;&lt;uuid&gt;&quot;,
+        &quot;firstName&quot;: &quot;Migration&quot;,
+        &quot;lastName&quot;: &quot;User&quot;,
+        &quot;userid&quot;: &quot;&lt;login&gt;&quot;,
+        &quot;email&quot;: &quot;&lt;email&gt;&quot;,
+        &quot;appIds&quot;: [
+          &quot;2&quot;
+        ],
+        &quot;defaultLocale&quot;: &quot;en_US&quot;,
+        &quot;cmsDefaultLocale&quot;: &quot;en_US&quot;,
+        &quot;cmsPowerRole&quot;: false,
+        &quot;usergroups&quot;: [
+          &quot;...&quot;
+        ]
+      }
+    ],
+    &quot;clientIpAddress&quot;: &quot;&lt;ip&gt;&quot;,
+    &quot;loginTimestamp&quot;: 0
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: 401 on any later call</span><button type="button" class="copy" aria-label="Copy Failure: 401 on any later call">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: 401,
+  &quot;error&quot;: &quot;Unauthorized&quot;,
+  &quot;message&quot;: &quot;Invalid or expired token&quot;,
+  &quot;path&quot;: &quot;/kauthor-api/...&quot;
+}</code></pre></figure></div></article></section><section class="grp" id="bulk"><h2>Bulk article import</h2><p class="lead">The main load path. The body is always a JSON ARRAY of articles, and each record succeeds or fails on its own.</p><article class="api" id="bulk-create" data-s="bulk create /kauthor-api/api/v1/bulk-article-import job 10 dmt post"><header><h3>Bulk create</h3><span class="jobtag">Job id BAI-</span><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/api/v1/bulk-article-import</code></p></header><p class="purpose">Creates master articles. legacyDocumentId becomes the Kapture article id.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 10</span><span class="who">DMT</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id (from k_content_type)</dd><dt>Query</dt><dd>batchSize = how Kapture splits the request across its workers</dd><dt>Query</dt><dd>publish = always false; it overrides every record. Use pubFlag per record</dd><dt>Header</dt><dd>Authorization: Bearer &lt;token&gt;</dd><dt>Header</dt><dd>X-Correlation-ID = our own id, needed to recover a timed-out request</dd></dl><ul class="notes"><li>legacyDocumentId is mandatory. Kapture will not mint an id.</li><li>The idempotency key is contentId + legacyDocumentId + primaryLocale.</li><li>Create accepts articleState Unpublished only; set pubFlag to publish.</li><li>SKIPPED_DUPLICATE does not return id or articleVersion. Recover them from k_article.</li><li>Match the duplicate case on 409 AND errorCode, never on 409 alone.</li><li>Validation stops at the first problem. One reported error does not prove it is the only one.</li><li>Category arrays tag the document. The CSV fields map nothing, and each entry needs selected: true.</li><li>One unknown category refkey fails the whole record.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>[
+  {
+    &quot;legacyDocumentId&quot;: &quot;SM1558284&quot;,
+    &quot;sourceIdentifier&quot;: &quot;sites/MAZDA/content/staging/SERVICE_MANUALS/1558000/SM1558284/ja_JP/12.0&quot;,
+    &quot;sourceFileName&quot;: &quot;content_1d31c5e9d5fb4e65a072759ddf6343e1.xml&quot;,
+    &quot;primaryLocale&quot;: &quot;ja_JP&quot;,
+    &quot;translatedLocale&quot;: &quot;ja_JP&quot;,
+    &quot;title&quot;: &quot;Clutch [C66M-R, C66MX-R]&quot;,
+    &quot;articleState&quot;: &quot;Published&quot;,
+    &quot;articleOwner&quot;: &quot;Migration User&quot;,
+    &quot;articleCreator&quot;: &quot;Migration User&quot;,
+    &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+    &quot;createdBy&quot;: &quot;Migration User&quot;,
+    &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+    &quot;type&quot;: &quot;SERVICE_MANUALS&quot;,
+    &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+    &quot;crawlType&quot;: &quot;KAPTURE&quot;,
+    &quot;pubFlag&quot;: true,
+    &quot;articlelistcategory&quot;: [
+      {
+        &quot;categoryRefKey&quot;: &quot;BODYSHOP_MANUAL&quot;,
+        &quot;categoryName&quot;: &quot;Bodyshop Manual&quot;,
+        &quot;selected&quot;: true
+      }
+    ],
+    &quot;articleesicategory&quot;: [
+      {
+        &quot;categoryRefKey&quot;: &quot;ESI01&quot;,
+        &quot;categoryName&quot;: &quot;Engine&quot;,
+        &quot;selected&quot;: true
+      }
+    ],
+    &quot;categoriesTreeRefKeys&quot;: &quot;&quot;,
+    &quot;categoriesESITreeRefKeys&quot;: &quot;&quot;,
+    &quot;articlelistusergroup&quot;: [
+      {
+        &quot;userGroupRefKey&quot;: &quot;TECHNICIAN_CONTENT_KEY&quot;,
+        &quot;userGroupName&quot;: &quot;Technician Content&quot;
+      }
+    ],
+    &quot;articlelistview&quot;: [
+      {
+        &quot;viewRefKey&quot;: &quot;MC_KEY&quot;,
+        &quot;viewName&quot;: &quot;MC&quot;
+      }
+    ],
+    &quot;facetsSchemaFields&quot;: [],
+    &quot;fieldSecurities&quot;: [],
+    &quot;articleTagList&quot;: [],
+    &quot;SERVICE_MANUALS&quot;: {
+      &quot;TITLE&quot;: &quot;Clutch [C66M-R, C66MX-R]&quot;,
+      &quot;CONTENT&quot;: &quot;&lt;hr /&gt; &lt;p&gt;...&lt;/p&gt;&quot;,
+      &quot;VTOC_FILENAME&quot;: &quot;ac3jj0510mcn0000001&quot;,
+      &quot;SIE_ID&quot;: &quot;id0510mc283600.ent&quot;,
+      &quot;DJVU_FILE_LOCATION&quot;: &quot;&quot;,
+      &quot;OASIS_FILE_LOCATION&quot;: &quot;&quot;,
+      &quot;ATTACHMENTS&quot;: []
+    }
+  }
+]</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Same shape as the live update capture</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;batchSize&quot;: 2,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;correlationId&quot;: &quot;dmt-bulk-MASTER-SM-20260818_104710-w1-b1&quot;,
+  &quot;jobId&quot;: &quot;BAI-...&quot;,
+  &quot;message&quot;: &quot;Bulk CREATE completed successfully.&quot;,
+  &quot;operation&quot;: &quot;CREATE&quot;,
+  &quot;status&quot;: &quot;COMPLETED&quot;,
+  &quot;processingTimeMs&quot;: 2199,
+  &quot;totalRecords&quot;: 2,
+  &quot;successfulRecords&quot;: 2,
+  &quot;failedRecords&quot;: 0,
+  &quot;skippedDuplicateRecords&quot;: 0,
+  &quot;workerThreads&quot;: 5,
+  &quot;results&quot;: [
+    {
+      &quot;sequenceNumber&quot;: 1,
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65533,
+      &quot;kaptureDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;legacyDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;articleState&quot;: &quot;Published&quot;,
+      &quot;articleVersion&quot;: &quot;10.0&quot;,
+      &quot;publishedVersion&quot;: &quot;10.0&quot;,
+      &quot;attemptCount&quot;: 1,
+      &quot;message&quot;: &quot;Article Published Successfully.&quot;,
+      &quot;processingTimeMs&quot;: 1129
+    },
+    {
+      &quot;sequenceNumber&quot;: 2,
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65535,
+      &quot;kaptureDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;legacyDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;articleVersion&quot;: &quot;0.9&quot;,
+      &quot;attemptCount&quot;: 1,
+      &quot;message&quot;: &quot;Article Tab Updated Successfully.&quot;,
+      &quot;processingTimeMs&quot;: 543
+    }
+  ]
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Already exists: two shapes, same request</span><button type="button" class="copy" aria-label="Copy Failure: Already exists: two shapes, same request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;jobId&quot;: &quot;BAI-3ca62485-be89-4467-ba90-9d1094318a33&quot;,
+  &quot;operation&quot;: &quot;CREATE&quot;,
+  &quot;status&quot;: &quot;COMPLETED_WITH_ERRORS&quot;,
+  &quot;message&quot;: &quot;Bulk CREATE completed with one or more record errors.&quot;,
+  &quot;totalRecords&quot;: 2,
+  &quot;successfulRecords&quot;: 0,
+  &quot;failedRecords&quot;: 1,
+  &quot;skippedDuplicateRecords&quot;: 1,
+  &quot;results&quot;: [
+    {
+      &quot;status&quot;: &quot;FAILED&quot;,
+      &quot;errorCode&quot;: &quot;PUBLISH_ARTICLE_ERROR&quot;,
+      &quot;httpStatus&quot;: 409,
+      &quot;id&quot;: 65525,
+      &quot;kaptureDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;message&quot;: &quot;Existing draft found but publish failed: Source article id does not match the requested article identity.&quot;
+    },
+    {
+      &quot;status&quot;: &quot;SKIPPED_DUPLICATE&quot;,
+      &quot;errorCode&quot;: &quot;DUPLICATE_SKIPPED&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;kaptureDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;message&quot;: &quot;Article already imported; duplicate skipped.&quot;
+    }
+  ]
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: legacyDocumentId missing</span><button type="button" class="copy" aria-label="Copy Failure: legacyDocumentId missing">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;FAILED&quot;,
+  &quot;httpStatus&quot;: 400,
+  &quot;errorCode&quot;: &quot;VALIDATION_ERROR&quot;,
+  &quot;message&quot;: &quot;Article validation failed.&quot;,
+  &quot;validationErrors&quot;: [
+    {
+      &quot;field&quot;: &quot;legacyDocumentId&quot;,
+      &quot;message&quot;: &quot;Legacy Document ID is required.&quot;
+    }
+  ]
+}</code></pre></figure></div></article><article class="api" id="bulk-update" data-s="bulk update /kauthor-api/api/v1/bulk-article-import/updates job 10 dmt post"><header><h3>Bulk update</h3><span class="jobtag">Job id BAU-</span><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/api/v1/bulk-article-import/updates</code></p></header><p class="purpose">Updates masters. Kapture resolves the target from articleId + locales and writes the next version.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 10</span><span class="who">DMT</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id (from k_content_type)</dd><dt>Query</dt><dd>batchSize = how Kapture splits the request across its workers</dd><dt>Query</dt><dd>publish = always false; it overrides every record. Use pubFlag per record</dd><dt>Header</dt><dd>Authorization: Bearer &lt;token&gt;</dd><dt>Header</dt><dd>X-Correlation-ID = our own id, needed to recover a timed-out request</dd></dl><ul class="notes"><li>Since 2026-08-25, leave id and articleVersion OUT. Absent means Kapture resolves them; sending either goes back to id/version targeting. The sample above carries none of them for that reason.</li><li>If you do send id, it must be a quoted string. A number is rejected.</li><li>articleState stays mandatory and is a lookup key: send the CURRENT state from k_article, not the target state.</li><li>A master sends primaryLocale and translatedLocale both set, but k_article stores translated_locale NULL. Lookups must OR the two forms.</li><li>A failed record may carry id and version (UPDATE_ARTICLE_ERROR). Read them when present, never require them.</li><li>Parse a version out of a message with (\d+(?:\.\d+)*) so the full stop is not captured.</li><li>After a publish failure the draft is at x.1 and live stays at x.0. Check articleState and publishedVersion.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>[
+  {
+    &quot;legacyDocumentId&quot;: &quot;SM1558284&quot;,
+    &quot;sourceIdentifier&quot;: &quot;sites/MAZDA/content/staging/SERVICE_MANUALS/1558000/SM1558284/ja_JP/12.0&quot;,
+    &quot;sourceFileName&quot;: &quot;content_1d31c5e9d5fb4e65a072759ddf6343e1.xml&quot;,
+    &quot;primaryLocale&quot;: &quot;ja_JP&quot;,
+    &quot;translatedLocale&quot;: &quot;ja_JP&quot;,
+    &quot;title&quot;: &quot;Clutch [C66M-R, C66MX-R]&quot;,
+    &quot;articleState&quot;: &quot;Published&quot;,
+    &quot;articleOwner&quot;: &quot;Migration User&quot;,
+    &quot;articleCreator&quot;: &quot;Migration User&quot;,
+    &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+    &quot;createdBy&quot;: &quot;Migration User&quot;,
+    &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+    &quot;type&quot;: &quot;SERVICE_MANUALS&quot;,
+    &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+    &quot;crawlType&quot;: &quot;KAPTURE&quot;,
+    &quot;pubFlag&quot;: true,
+    &quot;articlelistcategory&quot;: [
+      {
+        &quot;categoryRefKey&quot;: &quot;BODYSHOP_MANUAL&quot;,
+        &quot;categoryName&quot;: &quot;Bodyshop Manual&quot;,
+        &quot;selected&quot;: true
+      }
+    ],
+    &quot;articleesicategory&quot;: [
+      {
+        &quot;categoryRefKey&quot;: &quot;ESI01&quot;,
+        &quot;categoryName&quot;: &quot;Engine&quot;,
+        &quot;selected&quot;: true
+      }
+    ],
+    &quot;categoriesTreeRefKeys&quot;: &quot;&quot;,
+    &quot;categoriesESITreeRefKeys&quot;: &quot;&quot;,
+    &quot;articlelistusergroup&quot;: [
+      {
+        &quot;userGroupRefKey&quot;: &quot;TECHNICIAN_CONTENT_KEY&quot;,
+        &quot;userGroupName&quot;: &quot;Technician Content&quot;
+      }
+    ],
+    &quot;articlelistview&quot;: [
+      {
+        &quot;viewRefKey&quot;: &quot;MC_KEY&quot;,
+        &quot;viewName&quot;: &quot;MC&quot;
+      }
+    ],
+    &quot;facetsSchemaFields&quot;: [],
+    &quot;fieldSecurities&quot;: [],
+    &quot;articleTagList&quot;: [],
+    &quot;SERVICE_MANUALS&quot;: {
+      &quot;TITLE&quot;: &quot;Clutch [C66M-R, C66MX-R]&quot;,
+      &quot;CONTENT&quot;: &quot;&lt;hr /&gt; &lt;p&gt;...&lt;/p&gt;&quot;,
+      &quot;VTOC_FILENAME&quot;: &quot;ac3jj0510mcn0000001&quot;,
+      &quot;SIE_ID&quot;: &quot;id0510mc283600.ent&quot;,
+      &quot;DJVU_FILE_LOCATION&quot;: &quot;&quot;,
+      &quot;OASIS_FILE_LOCATION&quot;: &quot;&quot;,
+      &quot;ATTACHMENTS&quot;: []
+    },
+    &quot;articleId&quot;: &quot;SM1558284&quot;,
+    &quot;isUpdateArticle&quot;: true
+  }
+]</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;batchSize&quot;: 2,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;correlationId&quot;: &quot;dmt-bulk-MASTER-SM-20260818_104710-w1-b1&quot;,
+  &quot;jobId&quot;: &quot;BAU-d623b0bd-a4a6-4776-8e8c-675580949af8&quot;,
+  &quot;message&quot;: &quot;Bulk UPDATE completed successfully.&quot;,
+  &quot;operation&quot;: &quot;UPDATE&quot;,
+  &quot;status&quot;: &quot;COMPLETED&quot;,
+  &quot;processingTimeMs&quot;: 2199,
+  &quot;totalRecords&quot;: 2,
+  &quot;successfulRecords&quot;: 2,
+  &quot;failedRecords&quot;: 0,
+  &quot;skippedDuplicateRecords&quot;: 0,
+  &quot;workerThreads&quot;: 5,
+  &quot;results&quot;: [
+    {
+      &quot;sequenceNumber&quot;: 1,
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65533,
+      &quot;kaptureDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;legacyDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;articleState&quot;: &quot;Published&quot;,
+      &quot;articleVersion&quot;: &quot;10.0&quot;,
+      &quot;publishedVersion&quot;: &quot;10.0&quot;,
+      &quot;attemptCount&quot;: 1,
+      &quot;message&quot;: &quot;Article Published Successfully.&quot;,
+      &quot;processingTimeMs&quot;: 1129
+    },
+    {
+      &quot;sequenceNumber&quot;: 2,
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65535,
+      &quot;kaptureDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;legacyDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;locale&quot;: &quot;ja_JP&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;articleVersion&quot;: &quot;0.9&quot;,
+      &quot;attemptCount&quot;: 1,
+      &quot;message&quot;: &quot;Article Tab Updated Successfully.&quot;,
+      &quot;processingTimeMs&quot;: 543
+    }
+  ]
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Publish failed after the draft was written</span><button type="button" class="copy" aria-label="Copy Failure: Publish failed after the draft was written">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;FAILED&quot;,
+  &quot;httpStatus&quot;: 500,
+  &quot;errorCode&quot;: &quot;UPDATE_ARTICLE_ERROR&quot;,
+  &quot;id&quot;: &quot;&lt;row id&gt;&quot;,
+  &quot;articleVersion&quot;: &quot;x.1&quot;,
+  &quot;articleState&quot;: &quot;Unpublished&quot;,
+  &quot;message&quot;: &quot;Draft updated but publish failed: Transaction silently rolled back because it has been marked as rollback-only&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Conflict</span><button type="button" class="copy" aria-label="Copy Failure: Conflict">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;FAILED&quot;,
+  &quot;httpStatus&quot;: 409,
+  &quot;errorCode&quot;: &quot;ARTICLE_UPDATE_CONFLICT&quot;,
+  &quot;message&quot;: &quot;Article was updated by another request. Current database id=32510, current version=1.1. Reload the latest article before updating again.&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: articleState wrong or blank</span><button type="button" class="copy" aria-label="Copy Failure: articleState wrong or blank">Copy</button></figcaption><pre tabindex="0"><code>HTTP 409 stale identity when the state does not match the article. Omitted: 400 &quot;Article State is required&quot;. Exact 409 body not saved.</code></pre></figure></div></article><article class="api" id="bulk-translate" data-s="bulk translate /kauthor-api/api/v1/bulk-article-import/translations job 10 post"><header><h3>Bulk translate</h3><span class="jobtag">Job id BAT-</span><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/api/v1/bulk-article-import/translations</code></p></header><p class="purpose">Creates or updates a translation. The same call does both.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 10</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id (from k_content_type)</dd><dt>Query</dt><dd>batchSize = how Kapture splits the request across its workers</dd><dt>Query</dt><dd>publish = always false; it overrides every record. Use pubFlag per record</dd><dt>Header</dt><dd>Authorization: Bearer &lt;token&gt;</dd><dt>Header</dt><dd>X-Correlation-ID = our own id, needed to recover a timed-out request</dd></dl><ul class="notes"><li>The target key is translateLocale, not translatedLocale.</li><li>primaryLocale + articleId find the article, so primaryLocale must be the MASTER&#x27;s locale. Never take it from BASE_LOCALE: that is a sibling locale.</li><li>articleId, articleVersion and publishedVersion come from the master.</li><li>Leave out id, isUpdateArticle, articleState, ISARTICLE and crawlType.</li><li>pubFlag works on translations since 2026-08-18. No second publish call is needed.</li><li>A resent create that had already landed gives one extra draft (0.2 instead of 0.1). Check k_article first.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>[
+  {
+    &quot;legacyDocumentId&quot;: &quot;SM1558284&quot;,
+    &quot;sourceIdentifier&quot;: &quot;sites/MAZDA/content/staging/SERVICE_MANUALS/1558000/SM1558284/ja_JP/12.0&quot;,
+    &quot;sourceFileName&quot;: &quot;content_1d31c5e9d5fb4e65a072759ddf6343e1.xml&quot;,
+    &quot;primaryLocale&quot;: &quot;ja_JP&quot;,
+    &quot;translateLocale&quot;: &quot;es_MX&quot;,
+    &quot;articleId&quot;: &quot;SM1558284&quot;,
+    &quot;articleVersion&quot;: &quot;13.0&quot;,
+    &quot;publishedVersion&quot;: &quot;13.0&quot;,
+    &quot;title&quot;: &quot;Clutch [C66M-R, C66MX-R]&quot;,
+    &quot;articleOwner&quot;: &quot;Migration User&quot;,
+    &quot;articleCreator&quot;: &quot;Migration User&quot;,
+    &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+    &quot;createdBy&quot;: &quot;Migration User&quot;,
+    &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+    &quot;type&quot;: &quot;SERVICE_MANUALS&quot;,
+    &quot;pubFlag&quot;: true,
+    &quot;articlelistcategory&quot;: [],
+    &quot;articleesicategory&quot;: [],
+    &quot;categoriesTreeRefKeys&quot;: &quot;&quot;,
+    &quot;categoriesESITreeRefKeys&quot;: &quot;&quot;,
+    &quot;articlelistusergroup&quot;: [
+      {
+        &quot;userGroupRefKey&quot;: &quot;TECHNICIAN_CONTENT_KEY&quot;,
+        &quot;userGroupName&quot;: &quot;Technician Content&quot;
+      }
+    ],
+    &quot;articlelistview&quot;: [
+      {
+        &quot;viewRefKey&quot;: &quot;MC_KEY&quot;,
+        &quot;viewName&quot;: &quot;MC&quot;
+      }
+    ],
+    &quot;facetsSchemaFields&quot;: [],
+    &quot;fieldSecurities&quot;: [],
+    &quot;articleTagList&quot;: [],
+    &quot;SERVICE_MANUALS&quot;: {
+      &quot;TITLE&quot;: &quot;...&quot;,
+      &quot;CONTENT&quot;: &quot;...&quot;,
+      &quot;VTOC_FILENAME&quot;: &quot;...&quot;,
+      &quot;SIE_ID&quot;: &quot;...&quot;,
+      &quot;ATTACHMENTS&quot;: []
+    }
+  }
+]</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;jobId&quot;: &quot;BAT-13ca9a37-7235-4b9d-8b48-6e6b03a916d1&quot;,
+  &quot;operation&quot;: &quot;TRANSLATE&quot;,
+  &quot;status&quot;: &quot;COMPLETED&quot;,
+  &quot;message&quot;: &quot;Bulk TRANSLATE completed successfully.&quot;,
+  &quot;totalRecords&quot;: 2,
+  &quot;successfulRecords&quot;: 2,
+  &quot;failedRecords&quot;: 0,
+  &quot;skippedDuplicateRecords&quot;: 0,
+  &quot;results&quot;: [
+    {
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65573,
+      &quot;kaptureDocumentId&quot;: &quot;SM1558284&quot;,
+      &quot;locale&quot;: &quot;es_MX&quot;,
+      &quot;articleState&quot;: &quot;Published&quot;,
+      &quot;articleVersion&quot;: &quot;3.0&quot;,
+      &quot;publishedVersion&quot;: &quot;3.0&quot;,
+      &quot;message&quot;: &quot;Article Published Successfully.&quot;
+    },
+    {
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200,
+      &quot;id&quot;: 65575,
+      &quot;kaptureDocumentId&quot;: &quot;SM1559528&quot;,
+      &quot;locale&quot;: &quot;es_MX&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;articleVersion&quot;: &quot;0.6&quot;,
+      &quot;message&quot;: &quot;Article Translation Successfully.&quot;
+    }
+  ]
+}</code></pre></figure></div></article><article class="api" id="bulk-job" data-s="job report /kauthor-api/api/v1/bulk-article-import/jobs/{jobid}?page=0&amp;size=100 job 10 (client method, not called in a run) get"><header><h3>Job report</h3><p class="line"><span class="verb v-get">GET</span><code class="path">/kauthor-api/api/v1/bulk-article-import/jobs/{jobId}?page=0&amp;size=100</code></p></header><p class="purpose">Reads a bulk job after the fact, with results per document.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 10 (client method, not called in a run)</span></div><dl class="params"><dt>Path</dt><dd>jobId = BAI- / BAU- / BAT- id</dd><dt>Query</dt><dd>page, size</dd></dl><ul class="notes"><li>results is a plain array on the POST and a Spring page (results.content[]) on this GET.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;jobId&quot;: &quot;BAI-81c29833-cc07-4c95-9c13-46ec73bc2740&quot;,
+  &quot;correlationId&quot;: &quot;mdm-create-1786380000000-a1b2c3&quot;,
+  &quot;contentId&quot;: &quot;SERVICE_INFORMATION&quot;,
+  &quot;operation&quot;: &quot;CREATE&quot;,
+  &quot;requestedBy&quot;: &quot;&lt;email&gt;&quot;,
+  &quot;status&quot;: &quot;COMPLETED&quot;,
+  &quot;batchSize&quot;: 100,
+  &quot;workerThreads&quot;: 5,
+  &quot;totalRecords&quot;: 1,
+  &quot;successfulRecords&quot;: 1,
+  &quot;failedRecords&quot;: 0,
+  &quot;skippedDuplicateRecords&quot;: 0,
+  &quot;processingTimeMs&quot;: 1240,
+  &quot;results&quot;: {
+    &quot;content&quot;: [
+      {
+        &quot;sequenceNumber&quot;: 1,
+        &quot;legacyDocumentId&quot;: &quot;SI1786380000000&quot;,
+        &quot;kaptureDocumentId&quot;: &quot;SI1786380000000&quot;,
+        &quot;locale&quot;: &quot;en_US&quot;,
+        &quot;id&quot;: 64433,
+        &quot;articleVersion&quot;: &quot;0.1&quot;,
+        &quot;articleState&quot;: &quot;Unpublished&quot;,
+        &quot;status&quot;: &quot;SUCCESS&quot;,
+        &quot;httpStatus&quot;: 200,
+        &quot;attemptCount&quot;: 1,
+        &quot;message&quot;: &quot;Article Tab Added Successfully.&quot;
+      }
+    ],
+    &quot;totalElements&quot;: 1,
+    &quot;totalPages&quot;: 1,
+    &quot;number&quot;: 0,
+    &quot;size&quot;: 100,
+    &quot;first&quot;: true,
+    &quot;last&quot;: true,
+    &quot;empty&quot;: false
+  }
+}</code></pre></figure></div></article><article class="api" id="bulk-job-article" data-s="job result for one article /kauthor-api/api/v1/bulk-article-import/jobs/{jobid}/articles/{articleid}?locale= not used in code get"><header><h3>Job result for one article</h3><p class="line"><span class="verb v-get">GET</span><code class="path">/kauthor-api/api/v1/bulk-article-import/jobs/{jobId}/articles/{articleId}?locale=</code></p></header><p class="purpose">Reads one article&#x27;s result inside a job.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Not used in code</span></div><dl class="params"><dt>Path</dt><dd>jobId, articleId</dd><dt>Query</dt><dd>locale</dd></dl><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;jobId&quot;: &quot;BAI-81c29833-cc07-4c95-9c13-46ec73bc2740&quot;,
+  &quot;operation&quot;: &quot;CREATE&quot;,
+  &quot;status&quot;: &quot;COMPLETED&quot;,
+  &quot;articleId&quot;: &quot;SI1786380000000&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;matchedRecords&quot;: 1,
+  &quot;results&quot;: [
+    {
+      &quot;sequenceNumber&quot;: 1,
+      &quot;kaptureDocumentId&quot;: &quot;SI1786380000000&quot;,
+      &quot;id&quot;: 64433,
+      &quot;articleVersion&quot;: &quot;0.1&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;status&quot;: &quot;SUCCESS&quot;,
+      &quot;httpStatus&quot;: 200
+    }
+  ]
+}</code></pre></figure></div></article><article class="api" id="bulk-corr" data-s="recover a job by correlation id /kauthor-api/api/v1/bulk-article-import/jobs/by-correlation/{correlationid}?page=0&amp;size=100 not called in code; verified live 2026-08-14 get"><header><h3>Recover a job by correlation id</h3><p class="line"><span class="verb v-get">GET</span><code class="path">/kauthor-api/api/v1/bulk-article-import/jobs/by-correlation/{correlationId}?page=0&amp;size=100</code></p></header><p class="purpose">Finds a job whose POST timed out. Header form: same path without the id, plus X-Correlation-ID.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Not called in code; verified live 2026-08-14</span></div><dl class="params"><dt>Path</dt><dd>correlationId we sent</dd><dt>Header</dt><dd>X-Correlation-ID (alternative form)</dd></dl><ul class="notes"><li>Never resend a timed-out bulk POST. It may still be running, and a resend duplicates creates and adds a version to updates.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>Same body as the job report, including results.content[].</code></pre></figure></div></article><article class="api" id="temp-upload" data-s="temp attachment upload /kauthor-api/api/temp-attachment/upload job 9 (old form) job 10 dmt post"><header><h3>Temp attachment upload</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/api/temp-attachment/upload</code></p></header><p class="purpose">Uploads files first. The article then references each tempAttachmentId.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 9 (old form)</span><span class="who">Job 10</span><span class="who">DMT</span></div><dl class="params"><dt>Form</dt><dd>attachments[i].file</dd><dt>Form</dt><dd>attachments[i].clientAttachmentId = our id, used to match the answer</dd><dt>Form</dt><dd>attachments[i].legacyDocumentId</dd><dt>Form</dt><dd>attachments[i].locale</dd><dt>Form</dt><dd>uploadedBy = session userPkId</dd><dt>Old form</dt><dd>multipartFiles + uploadedBy (Job 9 only)</dd></dl><ul class="notes"><li>Do not send attachments[i].articleVersion. The finalizer validates it and kills the record.</li><li>One upload per attachment node. Sharing a tempAttachmentId across two nodes fails the record.</li><li>A temp expires after 2 hours, and a successful save finalizes it for good.</li><li>Size limit is undocumented. 12 files or fewer landed, 15 or more bounced. Job 10 ships 10 files / 8 MiB and bisects on rejection.</li><li>Sanitise .. out of file names (open defect). One bad file fails the whole request and the 500 names none of them.</li><li>The article can report success while its upload failed. Check the upload result itself.</li><li>Correlate on clientAttachmentId, never on position.</li><li>attachmentAction values: NEW, KEEP, REPLACE, DELETE.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>multipart/form-data
+
+attachments[0].file               = @manual.pdf
+attachments[0].clientAttachmentId = CAI-1a2b3c4d5e6f7a8b
+attachments[0].legacyDocumentId   = SI1786380200000
+attachments[0].locale             = en_US
+uploadedBy                        = &lt;userPkId&gt;</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>[
+  {
+    &quot;tempAttachmentId&quot;: &quot;TMP_1786380200000_ab12cd&quot;,
+    &quot;clientAttachmentId&quot;: &quot;CAI-1a2b3c4d5e6f7a8b&quot;,
+    &quot;legacyDocumentId&quot;: &quot;SI1786380200000&quot;,
+    &quot;locale&quot;: &quot;en_US&quot;,
+    &quot;articleVersion&quot;: null,
+    &quot;fileName&quot;: &quot;manual&quot;,
+    &quot;fileType&quot;: &quot;application/pdf&quot;,
+    &quot;fileExtension&quot;: &quot;pdf&quot;,
+    &quot;attachmentTitle&quot;: &quot;manual.pdf&quot;,
+    &quot;size&quot;: 124826
+  }
+]</code></pre></figure><figure class="sample"><figcaption><span>How the article references it</span><button type="button" class="copy" aria-label="Copy How the article references it">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;ATTACHMENTS&quot;: {
+    &quot;ATTACHMENT&quot;: [
+      {
+        &quot;tempAttachmentId&quot;: &quot;TMP_1786380200000_ab12cd&quot;,
+        &quot;clientAttachmentId&quot;: &quot;CAI-1a2b3c4d5e6f7a8b&quot;,
+        &quot;attachmentAction&quot;: &quot;NEW&quot;,
+        &quot;fileName&quot;: &quot;manual&quot;,
+        &quot;attachmentTitle&quot;: &quot;manual.pdf&quot;,
+        &quot;fileExtension&quot;: &quot;pdf&quot;,
+        &quot;fileType&quot;: &quot;application/pdf&quot;,
+        &quot;size&quot;: 124826
+      }
+    ]
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Request too large</span><button type="button" class="copy" aria-label="Copy Failure: Request too large">Copy</button></figcaption><pre tabindex="0"><code>HTTP 413 &quot;Uploaded file size exceeded&quot;, or no status at all (Error writing to server). Both mean the same thing.</code></pre></figure><figure class="sample"><figcaption><span>Failure: Two dots in a file name</span><button type="button" class="copy" aria-label="Copy Failure: Two dots in a file name">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;500&quot;,
+  &quot;errorCode&quot;: &quot;INTERNAL_SERVER_ERROR&quot;,
+  &quot;message&quot;: &quot;Unexpected error occurred&quot;
+}</code></pre></figure></div></article></section><section class="grp" id="single"><h2>Single-document APIs</h2><p class="lead">Used by MDM and DMT, and by Job 9 for writes. These writes replace the whole row, so an omitted field becomes NULL.</p><article class="api" id="add-article" data-s="create article /kauthor-api/add-article-tab?contentid= job 9 mdm (si data import) post"><header><h3>Create article</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/add-article-tab?contentId=</code></p></header><p class="purpose">Creates one document, always Unpublished. The document id comes back in the response.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 9</span><span class="who">MDM (SI Data Import)</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id</dd></dl><ul class="notes"><li>The result is nested at response.articleSaveResponse.</li><li>Under concurrency this path can write a duplicate articleId silently. That is why Job 9 ran single threaded.</li><li>Job 9 is superseded by Job 10 (2026-10-29).</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;primaryLocale&quot;: &quot;en_US&quot;,
+  &quot;title&quot;: &quot;TEST-Manual Document Creation&quot;,
+  &quot;articleState&quot;: &quot;Unpublished&quot;,
+  &quot;articleOwner&quot;: &quot;Migration User&quot;,
+  &quot;articleCreator&quot;: &quot;Migration User&quot;,
+  &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+  &quot;createdBy&quot;: &quot;Migration User&quot;,
+  &quot;articlelistusergroup&quot;: [
+    {
+      &quot;userGroupRefKey&quot;: &quot;TECHNICIAN_CONTENT_KEY&quot;,
+      &quot;userGroupName&quot;: &quot;Technician Content&quot;
+    }
+  ],
+  &quot;articlelistview&quot;: [
+    {
+      &quot;viewRefKey&quot;: &quot;MC_KEY&quot;,
+      &quot;viewName&quot;: &quot;MC&quot;
+    }
+  ],
+  &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;type&quot;: &quot;SERVICE_MANUALS&quot;,
+  &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+  &quot;translatedLocale&quot;: &quot;en_US&quot;,
+  &quot;facetsSchemaFields&quot;: [],
+  &quot;crawlType&quot;: &quot;KAPTURE&quot;,
+  &quot;SERVICE_MANUALS&quot;: {
+    &quot;TITLE&quot;: &quot;TEST-Manual Document Creation&quot;,
+    &quot;CONTENT&quot;: &quot;&lt;p&gt;...&lt;/p&gt;&quot;,
+    &quot;VTOC_FILENAME&quot;: &quot;VTOC File name&quot;,
+    &quot;SIE_ID&quot;: &quot;Sample SIE ID&quot;,
+    &quot;ATTACHMENTS&quot;: []
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Article Tab Added Successfully.&quot;,
+  &quot;operationType&quot;: &quot;CREATED&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;section&quot;: &quot;ARTICLE&quot;,
+  &quot;sectionKey&quot;: &quot;SM1022&quot;,
+  &quot;response&quot;: {
+    &quot;createdArticleId&quot;: &quot;SM1022&quot;,
+    &quot;articleSaveResponse&quot;: {
+      &quot;id&quot;: 62787,
+      &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+      &quot;articleId&quot;: &quot;SM1022&quot;,
+      &quot;articleIdWithLocale&quot;: &quot;SM1022_en_US&quot;,
+      &quot;locale&quot;: &quot;en_US&quot;,
+      &quot;primaryLocale&quot;: &quot;en_US&quot;,
+      &quot;masterLocale&quot;: &quot;en_US&quot;,
+      &quot;articleVersion&quot;: &quot;0.1&quot;,
+      &quot;publishedVersion&quot;: null,
+      &quot;latestVersion&quot;: &quot;Y&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;status&quot;: &quot;Created&quot;,
+      &quot;title&quot;: &quot;...&quot;,
+      &quot;type&quot;: &quot;SERVICE_MANUALS&quot;
+    }
+  }
+}</code></pre></figure></div></article><article class="api" id="update-article" data-s="update article /kauthor-api/update-article-tab?contentid= job 9 mdm put"><header><h3>Update article</h3><p class="line"><span class="verb v-put">PUT</span><code class="path">/kauthor-api/update-article-tab?contentId=</code></p></header><p class="purpose">Rewrites a master. On a published document it creates a new unpublished version.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 9</span><span class="who">MDM</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id</dd></dl><ul class="notes"><li>An omitted field becomes NULL. Echo the read and change only what you mean to change.</li><li>Write shape = 22 fields. A Published document adds isUpdateArticle: true and publishedVersion (24). Unpublished omits both keys entirely.</li><li>id, articleVersion, publishedVersion and article_state come from k_article. The read has no id and returns versions as numbers.</li><li>Send only selected: true categories, each with its name. A missing name renders as undefined in KAuthor.</li><li>articlelistusergroup, articlelistview and both category lists must be arrays, even if the read gave one object.</li><li>expireDate and reviewDate must be yyyy-MM-dd HH:mm:ss.</li><li>Masters only. Translations go through save-translate-article.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;id&quot;: &quot;64403&quot;,
+  &quot;primaryLocale&quot;: &quot;en_US&quot;,
+  &quot;title&quot;: &quot;Test TI Doc 07/29&quot;,
+  &quot;articleState&quot;: &quot;Published&quot;,
+  &quot;articleOwner&quot;: &quot;Migration User&quot;,
+  &quot;articleCreator&quot;: &quot;Migration User&quot;,
+  &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+  &quot;createdBy&quot;: &quot;Migration User&quot;,
+  &quot;articleVersion&quot;: &quot;1.0&quot;,
+  &quot;articleId&quot;: &quot;SI1123&quot;,
+  &quot;pubFlag&quot;: false,
+  &quot;isUpdateArticle&quot;: true,
+  &quot;publishedVersion&quot;: &quot;1.0&quot;,
+  &quot;articlelistusergroup&quot;: [
+    {
+      &quot;userGroupRefKey&quot;: &quot;AFTERMARKET_CONTENT_KEY&quot;,
+      &quot;userGroupName&quot;: &quot;Aftermarket Content&quot;
+    }
+  ],
+  &quot;articlelistview&quot;: [
+    {
+      &quot;viewName&quot;: &quot;Mazda&quot;,
+      &quot;viewRefKey&quot;: &quot;MAZDA_KEY&quot;
+    }
+  ],
+  &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;type&quot;: &quot;SERVICE_INFORMATION&quot;,
+  &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+  &quot;translatedLocale&quot;: &quot;en_US&quot;,
+  &quot;facetsSchemaFields&quot;: [],
+  &quot;crawlType&quot;: &quot;KAPTURE&quot;,
+  &quot;articleesicategory&quot;: [
+    {
+      &quot;categoryName&quot;: &quot;Engine&quot;,
+      &quot;categoryRefKey&quot;: &quot;ESI01&quot;,
+      &quot;selected&quot;: true
+    }
+  ],
+  &quot;articlelistcategory&quot;: [
+    {
+      &quot;categoryName&quot;: &quot;Technical Information&quot;,
+      &quot;categoryRefKey&quot;: &quot;TECHNICAL_INFORMATION&quot;,
+      &quot;selected&quot;: true
+    }
+  ],
+  &quot;SERVICE_INFORMATION&quot;: {
+    &quot;TITLE&quot;: &quot;Test TI Doc 07/29&quot;,
+    &quot;TI_SUMMARY&quot;: &quot;&lt;p&gt;test TI&lt;/p&gt;&quot;,
+    &quot;ISSUE_DATE&quot;: &quot;07/29/2026&quot;,
+    &quot;FIRST_PUBLICATION_DATE&quot;: &quot;07/29/2026&quot;,
+    &quot;ATTACHMENTS&quot;: {
+      &quot;PDF_ATTACHMENTS&quot;: &quot;&quot;,
+      &quot;ATTACHMENT&quot;: &quot;&quot;,
+      &quot;ATTACHMENT_TITLE&quot;: &quot;&quot;
+    },
+    &quot;RECALL_NUMBERS&quot;: {
+      &quot;RECALL_NUMBER&quot;: &quot;&quot;
+    }
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Article Tab Updated Successfully.&quot;,
+  &quot;operationType&quot;: &quot;UPDATED&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;section&quot;: &quot;ARTICLE&quot;,
+  &quot;sectionKey&quot;: &quot;SM1022&quot;,
+  &quot;pdfUrl&quot;: null,
+  &quot;response&quot;: {
+    &quot;retrieveArticleTabInfoVo&quot;: [
+      {
+        &quot;id&quot;: 62789,
+        &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+        &quot;locale&quot;: &quot;en_US&quot;,
+        &quot;articleState&quot;: &quot;Unpublished&quot;,
+        &quot;articleId&quot;: &quot;SM1022&quot;,
+        &quot;articleVersion&quot;: &quot;0.2&quot;
+      }
+    ],
+    &quot;createdArticleId&quot;: &quot;SM1022&quot;,
+    &quot;articleSaveResponse&quot;: {
+      &quot;id&quot;: 62789,
+      &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+      &quot;articleId&quot;: &quot;SM1022&quot;,
+      &quot;articleIdWithLocale&quot;: &quot;SM1022_en_US&quot;,
+      &quot;locale&quot;: &quot;en_US&quot;,
+      &quot;primaryLocale&quot;: &quot;en_US&quot;,
+      &quot;masterLocale&quot;: &quot;en_US&quot;,
+      &quot;articleVersion&quot;: &quot;0.2&quot;,
+      &quot;publishedVersion&quot;: null,
+      &quot;latestVersion&quot;: &quot;Y&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;status&quot;: &quot;Created&quot;,
+      &quot;createdDate&quot;: &quot;07/20/2026 03:12:49&quot;,
+      &quot;modifiedDate&quot;: &quot;07/20/2026 05:41:27&quot;,
+      &quot;title&quot;: &quot;...&quot;,
+      &quot;type&quot;: &quot;SERVICE_MANUALS&quot;
+    }
+  },
+  &quot;latestVersion&quot;: null,
+  &quot;documentPrimaryID&quot;: null
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Read response sent back as is</span><button type="button" class="copy" aria-label="Copy Failure: Read response sent back as is">Copy</button></figcaption><pre tabindex="0"><code>400 &quot;Validation failed. Missing or invalid mandatory fields.&quot;</code></pre></figure><figure class="sample"><figcaption><span>Failure: One-entry list sent as an object</span><button type="button" class="copy" aria-label="Copy Failure: One-entry list sent as an object">Copy</button></figcaption><pre tabindex="0"><code>400 &quot;Article User Group must be a valid list.&quot;</code></pre></figure></div></article><article class="api" id="save-translate" data-s="save translation /kauthor-api/save-translate-article?contentid= mdm post"><header><h3>Save translation</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/save-translate-article?contentId=</code></p></header><p class="purpose">Creates or updates one translation.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">MDM</span></div><dl class="params"><dt>Query</dt><dd>contentId = channel content id</dd></dl><ul class="notes"><li>There is no articleSaveResponse here. Read sectionKey (document), latestVersion and documentPrimaryID (k_article id).</li><li>Reading only the nested shape reports failure on a write that worked.</li><li>Open: articlelistusergroup sent here was found not persisted on SI1125/en_EU. Do not echo a read blindly, because a published translation can come back without its groups.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;id&quot;: 64569,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;DOCUMENTID&quot;: &quot;SI1125&quot;,
+  &quot;type&quot;: &quot;SERVICE_INFORMATION&quot;,
+  &quot;title&quot;: &quot;MME Test Document en_UK locale&quot;,
+  &quot;primaryLocale&quot;: &quot;en_UK&quot;,
+  &quot;translateLocale&quot;: &quot;en_EU&quot;,
+  &quot;articleVersion&quot;: &quot;1.0&quot;,
+  &quot;articleOwner&quot;: &quot;Migration User&quot;,
+  &quot;articleCreator&quot;: &quot;Migration User&quot;,
+  &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;emailId&quot;: &quot;&lt;email&gt;&quot;,
+  &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+  &quot;isAutoPublish&quot;: false,
+  &quot;status&quot;: &quot;Created&quot;,
+  &quot;articlelistusergroup&quot;: [
+    {
+      &quot;userGroupRefKey&quot;: &quot;CEC_AGENT_CONTENT_KEY&quot;,
+      &quot;userGroupName&quot;: &quot;CEC Agent Content&quot;
+    }
+  ],
+  &quot;articlelistcategory&quot;: [
+    {
+      &quot;categoryRefKey&quot;: &quot;CUSTOMIZATIONS&quot;,
+      &quot;categoryName&quot;: &quot;Customizations&quot;,
+      &quot;parentCategroryRefKey&quot;: &quot;M_TIPS&quot;,
+      &quot;masterCategoryRefKey&quot;: &quot;SERVICE_INFORMATION_TYPE&quot;,
+      &quot;locale&quot;: &quot;en_EU&quot;,
+      &quot;selected&quot;: true
+    }
+  ],
+  &quot;SERVICE_INFORMATION&quot;: {
+    &quot;TITLE&quot;: &quot;MME Test Document en_UK locale&quot;,
+    &quot;ATTACHMENTS&quot;: {
+      &quot;PDF_ATTACHMENTS&quot;: &quot;&quot;,
+      &quot;ATTACHMENT&quot;: &quot;&quot;,
+      &quot;ATTACHMENT_TITLE&quot;: &quot;&quot;
+    }
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Article Translation Successfully.&quot;,
+  &quot;operationType&quot;: &quot;ARTICLE-TRANSLATE&quot;,
+  &quot;locale&quot;: &quot;ja_JP&quot;,
+  &quot;section&quot;: &quot;ARTICLE&quot;,
+  &quot;sectionKey&quot;: &quot;SI1070&quot;,
+  &quot;response&quot;: {
+    &quot;createdArticleId&quot;: &quot;SI1070&quot;,
+    &quot;contentTypeWorkflowRefKey&quot;: &quot;WF_..._KEY&quot;
+  },
+  &quot;latestVersion&quot;: &quot;0.1&quot;,
+  &quot;documentPrimaryID&quot;: &quot;64505&quot;
+}</code></pre></figure></div></article><article class="api" id="publish-article" data-s="publish article /kauthor-api/publish-article mdm post"><header><h3>Publish article</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/publish-article</code></p></header><p class="purpose">Publishes the version an update just created. Use it only when the updated version was Published.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">MDM</span></div><dl class="params"><dt>Body</dt><dd>Master: as shown. Translation: add translateLocale</dd></dl><ul class="notes"><li>This call rewrites the row too. Send the UPDATED content, not the read taken before the update.</li><li>Set the title in both places: the schema node&#x27;s TITLE and the article-level title.</li><li>Publish the version the update created: re-read latest_version=&#x27;Y&#x27;.</li><li>Translation numbering: update makes 0.3, publish makes 1.0 again.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;id&quot;: &quot;60779&quot;,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;articleId&quot;: &quot;FAQ1148&quot;,
+  &quot;primaryLocale&quot;: &quot;en_US&quot;,
+  &quot;articleState&quot;: &quot;Unpublished&quot;,
+  &quot;articleLatestState&quot;: &quot;Published&quot;,
+  &quot;articleVersion&quot;: &quot;1.2&quot;,
+  &quot;publishedVersion&quot;: &quot;1.0&quot;,
+  &quot;expireDate&quot;: null,
+  &quot;reviewDate&quot;: null,
+  &quot;pubFlag&quot;: true,
+  &quot;type&quot;: &quot;FAQ&quot;,
+  &quot;title&quot;: &quot;Article Categories load check&quot;,
+  &quot;articleOwner&quot;: &quot;Migration User&quot;,
+  &quot;articleCreator&quot;: &quot;Migration User&quot;,
+  &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;userEmail&quot;: &quot;&lt;email&gt;&quot;,
+  &quot;createdBy&quot;: &quot;Migration User&quot;,
+  &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+  &quot;createdDate&quot;: &quot;07/31/2026 10:43:43&quot;,
+  &quot;dateAdded&quot;: &quot;07/31/2026 10:43:43&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Article Published Successfully.&quot;,
+  &quot;operationType&quot;: &quot;PUBLISH&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;section&quot;: &quot;ARTICLE&quot;,
+  &quot;sectionKey&quot;: &quot;SI1123&quot;,
+  &quot;response&quot;: {
+    &quot;retrieveArticleTabInfoVo&quot;: [
+      {
+        &quot;id&quot;: 64425,
+        &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+        &quot;locale&quot;: &quot;en_US&quot;,
+        &quot;articleState&quot;: &quot;Published&quot;,
+        &quot;articleId&quot;: &quot;SI1123&quot;,
+        &quot;articleVersion&quot;: &quot;2.0&quot;
+      }
+    ],
+    &quot;createdArticleId&quot;: &quot;SI1123&quot;
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Refusal inside HTTP 200</span><button type="button" class="copy" aria-label="Copy Failure: Refusal inside HTTP 200">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;500&quot;,
+  &quot;message&quot;: &quot;...&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Slash date in expireDate</span><button type="button" class="copy" aria-label="Copy Failure: Slash date in expireDate">Copy</button></figcaption><pre tabindex="0"><code>Refused with Unparseable date, while update-article-tab accepts the same value.</code></pre></figure></div></article><article class="api" id="latest-article" data-s="read latest article /kauthor-api/latest-article/{articleid}/{contentid}/{locale} mdm dmt get"><header><h3>Read latest article</h3><p class="line"><span class="verb v-get">GET</span><code class="path">/kauthor-api/latest-article/{articleId}/{contentId}/{locale}</code></p></header><p class="purpose">Returns the latest version for a locale without being told the version or state.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">MDM</span><span class="who">DMT</span></div><dl class="params"><dt>Path</dt><dd>articleId, contentId (channel), locale</dd></dl><ul class="notes"><li>k_article&#x27;s id is not in the response, so the k_article read stays.</li><li>Versions arrive as numbers: 4.0 comes back as 4. Take version strings from k_article.</li><li>A lone user group, view or category comes back as an object, several as an array.</li><li>Translations use translateLocale (no d). Compare values and read both keys.</li><li>An unpublished translation is thin: no articleState, publishedVersion, dateAdded, createdBy or modifiedBy.</li><li>expireDate and reviewDate come as MM/dd/yyyy HH:mm:ss. Convert these two fields before a write.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample (display-Article, proven identical)</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;articleId&quot;: &quot;SI1123&quot;,
+  &quot;DOCUMENTID&quot;: &quot;SI1123&quot;,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;contentid&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;title&quot;: &quot;Test TI Doc 07/29&quot;,
+  &quot;type&quot;: &quot;SERVICE_INFORMATION&quot;,
+  &quot;primaryLocale&quot;: &quot;en_US&quot;,
+  &quot;translatedLocale&quot;: &quot;en_US&quot;,
+  &quot;articleState&quot;: &quot;Unpublished&quot;,
+  &quot;articleVersion&quot;: 2.1,
+  &quot;publishedVersion&quot;: 2,
+  &quot;pubFlag&quot;: false,
+  &quot;articleOwner&quot;: &quot;Migration User&quot;,
+  &quot;articleCreator&quot;: &quot;Migration User&quot;,
+  &quot;articleCreatorUserID&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;createdBy&quot;: &quot;Migration User&quot;,
+  &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+  &quot;createdDate&quot;: &quot;07/31/2026 13:10:06&quot;,
+  &quot;status&quot;: &quot;Created&quot;,
+  &quot;WORKFLOW_STEP_NAME&quot;: &quot;Draft&quot;,
+  &quot;ISARTICLE&quot;: &quot;KAPTURE&quot;,
+  &quot;crawlType&quot;: &quot;KAPTURE&quot;,
+  &quot;articlelistusergroup&quot;: {
+    &quot;userGroupRefKey&quot;: &quot;AFTERMARKET_CONTENT_KEY&quot;,
+    &quot;userGroupName&quot;: &quot;Aftermarket Content&quot;
+  },
+  &quot;articlelistview&quot;: [
+    {
+      &quot;viewName&quot;: &quot;Mazda&quot;,
+      &quot;viewRefKey&quot;: &quot;MAZDA_KEY&quot;
+    }
+  ],
+  &quot;articlelistcategory&quot;: [
+    {
+      &quot;categoryRefKey&quot;: &quot;SERVICE_INFORMATION_TYPE&quot;,
+      &quot;categoryName&quot;: &quot;Service Information Type&quot;,
+      &quot;masterCategoryRefKey&quot;: &quot;SERVICE_INFORMATION_TYPE&quot;,
+      &quot;selected&quot;: false
+    }
+  ],
+  &quot;categoriesTreeRefKeys&quot;: &quot;SERVICE_INFORMATION_TYPE,TECHNICAL_INFORMATION,VIN,...&quot;,
+  &quot;categoriesESITreeRefKeys&quot;: &quot;ESI,ESI01&quot;,
+  &quot;SERVICE_INFORMATION&quot;: {
+    &quot;TITLE&quot;: &quot;Test TI Doc 07/29&quot;,
+    &quot;TI_SUMMARY&quot;: &quot;&lt;p&gt;test TI&lt;/p&gt;&quot;
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Not found</span><button type="button" class="copy" aria-label="Copy Failure: Not found">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200 with an EMPTY body, for an unknown document and for a locale with no version.</code></pre></figure></div></article><article class="api" id="display-article" data-s="read a named version /kauthor-api/display-article?articleid=&amp;contentid=&amp;articleversion=&amp;articlestate=&amp;locale= not used (dead property kapture.api.display.path in mdm) get"><header><h3>Read a named version</h3><p class="line"><span class="verb v-get">GET</span><code class="path">/kauthor-api/display-Article?articleId=&amp;contentId=&amp;articleVersion=&amp;articleState=&amp;locale=</code></p></header><p class="purpose">Same body as latest-article, but the caller must supply version and state.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Not used (dead property kapture.api.display.path in MDM)</span></div><dl class="params"><dt>Query</dt><dd>articleVersion and articleState are required</dd></dl><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>Byte-identical to latest-article in 7 tested cases. It lacks a real dateAdded.</code></pre></figure></div></article><article class="api" id="apply-actions" data-s="bulk publish /kauthor-api/author/bulk/apply-actions dmt (publish content job) post"><header><h3>Bulk publish</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/author/bulk/apply-actions</code></p></header><p class="purpose">Publishes the latest draft of many documents without resending content.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">DMT (Publish Content job)</span></div><dl class="params"><dt>Limit</dt><dd>One request per channel and locale, publish.batch.size = 50 documents</dd><dt>Header</dt><dd>X-Correlation-ID</dd></dl><ul class="notes"><li>Check results[].success per document, then read the state back from k_article.</li><li>Job 10 no longer uses this; pubFlag replaced it on 2026-08-18.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;action&quot;: &quot;PUBLISH_DOCUMENTS&quot;,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;documents&quot;: [
+    {
+      &quot;id&quot;: 64433,
+      &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+      &quot;articleId&quot;: &quot;SI1786380000000&quot;,
+      &quot;type&quot;: &quot;SERVICE_INFORMATION&quot;,
+      &quot;primaryLocale&quot;: &quot;en_US&quot;,
+      &quot;articleState&quot;: &quot;Unpublished&quot;,
+      &quot;articleVersion&quot;: &quot;0.1&quot;,
+      &quot;publishedVersion&quot;: null,
+      &quot;title&quot;: &quot;...&quot;,
+      &quot;articleOwner&quot;: &quot;Migration User&quot;,
+      &quot;articleCreator&quot;: &quot;Migration User&quot;,
+      &quot;modifiedBy&quot;: &quot;Migration User&quot;,
+      &quot;createdBy&quot;: &quot;Migration User&quot;
+    }
+  ],
+  &quot;options&quot;: {
+    &quot;locales&quot;: [
+      &quot;en_US&quot;
+    ],
+    &quot;bypassWorkflowAndPublish&quot;: true
+  }
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;jobId&quot;: &quot;0334e67f-58e9-4f23-9583-0269e9cf9f3e&quot;,
+  &quot;message&quot;: &quot;Bulk action completed.&quot;,
+  &quot;results&quot;: [
+    {
+      &quot;articleId&quot;: &quot;SM1558284&quot;,
+      &quot;locale&quot;: &quot;es_MX&quot;,
+      &quot;success&quot;: true,
+      &quot;message&quot;: &quot;OK&quot;
+    }
+  ]
+}</code></pre></figure></div></article><article class="api" id="unpublish" data-s="unpublish /kauthor-api/unpublish-this-versions dmt (delete processing) post"><header><h3>Unpublish</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/unpublish-this-versions</code></p></header><p class="purpose">Unpublishes one document. Content, categories and attachments stay as they are.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">DMT (delete processing)</span></div><dl class="params"><dt>Config</dt><dd>unpublishMode from kapture.api.unpublish.mode = SINGLE</dd></dl><ul class="notes"><li>The answer is HTTP 200 even on failure. Check the status inside the body.</li><li>&quot;Article is already Unpublished&quot; also counts as done.</li><li>Take row id, version and state from response.retrieveArticleTabInfoVo[0], not from k_article.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;articleId&quot;: &quot;SI1786380000000&quot;,
+  &quot;primaryLocale&quot;: &quot;en_US&quot;,
+  &quot;unpublishMode&quot;: &quot;SINGLE&quot;,
+  &quot;modifiedBy&quot;: &quot;Migration User&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture Postman</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Article Unpublished Successfully. Version remains 1.0.&quot;,
+  &quot;operationType&quot;: &quot;UNPUBLISH&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;section&quot;: &quot;ARTICLEID&quot;,
+  &quot;sectionKey&quot;: &quot;SI1786380000000&quot;,
+  &quot;response&quot;: {
+    &quot;createdArticleId&quot;: &quot;SI1786380000000&quot;,
+    &quot;retrieveArticleTabInfoVo&quot;: [
+      {
+        &quot;id&quot;: 64435,
+        &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+        &quot;locale&quot;: &quot;en_US&quot;,
+        &quot;articleState&quot;: &quot;Unpublished&quot;,
+        &quot;articleId&quot;: &quot;SI1786380000000&quot;,
+        &quot;articleVersion&quot;: &quot;1.0&quot;
+      }
+    ]
+  }
+}</code></pre></figure></div></article></section><section class="grp" id="category"><h2>Categories</h2><p class="lead">One category, one locale, one call. There is no bulk category endpoint.</p><article class="api" id="add-category" data-s="create category /kauthor-api/add-categorymgt?locale= job 4 mdm dmt (api write mode) post"><header><h3>Create category</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/add-categoryMgt?locale=</code></p></header><p class="purpose">Creates a category. A blank parentRefKey makes it a root.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 4</span><span class="who">MDM</span><span class="who">DMT (API write mode)</span></div><dl class="params"><dt>Query</dt><dd>locale</dd><dt>Body</dt><dd>emailId = the login e-mail</dd></dl><ul class="notes"><li>A 2xx does not prove the row was written. DMT reads k_categories back (4 attempts, 1.5 s apart).</li><li>DMT&#x27;s default write mode is DB (kapture.category.write.mode), not this API.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;categoryRoleName&quot;: &quot;test12&quot;,
+  &quot;categoryDescription&quot;: &quot;this is description of test12&quot;,
+  &quot;categoryRoleRef&quot;: &quot;CAT_683aa40b-9979-4cf9-ada5-eaca2160a4b1_KEY&quot;,
+  &quot;parentRefKey&quot;: &quot;CAT_fc769674-ad1d-46ae-b428-3cdd1a92309c_KEY&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;emailId&quot;: &quot;&lt;service-account-email&gt;&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;Saved Categories Successfully&quot;,
+  &quot;operationType&quot;: &quot;CREATED&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;section&quot;: &quot;CATEGORY&quot;,
+  &quot;sectionKey&quot;: null,
+  &quot;response&quot;: null
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Already there</span><button type="button" class="copy" aria-label="Copy Failure: Already there">Copy</button></figcaption><pre tabindex="0"><code>409 &quot;Category reference key &lt;ref&gt; already exists.&quot; Callers treat this as success.</code></pre></figure><figure class="sample"><figcaption><span>Failure: Parent missing for that locale</span><button type="button" class="copy" aria-label="Copy Failure: Parent missing for that locale">Copy</button></figcaption><pre tabindex="0"><code>404</code></pre></figure></div></article><article class="api" id="update-category" data-s="update category /kauthor-api/updatecategorybycatref?categoryref=&amp;locale= job 4 mdm dmt (api write mode) post"><header><h3>Update category</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/updateCategoryByCatRef?categoryRef=&amp;locale=</code></p></header><p class="purpose">Changes a category&#x27;s name and description.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 4</span><span class="who">MDM</span><span class="who">DMT (API write mode)</span></div><dl class="params"><dt>Query</dt><dd>categoryRef, locale</dd></dl><ul class="notes"><li>POST, not PUT. PUT on this URL returns 500.</li><li>There is no parentRefKey, so a category cannot be re-parented.</li><li>The row is rewritten, so k_categories.date_added resets to the update time.</li><li>Job 4&#x27;s shipped properties still point at the dead /Kapture-Author path. Fix them before any re-run.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Saved working sample</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;categoryRoleName&quot;: &quot;test1 (update)&quot;,
+  &quot;categoryDescription&quot;: &quot;this is description of test1&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;emailId&quot;: &quot;&lt;service-account-email&gt;&quot;,
+  &quot;categoryRoleRef&quot;: &quot;CAT_fc769674-ad1d-46ae-b428-3cdd1a92309c_KEY&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>Standard envelope with status 200 and message &quot;Updated Categories Successfully&quot;.</code></pre></figure></div></article></section><section class="grp" id="activity"><h2>Workflow history, case links, recommendations</h2><p class="lead">Job 11 only. The calls are one record at a time and run at about 90 per minute.</p><article class="api" id="add-comments" data-s="add history entry /kauthor-api/add-article-comments job 11 (api mode; db is the configured default) post"><header><h3>Add history entry</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/add-article-comments</code></p></header><p class="purpose">Saves one history entry or plain comment for an article version.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11 (API mode; DB is the configured default)</span></div><dl class="params"><dt>Body</dt><dd>currentArticleAction: Created, Edited, Reverted, Published, Unpublished or Approved; other labels are stored as sent</dd><dt>Config</dt><dd>activity.wfh.write.mode = DB writes k_article_comments directly</dd></dl><ul class="notes"><li>The new id is the first word of message.</li><li>The 6 standard actions dedupe on article + locale + version + action: you get 200 and the existing id.</li><li>There is no original timestamp field, and standard actions store the signed-in user.</li><li>No validation: an unknown article or version is saved anyway.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;articleId&quot;: &quot;SI101000&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;currentArticleVersion&quot;: &quot;1.1&quot;,
+  &quot;currentArticleWorkflowStep&quot;: &quot;Draft&quot;,
+  &quot;currentArticleAction&quot;: &quot;Edited&quot;,
+  &quot;articleComments&quot;: null,
+  &quot;userId&quot;: &quot;&lt;userPkId&gt;&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture API reference</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;200&quot;,
+  &quot;message&quot;: &quot;3f1c9a52-6b1e-4d57-9a0e-2c7f8d41b6aa Article comments saved successfully.&quot;,
+  &quot;response&quot;: null
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Not saved</span><button type="button" class="copy" aria-label="Copy Failure: Not saved">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;400&quot;,
+  &quot;message&quot;: &quot;Article comments not saved.&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Server error</span><button type="button" class="copy" aria-label="Copy Failure: Server error">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;500&quot;,
+  &quot;message&quot;: &quot;Internal server error while saving article comments.&quot;
+}</code></pre></figure></div></article><article class="api" id="add-case" data-s="add case link /kauthor-api/addcase/{articleid} job 11 post"><header><h3>Add case link</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/addCase/{articleId}</code></p></header><p class="purpose">Links a case to a document. It has no locale.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11</span></div><dl class="params"><dt>Path</dt><dd>articleId</dd></dl><ul class="notes"><li>No dedup and no update API. Tracking must prevent a resend.</li><li>A blank description is sent as the case number.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;caseNumber&quot;: &quot;12345&quot;,
+  &quot;description&quot;: &quot;test case&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;articleId&quot;: &quot;SI101000&quot;,
+  &quot;caseNumber&quot;: &quot;12345&quot;,
+  &quot;description&quot;: &quot;test case&quot;,
+  &quot;id&quot;: 6
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Article missing, or description NULL</span><button type="button" class="copy" aria-label="Copy Failure: Article missing, or description NULL">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;success&quot;: false,
+  &quot;status&quot;: &quot;500&quot;,
+  &quot;message&quot;: &quot;Unexpected error occurred&quot;,
+  &quot;errorCode&quot;: &quot;INTERNAL_SERVER_ERROR&quot;,
+  &quot;data&quot;: null,
+  &quot;timestamp&quot;: &quot;2026-09-23T07:37:50.318919469Z&quot;
+}</code></pre></figure></div></article><article class="api" id="delete-case" data-s="delete case link /kauthor-api/deletecase/{id} job 11 delete"><header><h3>Delete case link</h3><p class="line"><span class="verb v-delete">DELETE</span><code class="path">/kauthor-api/deleteCase/{id}</code></p></header><p class="purpose">Removes a link before it is re-added with new values.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11</span></div><dl class="params"><dt>Path</dt><dd>id from addCase</dd></dl><div class="samples"><figure class="sample"><figcaption><span>Response</span><span class="src">Live capture, trimmed</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200, plain text:
+CaseLink deleted successfully for id: 13</code></pre></figure><figure class="sample"><figcaption><span>Failure: Id does not exist</span><button type="button" class="copy" aria-label="Copy Failure: Id does not exist">Copy</button></figcaption><pre tabindex="0"><code>HTTP 500 with the standard error body.</code></pre></figure></div></article><article class="api" id="reco-create" data-s="create recommendation /kauthor-api/api/recommendations job 11 post"><header><h3>Create recommendation</h3><p class="line"><span class="verb v-post">POST</span><code class="path">/kauthor-api/api/recommendations</code></p></header><p class="purpose">Scope DOCUMENT targets one article; CONTENT_TYPE targets a channel (send contentChannel instead).</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11</span></div><dl class="params"><dt>Required</dt><dd>title, scope, locale, userId</dd></dl><ul class="notes"><li>Categories and views need { key, name }. A key alone gives 500 Internal database error.</li><li>Title must be unique per case + article, regardless of locale. Pre-check k_article_recommendations.</li><li>Create ignores any status in the body; it is always OPEN.</li><li>Treat an errorMessage in a 200 as a failure.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Kapture API reference</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;title&quot;: &quot;Add steps for resetting the device PIN&quot;,
+  &quot;description&quot;: &quot;Customers could not find the PIN reset steps.&quot;,
+  &quot;caseNumber&quot;: &quot;CS-10245&quot;,
+  &quot;priority&quot;: &quot;High&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;userId&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;scope&quot;: &quot;DOCUMENT&quot;,
+  &quot;articleId&quot;: &quot;FAQ1086&quot;,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;currentArticleVersion&quot;: &quot;2.0&quot;,
+  &quot;recommendationStatus&quot;: &quot;New&quot;,
+  &quot;comments&quot;: null,
+  &quot;categories&quot;: [
+    {
+      &quot;key&quot;: &quot;CAT_DEVICES_KEY&quot;,
+      &quot;name&quot;: &quot;Devices&quot;
+    }
+  ],
+  &quot;views&quot;: [
+    {
+      &quot;key&quot;: &quot;VIEW_AGENT_KEY&quot;,
+      &quot;name&quot;: &quot;Agent&quot;
+    }
+  ]
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture API reference</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;id&quot;: 42,
+  &quot;contentId&quot;: &quot;&lt;channel-contentId&gt;&quot;,
+  &quot;articleId&quot;: &quot;FAQ1086&quot;,
+  &quot;title&quot;: &quot;Add steps for resetting the device PIN&quot;,
+  &quot;priority&quot;: &quot;High&quot;,
+  &quot;status&quot;: &quot;OPEN&quot;,
+  &quot;recommendationStatus&quot;: &quot;NEW&quot;,
+  &quot;caseNumber&quot;: &quot;CS-10245&quot;,
+  &quot;locale&quot;: &quot;en_US&quot;,
+  &quot;currentArticleVersion&quot;: &quot;2.0&quot;,
+  &quot;contentChannel&quot;: &quot;FAQ&quot;,
+  &quot;scope&quot;: &quot;DOCUMENT&quot;,
+  &quot;requestedBy&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;userId&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;createdBy&quot;: &quot;&lt;userPkId&gt;&quot;,
+  &quot;modifiedBy&quot;: null,
+  &quot;createdAt&quot;: &quot;2026-09-21T06:10:12.845Z&quot;,
+  &quot;rejectedAt&quot;: null,
+  &quot;categories&quot;: [
+    {
+      &quot;key&quot;: &quot;CAT_DEVICES_KEY&quot;,
+      &quot;name&quot;: &quot;Devices&quot;
+    }
+  ],
+  &quot;views&quot;: [
+    {
+      &quot;key&quot;: &quot;VIEW_AGENT_KEY&quot;,
+      &quot;name&quot;: &quot;Agent&quot;
+    }
+  ]
+}</code></pre></figure><figure class="sample"><figcaption><span>Failure: Required field missing</span><button type="button" class="copy" aria-label="Copy Failure: Required field missing">Copy</button></figcaption><pre tabindex="0"><code>HTTP 400, for example {&quot;title&quot;: &quot;title can&#x27;t be null or empty&quot;}</code></pre></figure><figure class="sample"><figcaption><span>Failure: articleId missing for DOCUMENT</span><button type="button" class="copy" aria-label="Copy Failure: articleId missing for DOCUMENT">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200 with errorMessage &quot;articleId is required for DOCUMENT scope&quot;</code></pre></figure><figure class="sample"><figcaption><span>Failure: Duplicate title or unknown scope</span><button type="button" class="copy" aria-label="Copy Failure: Duplicate title or unknown scope">Copy</button></figcaption><pre tabindex="0"><code>HTTP 500 with the standard error body</code></pre></figure></div></article><article class="api" id="reco-update" data-s="update recommendation /kauthor-api/api/recommendations/{id} job 11 patch"><header><h3>Update recommendation</h3><p class="line"><span class="verb v-patch">PATCH</span><code class="path">/kauthor-api/api/recommendations/{id}</code></p></header><p class="purpose">Changes only the fields sent. Sent category or view lists replace the whole list.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11</span></div><dl class="params"><dt>Required</dt><dd>modifiedBy</dd></dl><ul class="notes"><li>status is free text and is never rejected.</li><li>On Java 8, PATCH needs a reflective method set, because HttpURLConnection refuses it.</li></ul><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;recommendationStatus&quot;: &quot;Approved&quot;,
+  &quot;status&quot;: &quot;Approved&quot;,
+  &quot;modifiedBy&quot;: &quot;&lt;userPkId&gt;&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture API reference</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200 with the updated recommendation, same shape as create.</code></pre></figure></div></article><article class="api" id="reco-reject" data-s="reject recommendation /kauthor-api/api/recommendations/reject/{id} job 11 patch"><header><h3>Reject recommendation</h3><p class="line"><span class="verb v-patch">PATCH</span><code class="path">/kauthor-api/api/recommendations/reject/{id}</code></p></header><p class="purpose">Sets the rejected status, rejectedAt and rejectedBy.</p><div class="who-row"><span class="lbl">Used by</span><span class="who">Job 11</span></div><dl class="params"><dt>Required</dt><dd>rejectedBy</dd></dl><div class="samples"><figure class="sample"><figcaption><span>Request</span><span class="src">Built from code</span><button type="button" class="copy" aria-label="Copy Request">Copy</button></figcaption><pre tabindex="0"><code>{
+  &quot;status&quot;: &quot;REJECTED&quot;,
+  &quot;recommendationStatus&quot;: &quot;Rejected - Duplicate&quot;,
+  &quot;rejectedBy&quot;: &quot;&lt;userPkId&gt;&quot;
+}</code></pre></figure><figure class="sample"><figcaption><span>Response</span><span class="src">Kapture API reference</span><button type="button" class="copy" aria-label="Copy Response">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200 with the updated recommendation, including rejectedAt and rejectedBy.</code></pre></figure><figure class="sample"><figcaption><span>Failure: Missing or unknown</span><button type="button" class="copy" aria-label="Copy Failure: Missing or unknown">Copy</button></figcaption><pre tabindex="0"><code>HTTP 200 with errorMessage &quot;rejectedBy can&#x27;t be null or empty !!&quot; or &quot;Recommendation not found&quot;</code></pre></figure></div></article></section>
+<section class="general" id="matrix"><h2>Who calls what</h2><p class="lead">Jobs 1-3, 5-8, the content path tools, AssetsTool, the 8 IM batch jobs and the Bulk Extract / Transfer jobs make no Kapture REST calls.</p><div class="tablebox"><table><thead><tr><th>API</th><th>Job 4</th><th>Job 9</th><th>Job 10</th><th>Job 11</th><th>DMT</th><th>MDM</th></tr></thead><tbody><tr><th scope="row"><a href="#cms-check">Login</a></th><td class="on">Yes</td><td class="on">Yes</td><td class="on">Yes</td><td class="on">Yes</td><td class="on">Yes</td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#bulk-create">Bulk create</a></th><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="on">Yes</td><td class="off"></td></tr><tr><th scope="row"><a href="#bulk-update">Bulk update</a></th><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="on">Yes</td><td class="off"></td></tr><tr><th scope="row"><a href="#bulk-translate">Bulk translate</a></th><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#temp-upload">Temp attachment upload</a></th><td class="off"></td><td class="on">Yes</td><td class="on">Yes</td><td class="off"></td><td class="on">Yes</td><td class="off"></td></tr><tr><th scope="row"><a href="#add-article">Create article</a></th><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#update-article">Update article</a></th><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#save-translate">Save translation</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#publish-article">Publish article</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#latest-article">Read latest article</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#apply-actions">Bulk publish</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td></tr><tr><th scope="row"><a href="#unpublish">Unpublish</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td></tr><tr><th scope="row"><a href="#add-category">Create category</a></th><td class="on">Yes</td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#update-category">Update category</a></th><td class="on">Yes</td><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="on">Yes</td></tr><tr><th scope="row"><a href="#add-comments">Add history entry</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#add-case">Add case link</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#delete-case">Delete case link</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#reco-create">Create recommendation</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#reco-update">Update recommendation</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr><tr><th scope="row"><a href="#reco-reject">Reject recommendation</a></th><td class="off"></td><td class="off"></td><td class="off"></td><td class="on">Yes</td><td class="off"></td><td class="off"></td></tr></tbody></table></div></section>
+<section class="general" id="unused"><h2>Available, not used</h2><p class="lead">Listed in the Kapture API reference of 2026-09-21. No job or web application calls these, apart from read-backs in the Job 11 sample run.</p><div class="tablebox"><table><thead><tr><th>Method</th><th>Path</th><th>Purpose</th></tr></thead><tbody><tr><td><span class="verb v-get">GET</span></td><td><code>/list-of-article-comments?articleId=</code></td><td>All history; sample-run read-back</td></tr><tr><td><span class="verb v-post">POST</span></td><td><code>/get-list-of-article-comments</code></td><td>Paged Content History; shows a subset only</td></tr><tr><td><span class="verb v-delete">DELETE</span></td><td><code>/delete-article-comments</code></td><td>Delete history entries</td></tr><tr><td><span class="verb v-get">GET</span></td><td><code>/getCases/{articleId}</code></td><td>Case links; sample-run read-back</td></tr><tr><td><span class="verb v-delete">DELETE</span></td><td><code>/deleteCaseByIds</code></td><td>Delete several case links</td></tr><tr><td><span class="verb v-post">POST</span></td><td><code>/api/recommendations/{id}/assign</code></td><td>Assign to an article</td></tr><tr><td><span class="verb v-get">GET</span></td><td><code>/api/recommendations/{id}</code></td><td>Read one</td></tr><tr><td><span class="verb v-get">GET</span></td><td><code>/api/recommendations</code></td><td>List, with filters and paging</td></tr><tr><td><span class="verb v-post">POST</span></td><td><code>/api/recommendations/search</code></td><td>Search</td></tr><tr><td><span class="verb v-get">GET</span></td><td><code>/api/recommendations/details</code></td><td>Details by article</td></tr><tr><td><span class="verb v-post">POST</span></td><td><code>/api/recommendations/delete</code></td><td>Delete</td></tr></tbody></table></div></section>
+<section class="general" id="open"><h2>Open with Kapture</h2><ul class="rules">
+<li><b>Two dots in attachment file names</b> give a 500 on upload.</li>
+<li><b>Bulk publish resolves the wrong row</b> on a translated document (highest id, no locale filter), which gives the 409.</li>
+<li><b>Rollback-only publish failure</b> on bulk update: the draft commits, the publish does not.</li>
+<li><b>Upload size limit</b> is undocumented; the working caps are ours.</li>
+<li><b>update-article-tab and translations (A11)</b>: by design or defect is unconfirmed in the tracker. We use save-translate-article either way.</li>
+<li><b>QA issues K2 and K5</b> (SC SVG, timeouts) stay open in the QA failures report.</li>
+</ul></section>
+<footer class="general"><p>Sources: APIS_Payloads_Responses (saved samples, tracker, Bulk_API_Evidence_20260818); API Docs (Postman collection 2026-08-11); WorkFlowHistory_Recommendations_Caselinks/KAuthor_API_Reference.pdf (2026-09-21); tmp/Job11_SampleRun (live evidence); SourceCode_Migrated client classes and application.properties; Project memory: shared API contract.</p></footer>
+</main>
+</div>
+<script>
+document.addEventListener('click',function(e){var b=e.target.closest('.copy');if(!b)return;
+var t=b.closest('.sample').querySelector('code').textContent;var d=function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1200)};
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(d,function(){sel(b)})}else{sel(b)}});
+function sel(b){var r=document.createRange();r.selectNodeContents(b.closest('.sample').querySelector('code'));var s=getSelection();s.removeAllRanges();s.addRange(r)}
+var q=document.getElementById('q'),h=document.getElementById('hits');
+q.addEventListener('input',function(){var v=q.value.trim().toLowerCase(),n=0,c=document.querySelectorAll('.api');
+c.forEach(function(a){var m=!v||a.dataset.s.indexOf(v)>=0||a.textContent.toLowerCase().indexOf(v)>=0;a.hidden=!m;if(m)n++});
+document.querySelectorAll('.grp').forEach(function(g){g.hidden=!g.querySelector('.api:not([hidden])')});
+document.querySelectorAll('.general').forEach(function(g){g.hidden=!!v});
+h.textContent=v?n+' of '+c.length+' APIs':''});
+</script>

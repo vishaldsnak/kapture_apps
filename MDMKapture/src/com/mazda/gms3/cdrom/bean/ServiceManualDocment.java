@@ -10,6 +10,14 @@ public class ServiceManualDocment {
 	List<LabelBean> attchments = new ArrayList<LabelBean>();
 	String DJVUFileLocation;
 	String attachment = null;
+	/** OEM document (OEM_FILE_LOCATION): the material folder to copy instead of the file's own folder - see getParseddocument */
+	String oemFolder;
+	public String getOemFolder() {
+		return oemFolder;
+	}
+	public void setOemFolder(String oemFolder) {
+		this.oemFolder = oemFolder;
+	}
 	public String getAttachment() {
 		return attachment;
 	}

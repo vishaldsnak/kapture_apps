@@ -98,12 +98,86 @@ public class DataExportToolUtils {
 	 *                          channel name (SERVICE_MANUALS), and the root now comes from
 	 *                          kapture.content.xml.root rather than dataexttool.live.folder.path.
 	 */
+	/*
+	 * PUBLISHED VERSIONS, PREFETCHED PER ITEM (2026-10-30). getDocumentXMLFile asked the Kapture CMS DB
+	 * for each document's published version - a connection and a query, ~485 ms per document on MC Dev
+	 * (RMI job 303). prefetchPublishedVersions reads the whole item BATCH at a time
+	 * (findLatestPublishedBatch, same choice as findLatestPublished, as CD Creation does) and
+	 * getDocumentXMLFile uses it: a document absent from a successful prefetch has no published version,
+	 * exactly what the per-document lookup would say. A failed prefetch falls back to that lookup.
+	 */
+	private java.util.Map<String, KapturePublishedContentDAO.PublishedVersion> publishedVersions = null;
+	private String publishedVersionsLocale = null;
+
+	public void prefetchPublishedVersions(java.util.List<?> documentIds, String locale)
+	{
+		publishedVersions = null;
+		publishedVersionsLocale = null;
+		if(null==documentIds || documentIds.isEmpty())
+		{
+			return;
+		}
+		long started = System.currentTimeMillis();
+		java.util.List<String> ids = new java.util.ArrayList<String>();
+		for(Object id : documentIds)
+		{
+			ids.add(String.valueOf(id));
+		}
+		publishedVersions = KapturePublishedContentDAO.findLatestPublishedBatch(ids, locale);
+		com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - published versions (Kapture CMS DB, batched)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis()-started, 0L);
+		publishedVersionsLocale = locale;
+		logger.info("prefetchPublishedVersions :: "+ids.size()+" documents, "
+				+(null==publishedVersions ? "lookup FAILED - falling back to one lookup per document" : publishedVersions.size()+" published")
+				+" in "+(System.currentTimeMillis()-started)+" ms");
+	}
+
+	/*
+	 * OTHER MANUAL LINKS -> TEXT, ALSO IN KAPTURE XML (2026-10-30). Legacy InfoManager XML carried rich text in
+	 * CDATA, so the <a ...>text</a> fragment jsoup returns was found verbatim and replaced by its text (rule of
+	 * 21 May 2024). Kapture XML carries the same HTML XML-escaped (&lt;a href=...&gt;), so that replace never
+	 * matched and every other manual link stayed a link (RMI job 303: 781 of 781). When the raw fragment is
+	 * not in the XML, its XML-escaped form is replaced instead (same escaping as the file: & < >).
+	 */
+	public static String replaceRichTextFragment(String xml, String fragment, String replacement)
+	{
+		if(null==xml || null==fragment || "".equals(fragment) || null==replacement)
+		{
+			return xml;
+		}
+		if(xml.contains(fragment))
+		{
+			return xml.replace(fragment, replacement);
+		}
+		if(xml.contains(xmlEscapeText(fragment)))
+		{
+			return xml.replace(xmlEscapeText(fragment), xmlEscapeText(replacement));
+		}
+		// jsoup writes a bare & of an href (legacy index?page=result_mc&startover=...) as &amp; - the stored HTML may have it bare
+		return xml.replace(xmlEscapeText(fragment.replace("&amp;", "&")), xmlEscapeText(replacement));
+	}
+
+	private static String xmlEscapeText(String value)
+	{
+		return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+	}
+
 	public File getDocumentXMLFile(String channelFolderPath,String documentId,String locale)
 	{
 		File xmlFile = null;
 		try
 		{
-			xmlFile = KapturePublishedContentDAO.findContentXmlFile(documentId, locale);
+			long started = System.currentTimeMillis();
+			if(null!=publishedVersions && null!=documentId && null!=locale && locale.equals(publishedVersionsLocale))
+			{
+				// prefetched for the item - see prefetchPublishedVersions
+				xmlFile = KapturePublishedContentDAO.findContentXmlFileForVersion(documentId, publishedVersions.get(documentId.trim().toLowerCase()));
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File - locate XML in version folder (one document)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis()-started, 0L);
+			}
+			else
+			{
+				xmlFile = KapturePublishedContentDAO.findContentXmlFile(documentId, locale);
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB + file - published version + XML locate (one document, fallback)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED, System.currentTimeMillis()-started, 0L);
+			}
 			if(null==xmlFile)
 			{
 				logger.info("getDocumentXMLFile :: No published content XML found for {"+documentId+"} / {"+locale+"}.");
@@ -949,7 +1023,7 @@ public class DataExportToolUtils {
 									{
 										if(childNode.getNodeName().equalsIgnoreCase("ATTACHMENT"))
 										{
-											name = Utilities.getCharacterDataFromElement((Element)childNode);
+											name = Utilities.getAttachmentFileName((Element)childNode);
 											if(null!=name && !"".equals(name))
 											{
 												attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -969,7 +1043,7 @@ public class DataExportToolUtils {
 													{
 														if(pdfNode.getNodeName().equalsIgnoreCase("LEGACY_PDF") || pdfNode.getNodeName().equalsIgnoreCase("REVISION_HISTORY")  || pdfNode.getNodeName().equalsIgnoreCase("OTHER_PDF") )
 														{
-															name = Utilities.getCharacterDataFromElement((Element)pdfNode);
+															name = Utilities.getAttachmentFileName((Element)pdfNode);
 															if(null!=name && !"".equals(name))
 															{
 																attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -1013,7 +1087,7 @@ public class DataExportToolUtils {
 						{
 							if(campaignNode.getNodeName().equalsIgnoreCase("CAMPAIGN_ATTACHMENT"))
 							{
-								name = Utilities.getCharacterDataFromElement((Element)campaignNode);
+								name = Utilities.getAttachmentFileName((Element)campaignNode);
 								if(null!=name && !"".equals(name))
 								{
 									attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -1083,7 +1157,7 @@ public class DataExportToolUtils {
 									{
 										if(childNode.getNodeName().equalsIgnoreCase("ATTACHMENT"))
 										{
-											name = Utilities.getCharacterDataFromElement((Element)childNode);
+											name = Utilities.getAttachmentFileName((Element)childNode);
 											if(null!=name && !"".equals(name))
 											{
 												attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -1160,7 +1234,7 @@ public class DataExportToolUtils {
 									{
 										if(childNode.getNodeName().equalsIgnoreCase("ATTACHMENT"))
 										{
-											name = Utilities.getCharacterDataFromElement((Element)childNode);
+											name = Utilities.getAttachmentFileName((Element)childNode);
 											if(null!=name && !"".equals(name))
 											{
 												attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -1238,7 +1312,7 @@ public class DataExportToolUtils {
 									{
 										if(childNode.getNodeName().equalsIgnoreCase("THUMBNAIL_FILE") || childNode.getNodeName().equalsIgnoreCase("VIDEO_FILE"))
 										{
-											name = Utilities.getCharacterDataFromElement((Element)childNode);
+											name = Utilities.getAttachmentFileName((Element)childNode);
 											if(null!=name && !"".equals(name))
 											{
 												attachmentsList = addAttachmentDetails(attachmentsList, name, itemDetails, sourceDirPath);
@@ -1310,7 +1384,23 @@ public class DataExportToolUtils {
 		return attachmentsList;
 	}
 
+	/** Timed (job TIMING SUMMARY) - the copy itself is xcopyOperationImpl, unchanged. */
 	public DataExportToolAttachmentDetails xcopyOperation(DataExportToolAttachmentDetails attachmentDetails)
+	{
+		long started = System.currentTimeMillis();
+		try
+		{
+			return xcopyOperationImpl(attachmentDetails);
+		}
+		finally
+		{
+			File source = (null==attachmentDetails || null==attachmentDetails.getSourcePath()) ? null : new File(attachmentDetails.getSourcePath());
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File copy - image / PDF / attachment (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis()-started,
+					null!=source && source.isFile() ? source.length() : 0L);
+		}
+	}
+
+	private DataExportToolAttachmentDetails xcopyOperationImpl(DataExportToolAttachmentDetails attachmentDetails)
 	{
 		boolean readFileInBytes = false;
 		try
@@ -1319,52 +1409,64 @@ public class DataExportToolUtils {
 			if(sourceFile.exists() && sourceFile.isFile())
 			{
 				File destinationFile = new File(attachmentDetails.getDestinationPath());
-				Runtime r = Runtime.getRuntime();
-				/*Process p = r
-						.exec("xcopy " + "\""
-								+ sourceFile.getAbsolutePath() + "\""
-								+ " " + "\"" + destinationFile
-								+ "\"/y/c/h/j/q/z");*/
-				// use robocopy
-				Process p = r.exec("robocopy \""+sourceFile.getParentFile()+"\" \""+destinationFile+"\" \""+sourceFile.getName()+"\" ");
-				p.waitFor();
-				p.destroy();
-				
-//				FileUtils.copyFileToDirectory(sourceFile, destinationFile);
-
 				/*
-				 * check if file has been moved successfully or not
+				 * ROBOCOPY IS WINDOWS ONLY (2026-10-30). The legacy server ran on Windows; on Linux every file
+				 * failed to start "robocopy", logged a stack trace and then took the byte copy below anyway.
+				 * Off Windows the byte copy is used straight away - same result, no failed process per file.
 				 */
-				String tempPath = attachmentDetails.getDestinationPath();
-				if(!tempPath.endsWith("/"))
+				if(File.separatorChar!='\\')
 				{
-					tempPath+="/";
-				}
-				tempPath=tempPath+attachmentDetails.getName();
-				File tFile = new File(tempPath);
-				if(tFile.exists() && tFile.isFile())
-				{
-					logger.info("xcopyOperation :: File {"+attachmentDetails.getName()+"} moved successfully from {"+ attachmentDetails.getSourcePath()+"} to {"+attachmentDetails.getDestinationPath()+"}." );
-					// set Processing Status to Success
-					attachmentDetails.setProcessingStatus(ScheduleConstants.STATUS_SUCCESS);
+					readFileInBytes = true;
 				}
 				else
 				{
+					Runtime r = Runtime.getRuntime();
+					/*Process p = r
+							.exec("xcopy " + "\""
+									+ sourceFile.getAbsolutePath() + "\""
+									+ " " + "\"" + destinationFile
+									+ "\"/y/c/h/j/q/z");*/
+					// use robocopy
+					Process p = r.exec("robocopy \""+sourceFile.getParentFile()+"\" \""+destinationFile+"\" \""+sourceFile.getName()+"\" ");
+					p.waitFor();
+					p.destroy();
+				
+	//				FileUtils.copyFileToDirectory(sourceFile, destinationFile);
+
 					/*
-					 * SINCE XCOPY HAS FAILED - 
-					 * TRY READING FILE FROM SOURCE LOCATION IN BYTES
-					 * AND WRITE FILE AT THE DESTINATION LOCATION AND THEN RE-CHECK IF EXISTS OR NOT
-					 * SET READ FILE IN BYTES TO TRUE
+					 * check if file has been moved successfully or not
 					 */
-					readFileInBytes = true;
+					String tempPath = attachmentDetails.getDestinationPath();
+					if(!tempPath.endsWith("/"))
+					{
+						tempPath+="/";
+					}
+					tempPath=tempPath+attachmentDetails.getName();
+					File tFile = new File(tempPath);
+					if(tFile.exists() && tFile.isFile())
+					{
+						logger.info("xcopyOperation :: File {"+attachmentDetails.getName()+"} moved successfully from {"+ attachmentDetails.getSourcePath()+"} to {"+attachmentDetails.getDestinationPath()+"}." );
+						// set Processing Status to Success
+						attachmentDetails.setProcessingStatus(ScheduleConstants.STATUS_SUCCESS);
+					}
+					else
+					{
+						/*
+						 * SINCE XCOPY HAS FAILED - 
+						 * TRY READING FILE FROM SOURCE LOCATION IN BYTES
+						 * AND WRITE FILE AT THE DESTINATION LOCATION AND THEN RE-CHECK IF EXISTS OR NOT
+						 * SET READ FILE IN BYTES TO TRUE
+						 */
+						readFileInBytes = true;
 					
-					logger.info("xcopyOperation :: Failed to XCOPY file {"+attachmentDetails.getName()+"} from {"+ attachmentDetails.getSourcePath()+"} to {"+attachmentDetails.getDestinationPath()+"}." );
-					logger.info("xcopyOperation :: Proceed for reading source File in Bytes and Write it on Destination Location.");
-					// set Processing Status to Failure
-//					attachmentDetails.setProcessingStatus(ScheduleConstants.STATUS_FAILURE);
-//					attachmentDetails.setErrorMessage("FAILED TO MOVE FILE TO DESTINATION LOCATION. PLEASE CONTACT IT ADMIN SUPPORT FOR MORE DETAIL.");
+						logger.info("xcopyOperation :: Failed to XCOPY file {"+attachmentDetails.getName()+"} from {"+ attachmentDetails.getSourcePath()+"} to {"+attachmentDetails.getDestinationPath()+"}." );
+						logger.info("xcopyOperation :: Proceed for reading source File in Bytes and Write it on Destination Location.");
+						// set Processing Status to Failure
+	//					attachmentDetails.setProcessingStatus(ScheduleConstants.STATUS_FAILURE);
+	//					attachmentDetails.setErrorMessage("FAILED TO MOVE FILE TO DESTINATION LOCATION. PLEASE CONTACT IT ADMIN SUPPORT FOR MORE DETAIL.");
+					}
+					tFile = null;
 				}
-				tFile = null;
 				destinationFile = null;
 			}
 			else
@@ -1651,7 +1753,7 @@ public class DataExportToolUtils {
 		return imagesList;
 	}
 
-	public ArrayList<DataExportToolAttachmentDetails> readInlinePDFs(String xmlFileData, DataExportToolItemDetails itemDetails)
+	public ArrayList<DataExportToolAttachmentDetails> readInlinePDFs(String xmlFileData, DataExportToolItemDetails itemDetails, String contentFolder)
 	{
 		ArrayList<DataExportToolAttachmentDetails> pdfsList = null;
 		try
@@ -1783,6 +1885,12 @@ public class DataExportToolUtils {
 												// SAMPLE SRC PATH = /library/MAZDA/SERVICE MANUALS/en_us/cx-5/1a11-1u-12b_xml/pdf/pbc.pdf
 												pdfDetails.setName(hrefValue.substring(hrefValue.lastIndexOf("/")+1, hrefValue.length()));
 												pdfDetails.setSourcePath(resolveAssetPath(sourceOkAssetsPath, hrefValue));
+												// a legacy resources href has no file under the asset root: the same PDF sits beside the content XML
+												File besideContentXml = new File(contentFolder, pdfDetails.getName());
+												if(!new File(pdfDetails.getSourcePath()).exists() && besideContentXml.exists())
+												{
+													pdfDetails.setSourcePath(besideContentXml.getPath());
+												}
 												pdfDetails.setDestinationPath(destinationNetworkPath);
 												// set SRC Path
 												pdfDetails.setSrcHrefPath(hrefValue);
@@ -1884,6 +1992,14 @@ public class DataExportToolUtils {
 				String htmlContent = null;
 
 				String innerLinkContent=ApplicationProperties.getProperty("dataexttool.innerlink.url");
+				/*
+				 * KAPTURE LINK FORM (2026-10-30, as CD Creation and the Bulk Extract job): content loaded by Job 10 / DMT
+				 * links a document as content/<id> (dataexttool.innerlink.kapture.pattern, group 1 = id); older content may
+				 * still carry index?page=content&id=<id> (dataexttool.innerlink.url). Both are inner links.
+				 */
+				java.util.regex.Pattern kaptureInnerLink = java.util.regex.Pattern.compile(ApplicationProperties.requireProperty("dataexttool.innerlink.kapture.pattern"), java.util.regex.Pattern.CASE_INSENSITIVE);
+				java.util.regex.Matcher kaptureInnerLinkMatch = null;
+				boolean kaptureInnerLinkFound = false;
 				org.jsoup.nodes.Document doc = null;
 				org.jsoup.select.Elements aTagsList = null;
 				DataExportToolInnerLinkDetails innerLinkDetails = null;
@@ -1932,10 +2048,12 @@ public class DataExportToolUtils {
 												/*
 												 * check if Actual InnerLink for Processing or link just for tracking Purpose in Report
 												 */
+												kaptureInnerLinkMatch = kaptureInnerLink.matcher(hrefValue.trim());
+												kaptureInnerLinkFound = kaptureInnerLinkMatch.find();
 												if (!hrefValue.trim().toLowerCase().startsWith("http://") 
 														&& !hrefValue.trim().toLowerCase().startsWith("https://")  
 														&& !hrefValue.trim().toLowerCase().endsWith(ApplicationProperties.getProperty("extension.pdf")) && 
-														hrefValue.trim().toLowerCase().indexOf(innerLinkContent.trim().toLowerCase())!=-1)
+														(kaptureInnerLinkFound || hrefValue.trim().toLowerCase().indexOf(innerLinkContent.trim().toLowerCase())!=-1))
 												{
 													/*
 													 * 	INNER LINK FOUND
@@ -1943,7 +2061,8 @@ public class DataExportToolUtils {
 													 *  READ THE DOCUMENT ID 
 													 */
 													// set INNERLINK DOCUMENT ID
-													innerLinkDetails.setInnerLinkDocumentId(hrefValue.substring(hrefValue.trim().toLowerCase().indexOf(innerLinkContent.trim().toLowerCase())+(innerLinkContent.trim().length()), hrefValue.length()));
+													// Kapture form: the id of content/<id>; InfoManager form: the text after index?page=content&id= (as before)
+													innerLinkDetails.setInnerLinkDocumentId(kaptureInnerLinkFound ? kaptureInnerLinkMatch.group(1) : hrefValue.substring(hrefValue.trim().toLowerCase().indexOf(innerLinkContent.trim().toLowerCase())+(innerLinkContent.trim().length()), hrefValue.length()));
 													
 													if(null!=innerLinkDetails.getInnerLinkDocumentId() && !"".equals(innerLinkDetails.getInnerLinkDocumentId()))
 													{
@@ -2054,6 +2173,11 @@ public class DataExportToolUtils {
 				String otherManualLinkMNAOPattern=ApplicationProperties.getProperty("rimtool.othermanualink.mnao.url.pattern");
 				String otherManualLinkMCPattern=ApplicationProperties.getProperty("rimtool.othermanualink.mc.url.pattern");
 				String otherManualLinkMMEPattern=ApplicationProperties.getProperty("rimtool.othermanualink.mme.url.pattern");
+				// KAPTURE LINK FORM (2026-10-30, as CD Creation and the Bulk Extract job): Job 10 / DMT search links
+				// result?question_box= / result_mc?question_box= / result_mme?question_box= - other manual links too
+				String kaptureOtherManualMNAO=ApplicationProperties.requireProperty("rimtool.othermanualink.kapture.mnao.url.pattern").toLowerCase();
+				String kaptureOtherManualMC=ApplicationProperties.requireProperty("rimtool.othermanualink.kapture.mc.url.pattern").toLowerCase();
+				String kaptureOtherManualMME=ApplicationProperties.requireProperty("rimtool.othermanualink.kapture.mme.url.pattern").toLowerCase();
 				org.jsoup.nodes.Document doc = null;
 				org.jsoup.select.Elements aTagsList = null;
 				DataExportToolInnerLinkDetails innerLinkDetails = null;
@@ -2096,7 +2220,10 @@ public class DataExportToolUtils {
 													!hrefValue.startsWith("#") && 
 													(hrefValue.trim().toLowerCase().startsWith(otherManualLinkMNAOPattern.trim().toLowerCase()) || 
 															hrefValue.trim().toLowerCase().startsWith(otherManualLinkMCPattern.trim().toLowerCase()) || 
-															hrefValue.trim().toLowerCase().startsWith(otherManualLinkMMEPattern.trim().toLowerCase())))
+															hrefValue.trim().toLowerCase().startsWith(otherManualLinkMMEPattern.trim().toLowerCase()) ||
+														hrefValue.trim().toLowerCase().startsWith(kaptureOtherManualMNAO) ||
+														hrefValue.trim().toLowerCase().startsWith(kaptureOtherManualMC) ||
+														hrefValue.trim().toLowerCase().startsWith(kaptureOtherManualMME)))
 											{
 												innerLinkDetails = new DataExportToolInnerLinkDetails();
 //												innerLinkDetails.setSrcHrefPath(hrefValue);

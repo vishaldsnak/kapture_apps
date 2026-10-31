@@ -144,6 +144,24 @@ public class KapturePublishedContentDAO extends DBConnectionHelper {
 	}
 
 	/**
+	 * As findContentXmlFile(), for a version already read by findLatestPublishedBatch (RMI Export /
+	 * MNAO Data Export read a whole item's versions up front). null version = the document has no
+	 * published version, as findContentXmlFile would say.
+	 */
+	public static File findContentXmlFileForVersion(String documentId, PublishedVersion version) {
+		if (null == documentId || "".equals(documentId.trim()) || null == version) {
+			return null;
+		}
+		String folder = resolveContentFolder(documentId.trim(), version.getLocale(), version.getVersion());
+		if (null == folder) {
+			logger.info("findContentXmlFileForVersion :: no content XML on disk for {" + documentId.trim() + "} / {"
+					+ version.getLocale() + "} / version {" + version.getVersion() + "}.");
+			return null;
+		}
+		return findContentXml(new File(folder));
+	}
+
+	/**
 	 * THE HIGHEST PUBLISHED VERSION OF A DOCUMENT.
 	 *
 	 * A document keeps one k_article row per version, so the same article id has several rows with
@@ -197,6 +215,142 @@ public class KapturePublishedContentDAO extends DBConnectionHelper {
 				}
 			}
 		}
+	}
+
+	/** Documents per IN (...) list in findLatestPublishedBatch. */
+	private static final int BATCH_LOOKUP_CHUNK = 500;
+
+	/**
+	 * findLatestPublished FOR MANY DOCUMENTS AT ONCE - same rows, same choice, fewer round trips.
+	 *
+	 * CD Creation looked every document of a manual type up one at a time: one CMS connection and one
+	 * or two queries each, ~495 ms per document on MC Dev (1,851 e-WD documents = 15 minutes before
+	 * the first one was converted). Here the published rows of up to BATCH_LOOKUP_CHUNK documents come
+	 * back in one query, and the choice per document is made exactly as findLatestPublished makes it:
+	 * the highest MASTER row first, a translation row only when there is no master, numeric version
+	 * order, ties on the later k_article id (rows are read id DESC and pickHighest keeps the first).
+	 *
+	 * @return document id (trimmed, lower case) -> version; a document with no published row is
+	 *         simply absent. null when the lookup itself failed - the caller then falls back to
+	 *         findLatestPublished per document.
+	 */
+	public static java.util.Map<String, PublishedVersion> findLatestPublishedBatch(List<String> documentIds, String locale) {
+		java.util.Map<String, PublishedVersion> result = new java.util.HashMap<String, PublishedVersion>();
+		java.util.LinkedHashSet<String> distinct = new java.util.LinkedHashSet<String>();
+		if (null != documentIds) {
+			for (String id : documentIds) {
+				if (null != id && !"".equals(id.trim())) {
+					distinct.add(id.trim());
+				}
+			}
+		}
+		if (distinct.isEmpty()) {
+			return result;
+		}
+		boolean useLocale = (null != locale && !"".equals(locale.trim()));
+		List<String> ids = new ArrayList<String>(distinct);
+		// per document: master rows and all rows, both in id DESC order
+		java.util.Map<String, List<PublishedVersion>> masters = new java.util.HashMap<String, List<PublishedVersion>>();
+		java.util.Map<String, List<PublishedVersion>> all = new java.util.HashMap<String, List<PublishedVersion>>();
+		Connection conn = null;
+		try {
+			conn = getCMSConnection();
+			if (null == conn) {
+				logger.info("findLatestPublishedBatch :: no CMS connection - falling back to one lookup per document.");
+				return null;
+			}
+			for (int from = 0; from < ids.size(); from += BATCH_LOOKUP_CHUNK) {
+				List<String> chunk = ids.subList(from, Math.min(from + BATCH_LOOKUP_CHUNK, ids.size()));
+				StringBuffer sql = new StringBuffer();
+				sql.append("SELECT article_id, id, article_version, published_version,");
+				sql.append(" COALESCE(article_translated_locale, article_primary_locale) AS effective_locale,");
+				sql.append(" CASE WHEN COALESCE(article_translated_locale, article_primary_locale)");
+				sql.append(" = COALESCE(master_locale, article_primary_locale) THEN 1 ELSE 0 END AS is_master");
+				sql.append(" FROM ").append(T_ARTICLE);
+				sql.append(" WHERE article_state = ? AND article_id IN (");
+				for (int i = 0; i < chunk.size(); i++) {
+					sql.append(i == 0 ? "?" : ",?");
+				}
+				sql.append(")");
+				if (useLocale) {
+					sql.append(LOCALE_PREDICATE);
+				}
+				sql.append(" ORDER BY id DESC");
+				PreparedStatement pstmt = null;
+				ResultSet rs = null;
+				try {
+					pstmt = conn.prepareStatement(sql.toString());
+					int index = 1;
+					pstmt.setString(index++, STATE_PUBLISHED);
+					for (int i = 0; i < chunk.size(); i++) {
+						pstmt.setString(index++, chunk.get(i));
+					}
+					if (useLocale) {
+						String normalised = locale.replace("-", "_").trim();
+						pstmt.setString(index++, normalised);
+						pstmt.setString(index++, normalised);
+					}
+					rs = pstmt.executeQuery();
+					while (rs.next()) {
+						PublishedVersion row = new PublishedVersion();
+						row.recordId = safeTrim(rs.getString("id"));
+						row.locale = safeTrim(rs.getString("effective_locale"));
+						String published = safeTrim(rs.getString("published_version"));
+						if ("".equals(published) || "NaN".equalsIgnoreCase(published)) {
+							published = safeTrim(rs.getString("article_version"));
+						}
+						row.version = published;
+						if (!row.isUsable()) {
+							continue;
+						}
+						String key = safeTrim(rs.getString("article_id")).toLowerCase();
+						addRow(all, key, row);
+						if (rs.getInt("is_master") == 1) {
+							addRow(masters, key, row);
+						}
+					}
+				} finally {
+					closeQuietly(rs, pstmt);
+				}
+			}
+		} catch (Exception e) {
+			Utilities.printStackTraceToLogs(KapturePublishedContentDAO.class.getName(),
+					"findLatestPublishedBatch()", e);
+			return null;
+		} finally {
+			if (null != conn) {
+				try {
+					conn.close();
+				} catch (Exception ignore) {
+					// nothing useful to do here
+				}
+			}
+		}
+		for (String id : ids) {
+			String key = id.toLowerCase();
+			PublishedVersion best = pickHighest(masters.get(key));
+			if (null == best) {
+				best = pickHighest(all.get(key));
+				if (null != best) {
+					logger.info("findLatestPublished :: {" + id + "} / {" + locale + "} has NO"
+							+ " published MASTER row - falling back to a translation row, locale {"
+							+ best.getLocale() + "} version {" + best.getVersion() + "}.");
+				}
+			}
+			if (null != best) {
+				result.put(key, best);
+			}
+		}
+		return result;
+	}
+
+	private static void addRow(java.util.Map<String, List<PublishedVersion>> rows, String key, PublishedVersion row) {
+		List<PublishedVersion> list = rows.get(key);
+		if (null == list) {
+			list = new ArrayList<PublishedVersion>();
+			rows.put(key, list);
+		}
+		list.add(row);
 	}
 
 	/** Every published row of a document, optionally restricted to a locale and to masters. */

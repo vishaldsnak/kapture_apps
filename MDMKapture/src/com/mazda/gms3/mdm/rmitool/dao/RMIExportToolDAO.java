@@ -482,6 +482,36 @@ public class RMIExportToolDAO extends DBConnectionHelper{
 		return itemsList;
 	}
 	
+	/**
+	 * THE RMI Export JOBS PENDING / PROCESSING NOW, by schedule name - for the parallel jobs cap
+	 * (rmitool.max.parallel.jobs, 2026-10-30, as CD Creation and DMT).
+	 */
+	public static List<String> getActiveJobs() throws Exception {
+		List<String> names = new ArrayList<String>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			conn = getConnection();
+			pstmt = conn.prepareStatement("SELECT rmi_sch_name FROM gms3_mdm_rmi_tool_sch WHERE rmi_sch_processing_status IN (?, ?) ORDER BY rmi_sch_id");
+			pstmt.setString(1, ScheduleConstants.STATUS_PENDING);
+			pstmt.setString(2, ScheduleConstants.STATUS_PROCESSING);
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				names.add(rs.getString(1));
+			}
+		} finally {
+			if (null != rs)
+				rs.close();
+			if (null != pstmt)
+				pstmt.close();
+			if (null != conn)
+				conn.close();
+		}
+		logger.info("getActiveJobs :: Pending / Processing RMI Export jobs :: " + names);
+		return names;
+	}
+
 	public static Long createSchedule(RMIExportToolScheduleDetails schDetails)
 	{
 		Long scheduleId=null;

@@ -96,10 +96,11 @@ public class MNAOSIVINBatchProcessingImpl extends Thread{
 	 * THROTTLED ON PURPOSE. Some of these loops run through thousands of rows quickly and a
 	 * SELECT per iteration would be pure load. The answer is cached for ABORT_CHECK_INTERVAL_MS,
 	 * so the database sees at most one read every two seconds however fast the loop spins, and
-	 * once aborted the flag latches and it never asks again. Worst case the check itself is half a second
-	 * behind the click - the rest of any delay is the operation already in flight.
+	 * once aborted the flag latches and it never asks again. Worst case the check itself is ~11 s
+	 * behind the click (2026-10-30: 10 s from the END of the last check - one check costs ~733 ms on
+	 * MC Dev, so 500 ms from the START sent every call to the DB) - the rest of any delay is the operation already in flight.
 	 */
-	private static final long ABORT_CHECK_INTERVAL_MS = 500L;
+	private static final long ABORT_CHECK_INTERVAL_MS = 10000L;
 
 	private long lastAbortCheckTime = 0L;
 
@@ -120,7 +121,6 @@ public class MNAOSIVINBatchProcessingImpl extends Thread{
 		{
 			return false;
 		}
-		lastAbortCheckTime = now;
 		if(null!=categoryProcessingDAO)
 		{
 			scheduleAborted = categoryProcessingDAO.isAborted(abortScheduleId);
@@ -130,6 +130,8 @@ public class MNAOSIVINBatchProcessingImpl extends Thread{
 						+" SCREEN. Stopping after the item in flight.");
 			}
 		}
+		// the next check is due ABORT_CHECK_INTERVAL_MS after this one ENDED
+		lastAbortCheckTime = System.currentTimeMillis();
 		return scheduleAborted;
 	}
 	public void startProcess(String scheduleId, SIVinDetails addVinDetails, String market,String translationUpdateFlag)

@@ -40,6 +40,8 @@ import com.mazda.gms3.mdm.vo.ScheduleConstants;
  */
 public class RMIToolServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
+	/** The parallel jobs check and the insert of the new schedule run under this lock (two clicks at once). */
+	private static final Object SCHEDULE_LOCK = new Object();
 	static Logger logger = LogManager.getLogger(MMESIVin.class);
 	static String wslId=null;
 	static MessageProperties msgProps= null;
@@ -1059,7 +1061,26 @@ public class RMIToolServlet extends HttpServlet {
 				schDetails.setWslId(wslId);
 				schDetails.setItemsList(sessionBean.getSelectedItemsList());
 				
-				long scheduleId = RMIExportToolDAO.createSchedule(schDetails);
+				/*
+				 * PARALLEL JOBS CAP (2026-10-30, as CD Creation and DMT): at most rmitool.max.parallel.jobs RMI Export jobs
+				 * Pending / Processing at once - they read and write the same /s3kapture mount as CD Creation,
+				 * DMT and the bulk extract jobs. Completed and aborted jobs do not count.
+				 */
+				long scheduleId = 0;
+				synchronized (SCHEDULE_LOCK)
+				{
+					int maxJobs = ApplicationProperties.requirePositiveInt("rmitool.max.parallel.jobs");
+					List<String> activeJobs = RMIExportToolDAO.getActiveJobs();
+					if (activeJobs.size() >= maxJobs)
+					{
+						logger.info("schedule :: refused - " + activeJobs.size() + " RMI Export jobs Pending / Processing, limit "
+								+ maxJobs + " :: " + activeJobs);
+						sessionBean.setErrorMessage(msgProps.getMessage(new String[] { String.valueOf(maxJobs),
+								String.join(" / ", activeJobs) }, "error.export.job.limit.reached"));
+						return;
+					}
+					scheduleId = RMIExportToolDAO.createSchedule(schDetails);
+				}
 				if(scheduleId > 0)
 				{
 					schDetails.setScheduleName(null);

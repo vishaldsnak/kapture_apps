@@ -179,6 +179,7 @@ public class CDRomUtil {
 						try
 						{
 							// START PROCESSING DOC TYPE FOR SCHDEULE.
+							long typeStarted = System.currentTimeMillis();
 							List<LabelBean> xmlDocumentList = CDRomManualsDAO
 									.getDocumentRecordIdAndXMLForManual(itemDetails.getDocumentIdsList(), locale);
 							loadModelData(itemDetails.getManualTypeCode(), xmlDocumentList, locale,
@@ -192,6 +193,9 @@ public class CDRomUtil {
 									transactionReportBean, documentFailureReportBean,
 									"",cdRomDao);
 							
+							logger.info("getDocumentData :: manual type {" + itemDetails.getManualTypeCode() + "} :: "
+									+ itemDetails.getDocumentIdsList().size() + " documents done in "
+									+ (System.currentTimeMillis() - typeStarted) / 1000 + " s");
 							// HERE AFTER EXTRACTION , ITEM STATUS IS GETTING UPDATED AS COMPLETED INSIDE LOAD MODEL DATA FUNCTION.
 						}
 						catch(Exception e1)

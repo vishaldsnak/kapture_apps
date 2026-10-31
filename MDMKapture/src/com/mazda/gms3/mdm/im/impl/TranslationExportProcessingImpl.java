@@ -63,10 +63,11 @@ public class TranslationExportProcessingImpl extends Thread{
 	 * thread any more, so the worker stops itself by reading the status the screen already wrote.
 	 *
 	 * Throttled: the answer is cached for ABORT_CHECK_INTERVAL_MS and latches once aborted, so a
-	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is half a second
-	 * behind the click - the rest of any delay is the operation already in flight.
+	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is ~11 s
+	 * behind the click (2026-10-30: 10 s from the END of the last check - one check costs ~733 ms on
+	 * MC Dev, so 500 ms from the START sent every call to the DB) - the rest of any delay is the operation already in flight.
 	 */
-	private static final long ABORT_CHECK_INTERVAL_MS = 500L;
+	private static final long ABORT_CHECK_INTERVAL_MS = 10000L;
 
 	private long lastAbortCheckTime = 0L;
 
@@ -89,13 +90,14 @@ public class TranslationExportProcessingImpl extends Thread{
 		{
 			return false;
 		}
-		lastAbortCheckTime = now;
 		scheduleAborted = TranslationUpdateDAO.isAborted(abortScheduleId);
 		if(scheduleAborted==true)
 		{
 			logger.info("isScheduleAborted :: SCHEDULE {"+abortScheduleId+"} WAS ABORTED FROM THE"
 					+" SCREEN. Stopping after the item in flight.");
 		}
+		// the next check is due ABORT_CHECK_INTERVAL_MS after this one ENDED
+		lastAbortCheckTime = System.currentTimeMillis();
 		return scheduleAborted;
 	}
 	public void startProcess(SITranslationScheduleDetails schDetails, ArrayList<String> documentsList)

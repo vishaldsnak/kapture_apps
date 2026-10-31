@@ -61,10 +61,23 @@ public class CDRomKaptureContentDAO {
 			logger.info("getPublishedChannelNode :: document id as parameter is null.");
 			return null;
 		}
+		return getPublishedChannelNode(documentId, locale,
+				KapturePublishedContentDAO.findLatestPublished(documentId.trim(), locale));
+	}
+
+	/**
+	 * As getPublishedChannelNode(documentId, locale), with the published version already looked up -
+	 * CDRomManualsDAO resolves a whole manual type in one KapturePublishedContentDAO
+	 * .findLatestPublishedBatch call. A null version means "no published version".
+	 */
+	public static LabelBean getPublishedChannelNode(String documentId, String locale,
+			KapturePublishedContentDAO.PublishedVersion version) {
+		if (null == documentId || "".equals(documentId.trim())) {
+			logger.info("getPublishedChannelNode :: document id as parameter is null.");
+			return null;
+		}
 		String docId = documentId.trim();
 		try {
-			KapturePublishedContentDAO.PublishedVersion version =
-					KapturePublishedContentDAO.findLatestPublished(docId, locale);
 			if (null == version) {
 				logger.info("getPublishedChannelNode :: no PUBLISHED version in k_article for {"
 						+ docId + "} / {" + locale + "} - document skipped.");

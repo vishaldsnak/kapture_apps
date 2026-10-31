@@ -48,6 +48,33 @@ public final class KaptureLibraryPath {
 	}
 
 	/**
+	 * EXPORTED XML (RMI Export / MNAO Data Export): every library path back in the legacy form - a
+	 * /content/library/... that starts a node value (>), a CDATA value ([) or an attribute value (" or ')
+	 * becomes /library/... . Legacy exports carry /library/MAZDA/... (WD HTML5_UPLOAD_DIRECTORY and
+	 * DJVU_FILE_LOCATION, the SM css link ...) and resolve it under the export's OkAssets folder.
+	 */
+	public static String xmlLibraryPathsWithoutKaptureContext(String xml) {
+		if (null == xml || "".equals(xml)) {
+			return xml;
+		}
+		String ctx = ApplicationProperties.getProperty("kapture.library.path.context");
+		if (null == ctx) {
+			throw new IllegalStateException("kapture.library.path.context is not set in application.properties");
+		}
+		ctx = ctx.trim().replace("\\", "/");
+		while (ctx.endsWith("/")) {
+			ctx = ctx.substring(0, ctx.length() - 1);
+		}
+		if ("".equals(ctx)) {
+			return xml;
+		}
+		if (!ctx.startsWith("/")) {
+			ctx = "/" + ctx;
+		}
+		return xml.replaceAll("(?i)(?<=[>\\[\"'])" + java.util.regex.Pattern.quote(ctx) + "(?=/library/)", "");
+	}
+
+	/**
 	 * window.js text: every quoted address "/content/library/... (or '...) becomes "/library/...,
 	 * so new DMT window.js files and the legacy ones are rewritten by the same CD search strings.
 	 */

@@ -110,6 +110,31 @@ public class CDRomStartConversionImpl {
 	List<String> djvuPathList = new ArrayList<String>();
 	List<String> pdfPathList = new ArrayList<String>();
 	MessageProperties msgProps = null;
+
+	/*
+	 * KEYWORD + VIEW DETAILS, READ FOR A WHOLE MANUAL TYPE BEFORE ITS DOCUMENTS ARE CONVERTED (startConversion).
+	 * Two queries per document were ~0.7 s each document on MC Dev. A document is taken out when used, so a
+	 * second use (or an inner-link document, never prefetched) asks the DB per document as before.
+	 * null map = that batch failed: per document as before.
+	 */
+	private java.util.Map<String, KeyWordSearchBean> prefetchedKeywords = null;
+	private java.util.Set<String> prefetchedKeywordIds = new java.util.HashSet<String>();
+	private java.util.Map<String, ViewContentBean> prefetchedViews = null;
+	private java.util.Set<String> prefetchedViewIds = new java.util.HashSet<String>();
+
+	/*
+	 * DOES AN OK ASSET EXIST ON THE MOUNT - asked once per image path per job. Every document checked every
+	 * image it uses with File.exists on /s3kapture (a round trip each), and workshop manual documents share
+	 * many images.
+	 */
+	private final java.util.Map<String, Boolean> okAssetExists = new HashMap<String, Boolean>();
+
+	/** time spent in findOkAsset for the document in flight (timing log in saveFileInFolder) */
+	private long okAssetCheckMs = 0L;
+
+	/* the job's DAO and the manual type in flight - copyDocuments shows "Folder Copy" on the History page */
+	private CDRomDAO jobDao = null;
+	private String currentDocType = null;
 	String mazdaMCCSSName=  ApplicationProperties.getProperty("GMS3_MC_CUSTOM_CONTENT_CSS");
 	
 
@@ -124,7 +149,13 @@ public class CDRomStartConversionImpl {
 	 * Throttled and latching, so a loop over thousands of assets cannot turn this into a query per
 	 * iteration. CDRom keeps NUMERIC status codes, which CDRomDAO.isAborted() resolves.
 	 */
-	private static final long ABORT_CHECK_INTERVAL_MS = 500L;
+	/*
+	 * 10 s FROM THE END OF THE LAST CHECK (2026-10-30). It was 500 ms from the START of the last check,
+	 * but one check costs ~733 ms on MC Dev (pool connection + query, ~360 ms each), so every call went
+	 * to the DB: every copied file, image, link and zip write paid 0.7 s (job 849: 733 ms per file, while
+	 * the same copy outside Tomcat takes 1 ms). An abort is now noticed within ~11 s.
+	 */
+	private static final long ABORT_CHECK_INTERVAL_MS = 10000L;
 
 	private long lastAbortCheckTime = 0L;
 
@@ -132,7 +163,22 @@ public class CDRomStartConversionImpl {
 
 	private String abortScheduleId = null;
 
+	/*
+	 * Guards the abort-check fields - the copy threads ask too. NOT "synchronized" on this object:
+	 * CDRomScheduleServlet runs the whole job inside synchronized (startConvImpl), so the copy threads
+	 * would wait for that monitor while the job thread waits for them (MC Dev job 850 hung that way).
+	 */
+	private final Object abortCheckLock = new Object();
+
 	private boolean isScheduleAborted()
+	{
+		synchronized (abortCheckLock)
+		{
+			return isScheduleAbortedLocked();
+		}
+	}
+
+	private boolean isScheduleAbortedLocked()
 	{
 		if(scheduleAborted==true)
 		{
@@ -147,8 +193,9 @@ public class CDRomStartConversionImpl {
 		{
 			return false;
 		}
-		lastAbortCheckTime = now;
 		scheduleAborted = CDRomDAO.isAborted(abortScheduleId);
+		// the next check is due ABORT_CHECK_INTERVAL_MS after this one ENDED
+		lastAbortCheckTime = System.currentTimeMillis();
 		if(scheduleAborted==true)
 		{
 			logger.info("isScheduleAborted :: CD SCHEDULE {"+abortScheduleId+"} WAS ABORTED FROM THE"
@@ -170,6 +217,8 @@ public class CDRomStartConversionImpl {
 			String jobStatus,CDRomDAO cdRomDao) {
 		// remember the schedule so the abort check works in the helpers below
 		abortScheduleId = scheduleId;
+		jobDao = cdRomDao;
+		currentDocType = docType;
 //		boolean updateProcessingStatus;
 		List<String> docIdList = new ArrayList<String>();
 		try {
@@ -181,6 +230,9 @@ public class CDRomStartConversionImpl {
 //							docType);
 //			if (updateProcessingStatus == true) {
 			
+				prefetchLookups(xmlDocumentList, locale, docType);
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Document conversion - " + docType + " (" + xmlDocumentList.size() + " documents)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED);
+				try {
 				for (LabelBean xmlDoc : xmlDocumentList) {
 					if(isScheduleAborted()) { break; }
 //					String documentId = CDRomManualsDAO.getDocumentID(xmlDoc
@@ -198,9 +250,17 @@ public class CDRomStartConversionImpl {
 							innerLinkReportBean);
 					updateCount(String.valueOf(scheduleId), success, docType,cdRomDao);
 				}
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
 				documentIdListFromManual.addAll(docIdList);
 				if(docType.equalsIgnoreCase("WD") || docType.equalsIgnoreCase("e-WD")){
-					countOkAssetForWiringDiagram(timeStamp, networkPath);
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Count WD images (folder listing) - " + docType, com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+					try {
+						countOkAssetForWiringDiagram(timeStamp, networkPath);
+					} finally {
+						com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+					}
 					cdRomDao.updateInnerLinkAndOKAssetCount(scheduleId,
 							okAssetCount, documentIdListFromFiles.size(),
 							docType);
@@ -230,23 +290,38 @@ public class CDRomStartConversionImpl {
 				
 				cdRomDao.updateProcessedInnerLinksCount(scheduleId,
 						documentIdListFromFiles.size(), docType);
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Inner-link documents (read + convert) - " + docType, com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED);
+				try {
 				processInnerLinkDocs(timeStamp, locale, carLineCode, docType,
 						vdsCode, vinStartRange, modelName, scheduleId,
 						networkPath, wmiCode, keywordSearchList,
-						viewContentList, firstLevelCatList, 
+						viewContentList, firstLevelCatList,
 						manualTypeName, innerLinkReportBean,
 						transactionReportBean, documentFailureReportBean,
 						jobStatus,cdRomDao);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
 				String folderPath = getFolderPath(timeStamp, locale,
 						carLineCode, docType, vdsCode, vinStartRange,
 						modelName, networkPath);
 				// UPDATE TOTAL OKASSETS COUNT - OF ORIGINAL DOCS & INNERLINK DOCS
 				cdRomDao.updateOKAssetCount(scheduleId, imagePathList.size(), docType);
 				
-				copyImages(folderPath, scheduleId, docType, okAssetReportBean,
-						jobStatus,cdRomDao);
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Image copy - " + docType, com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+				try {
+					copyImages(folderPath, scheduleId, docType, okAssetReportBean,
+							jobStatus,cdRomDao);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
 				// CALL FUNCTION TO  COPY INLINE CONTENT CSS - TOYOTA CONTENT
-				copyContentCSS(folderPath, scheduleId, docType, okAssetReportBean, jobStatus);
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Content CSS copy - " + docType, com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+				try {
+					copyContentCSS(folderPath, scheduleId, docType, okAssetReportBean, jobStatus);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
 				documentIdListFromManual.removeAll(documentIdListFromManual);
 				documentIdListFromFiles.removeAll(documentIdListFromFiles);
 				documentsStatusList.removeAll(documentsStatusList);
@@ -308,6 +383,8 @@ public class CDRomStartConversionImpl {
 	private void copyImages(String folderPath, String scheduleId,
 			String docType, List<OKAssetReportBean> okAssetReportBean,
 			String jobStatus,CDRomDAO cdRomDao) throws SQLException {
+		long imagesStarted = System.currentTimeMillis();
+		int imagesTotal = (null == imagePathList ? 0 : imagePathList.size());
 		if (imagePathList != null && imagePathList.size() > 0) {
 			cdRomDao.updateCurrentProcessingStatus(
 					String.valueOf(scheduleId),
@@ -315,39 +392,85 @@ public class CDRomStartConversionImpl {
 							.getProperty("schedule.current.status.okasset.value"),
 					docType);
 			logger.info(" Start OKAssetProcessing for manual type: " + docType);
+			/*
+			 * EACH DISTINCT IMAGE IS COPIED ONCE, cdrom.copy.parallel.threads AT A TIME (2026-10-30).
+			 * The list has one entry per image per document ("path,documentId" - the duplicate check in
+			 * createImagePathList compares the bare path, so it never matches) and every entry was copied
+			 * again, one after another, ~0.7 s each on the /s3kapture mount. The report keeps one row per
+			 * entry and the counts move per entry exactly as before; an entry shares the outcome of its
+			 * image's one copy. Entries not reached after an abort get no row, as before.
+			 */
+			String imageRoot = ApplicationProperties.getProperty("cdrom.image.server.path");
+			File dest = new File(folderPath + "/images");
+			if (!dest.isDirectory() && !dest.mkdirs() && !dest.isDirectory()) {
+				logger.info("copyImages :: could not create {" + dest.getAbsolutePath() + "} - every copy below fails.");
+			}
+			final java.util.LinkedHashMap<String, Integer> pairOfPath = new java.util.LinkedHashMap<String, Integer>();
+			final List<File[]> pairs = new ArrayList<File[]>();
+			final List<Integer> entriesOfPair = new ArrayList<Integer>();
+			int[] entryPair = new int[imagePathList.size()];
+			String[] entryImagePath = new String[imagePathList.size()];
 			for (int i = 0; i < imagePathList.size(); i++) {
-				if(isScheduleAborted()) { break; }
 				String arr[] = imagePathList.get(i).split(",");
-				String imagePath = resolveAssetPath(ApplicationProperties
-						.getProperty("cdrom.image.server.path"), arr[0]);
+				String imagePath = resolveAssetPath(imageRoot, arr[0]);
+				entryImagePath[i] = imagePath;
+				Integer pair = pairOfPath.get(imagePath);
+				if (null == pair) {
+					pair = Integer.valueOf(pairs.size());
+					pairOfPath.put(imagePath, pair);
+					pairs.add(new File[] { new File(imagePath), dest });
+					entriesOfPair.add(Integer.valueOf(0));
+				}
+				entryPair[i] = pair.intValue();
+				entriesOfPair.set(pair.intValue(), Integer.valueOf(entriesOfPair.get(pair.intValue()).intValue() + 1));
+			}
+			logger.info("copyImages :: manual type " + docType + " :: " + imagePathList.size() + " image entries, "
+					+ pairs.size() + " distinct images to copy");
+			final String countScheduleId = scheduleId;
+			final String countDocType = docType;
+			final CDRomDAO countDao = cdRomDao;
+			CopyOutcome[] outcomes = copyFiles(pairs, true, new CopyListener() {
+				public void copied(int pair, Exception error) {
+					// the History counts move as the copies finish, once per entry as before
+					int entries = entriesOfPair.get(pair).intValue();
+					try {
+						if (null == error) {
+							countDao.updateOKAssetProcessingCount(countScheduleId, countDocType, entries);
+						} else {
+							for (int e = 0; e < entries; e++) {
+								countDao.updateOKAssetFailureCount(countScheduleId, countDocType);
+							}
+						}
+					} catch (SQLException e) {
+						Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "copyImages()", e);
+					}
+				}
+			});
+			for (int i = 0; i < imagePathList.size(); i++) {
+				CopyOutcome outcome = outcomes[entryPair[i]];
+				if (null == outcome) {
+					// not copied - the schedule was aborted
+					continue;
+				}
+				String arr[] = imagePathList.get(i).split(",");
 				String okAssetName = arr[0].substring(
 						arr[0].lastIndexOf('/') + 1, arr[0].length());
-				File source = new File(imagePath);
-				File dest = new File(folderPath + "/images");
 				OKAssetReportBean temp = new OKAssetReportBean();
-				try {
-					temp.setDocumentId(arr[1]);
-					temp.setManualType(docType);
-					temp.setOkAssetName(okAssetName);
-					temp.setOkAssetSourceLocation(imagePath);
-					FileUtils.copyFileToDirectory(source, dest);
+				temp.setDocumentId(arr[1]);
+				temp.setManualType(docType);
+				temp.setOkAssetName(okAssetName);
+				temp.setOkAssetSourceLocation(entryImagePath[i]);
+				if (null == outcome.error) {
 					temp.setStatus("Success");
 					temp.setOkAssetDestinationLocation(folderPath + "/images");
 					temp.setErrorCode("");
 					temp.setErrorMessage("");
 					temp.setErrorTime("");
-					cdRomDao.updateOKAssetProcessingCount(scheduleId, docType, 1);
-				} catch (IOException e) {
+				} else {
 					temp.setStatus("Failure");
-					temp.setErrorCode(e.getClass().getName());
-					temp.setErrorMessage(e.getMessage());
-					temp.setErrorTime(String.valueOf(new Date().getTime()));
-					cdRomDao.updateOKAssetFailureCount(scheduleId, docType);
-					logger.info("processImages :: ################ Exception ################");
-					Utilities.printStackTraceToLogs(
-							CDRomStartConversionImpl.class.getName(),
-							"processImages()", e);
-					logger.info("processImages :: ################ Exception ################");
+					temp.setErrorCode(outcome.error.getClass().getName());
+					temp.setErrorMessage(outcome.error.getMessage());
+					temp.setErrorTime(String.valueOf(outcome.finishedAt));
 				}
 				okAssetReportBean.add(temp);
 			}
@@ -355,7 +478,8 @@ public class CDRomStartConversionImpl {
 		if(docType.equalsIgnoreCase("WD") || docType.equalsIgnoreCase("e-WD")){
 			cdRomDao.updateOKAssetProcessingCount(scheduleId, docType, okAssetCount);
 		}
-		logger.info(" End OKAssetProcessing for manual type: " + docType);
+		logger.info(" End OKAssetProcessing for manual type: " + docType + " :: " + imagesTotal
+				+ " images in " + (System.currentTimeMillis() - imagesStarted) + " ms");
 		imagePathList.removeAll(imagePathList);
 	}
 
@@ -390,7 +514,9 @@ public class CDRomStartConversionImpl {
 //					temp.setManualType(docType);
 //					temp.setOkAssetName(okAssetName);
 //					temp.setOkAssetSourceLocation(cssPath);
+					long opStarted = System.currentTimeMillis();
 					FileUtils.copyFileToDirectory(source, dest);
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File copy - content CSS (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, source.length());
 //					temp.setStatus("Success");
 //					temp.setOkAssetDestinationLocation(folderPath + "/contentcss");
 //					temp.setErrorCode("");
@@ -437,11 +563,42 @@ public class CDRomStartConversionImpl {
 			if(isScheduleAborted()) { break; }
 			List<String> newDocList = compareDocList();
 			documentIdListFromFiles.removeAll(documentIdListFromFiles);
+			/*
+			 * ONE ROUND OF LINKED DOCUMENTS (2026-10-30): the DB lookups of the round are batched - published
+			 * versions (any locale, as getDocumentsFromDocList) and keyword + view details - instead of one
+			 * round trip each per document (831 documents = 47 min on MC Dev, job 852). The XML of each
+			 * document is still read on its own; levels, order, counts and reports are unchanged.
+			 * A failed batch falls back to the per-document lookups.
+			 */
+			java.util.Map<String, com.mazda.gms3.mdm.dao.KapturePublishedContentDAO.PublishedVersion> roundVersions;
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Inner-link documents - published versions (Kapture CMS DB, batched) - " + docType, com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB);
+			try {
+				roundVersions = com.mazda.gms3.mdm.dao.KapturePublishedContentDAO.findLatestPublishedBatch(newDocList, null);
+			} finally {
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+			}
+			prefetchLookups(newDocList, locale, docType, "Inner-link documents - keyword + view details lookup, batched - " + docType);
+			logger.info("processInnerLinkDocs :: " + docType + " :: round of " + newDocList.size() + " linked documents"
+					+ (null == roundVersions ? " - published versions BATCH FAILED, one lookup per document" : ""));
 			for (String docId : newDocList) {
 				if(isScheduleAborted()) { break; }
-				List<LabelBean> newXmlDocumentList = CDRomManualsDAO
-						.getDocumentsFromDocList(docId, locale, carLineCode,
-								vdsCode, vinStartRange);
+				List<LabelBean> newXmlDocumentList;
+				if (null == roundVersions) {
+					newXmlDocumentList = CDRomManualsDAO
+							.getDocumentsFromDocList(docId, locale, carLineCode,
+									vdsCode, vinStartRange);
+				} else {
+					newXmlDocumentList = new ArrayList<LabelBean>();
+					long opStarted = System.currentTimeMillis();
+					LabelBean clDetails = (null == docId || "".equals(docId.trim())) ? null
+							: com.mazda.gms3.cdrom.dao.CDRomKaptureContentDAO.getPublishedChannelNode(docId.trim(), null,
+									roundVersions.get(docId.trim().toLowerCase()));
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File read - inner-link document XML (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE,
+							System.currentTimeMillis() - opStarted, null == clDetails || null == clDetails.getValue() ? 0L : clDetails.getValue().length());
+					if (null != clDetails) {
+						newXmlDocumentList.add(clDetails);
+					}
+				}
 				saveInnerLinkFiles(newXmlDocumentList, timeStamp, locale,
 						carLineCode, docType, vdsCode, vinStartRange,
 						modelName, scheduleId, networkPath, wmiCode,
@@ -512,6 +669,40 @@ public class CDRomStartConversionImpl {
 		return newDocList;
 	}
 
+	/** Keyword + view details of every document of the manual type, two batch reads - see prefetchedKeywords. */
+	private void prefetchLookups(List<LabelBean> xmlDocumentList, String locale, String docType) {
+		List<String> ids = new ArrayList<String>();
+		if (null != xmlDocumentList) {
+			for (LabelBean xmlDoc : xmlDocumentList) {
+				if (null != xmlDoc.getExtraAttribute() && !"".equals(xmlDoc.getExtraAttribute().trim())) {
+					ids.add(xmlDoc.getExtraAttribute().trim());
+				}
+			}
+		}
+		prefetchLookups(ids, locale, docType, "Keyword + view details lookup, batched - " + docType);
+	}
+
+	/** Keyword + view details of these documents in batched queries (replaces the previous prefetch). */
+	private void prefetchLookups(List<String> ids, String locale, String docType, String phase) {
+		prefetchedKeywordIds.clear();
+		prefetchedViewIds.clear();
+		com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin(phase, com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB);
+		try {
+			prefetchedKeywords = CDRomManualsDAO.getKeyWordSearchDetailsBatch(ids, locale, docType);
+			prefetchedViews = CDRomManualsDAO.getViewDetailsFromCDRomBatch(ids, locale);
+		} finally {
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+		}
+		for (String id : ids) {
+			if (null != prefetchedKeywords) {
+				prefetchedKeywordIds.add(id.toLowerCase());
+			}
+			if (null != prefetchedViews) {
+				prefetchedViewIds.add(id.toLowerCase());
+			}
+		}
+	}
+
 	private void updateCount(String scheduleID, boolean success, String docType,CDRomDAO cdRomDao)
 			throws SQLException {
 		int count = 1;
@@ -552,12 +743,31 @@ public class CDRomStartConversionImpl {
 //				viewBean = CDRomManualsDAO.getViewDetails(documentId, locale,
 //						selectedModel, selectedVds, wmiCode, selectedVinRange,
 //						manualType);
-				keyBean = CDRomManualsDAO.getKeyWordSearchDetails(documentId,
-						locale,  manualType);
-				viewBean = CDRomManualsDAO.getViewDetailsFromCDRom(documentId,locale);
+				long lookupStarted = System.currentTimeMillis();
+				String lookupKey = (null == documentId ? "" : documentId.trim().toLowerCase());
+				if (prefetchedKeywordIds.remove(lookupKey)) {
+					keyBean = prefetchedKeywords.remove(lookupKey);
+				} else {
+					long opStarted = System.currentTimeMillis();
+					keyBean = CDRomManualsDAO.getKeyWordSearchDetails(documentId,
+							locale,  manualType);
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - keyword details, one document", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - opStarted, 0L);
+				}
+				if (prefetchedViewIds.remove(lookupKey)) {
+					viewBean = prefetchedViews.remove(lookupKey);
+				} else {
+					long opStarted = System.currentTimeMillis();
+					viewBean = CDRomManualsDAO.getViewDetailsFromCDRom(documentId,locale);
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - view details, one document", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis() - opStarted, 0L);
+				}
+				long saveStarted = System.currentTimeMillis();
+				okAssetCheckMs = 0L;
 				saveFile(filePath, documentId, xml, locale, selectedModel,
 						keyBean, viewBean, timeStamp, networkPath,
 						filePathForHTML, manualType, innerLinkReportBean, tr);
+				logger.info("saveFileInFolder :: {" + documentId + "} :: lookups " + (saveStarted - lookupStarted)
+						+ " ms, conversion + write " + (System.currentTimeMillis() - saveStarted) + " ms (image checks "
+						+ okAssetCheckMs + " ms, " + tr.getOkAssetCount() + " images)");
 				if(null!=keyBean)
 				{
 					keyBean.setManualTypeName(manualTypeName);
@@ -618,24 +828,23 @@ public class CDRomStartConversionImpl {
 		return false;
 	}
 
+	private static String publishedVersionFolder(String documentId, String locale) {
+		return com.mazda.gms3.mdm.dao.KapturePublishedContentDAO.findContentFolder(documentId, locale.trim().replace("-", "_"));
+	}
+
 	private void processPDFFiles(String pdfResourcePath, String filePath,
 			String pdfDocId) throws IOException {
-		// sites/MAZDA/content/staging/OTHER_SERVICE_MANUALS/112000/OSM112941/ja_JP/2.0/
-		// sites/MAZDA/content/live/OTHER_SERVICE_MANUALS/112000/OSM112941/ja_JP/
-		pdfResourcePath = pdfResourcePath.replace("staging", "live");
-		int index = StringUtils.ordinalIndexOf(pdfResourcePath, "/", 8);
-		pdfResourcePath = pdfResourcePath.substring(0, index + 1);
+		// pdfResourcePath = published version folder of the document (see publishedVersionFolder): the attachments sit beside the content XML
 		copyPDFFile(pdfResourcePath, filePath, pdfDocId);
 	}
 
 	private void copyPDFFile(String pdfResourcePath, String filePath,
 			String pdfDocId) throws IOException {
-		String pdfFileServerPath = ApplicationProperties
-				.getProperty("cdrom.pdf.server.path");
-		pdfResourcePath = pdfFileServerPath + pdfResourcePath + pdfDocId;
-		File source = new File(pdfResourcePath);
+		File source = new File(pdfResourcePath, pdfDocId);
 		File dest = new File(filePath + "/pdf");
+		long opStarted = System.currentTimeMillis();
 		FileUtils.copyFileToDirectory(source, dest);
+		com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File copy - PDF attachment (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, source.length());
 	}
 
 	public String getFolderPath(String timeStamp, String locale,
@@ -660,6 +869,7 @@ public class CDRomStartConversionImpl {
 		String folderPath = root + "/CD_ROM_" + timeStamp + "/"+marketFolderName+"/" + locale
 				+ "/" + modelName + "_" + selectedModel + "/"
 				+ selectedVds + "/" + selectedVinRange + "/" + manualType;
+		long opStarted = System.currentTimeMillis();
 		File path = new File(folderPath);
 		if (!path.exists()) {
 			try {
@@ -669,6 +879,7 @@ public class CDRomStartConversionImpl {
 				return "";
 			}
 		}
+		com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("Folder - exists check of the document folder", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, 0L);
 		marketFolderName = null;
 		return folderPath;
 	}
@@ -722,7 +933,8 @@ public class CDRomStartConversionImpl {
 				}
 				String filename = fileLocation;
 				int index = fileLocation.lastIndexOf('/');
-				fileLocation = fileLocation.substring(0, index);
+				// OEM document: its whole material folder (see getParseddocument); DJVU: the file's own folder
+				fileLocation = StringUtils.isNotBlank(document.getOemFolder()) ? document.getOemFolder() : fileLocation.substring(0, index);
 					if(!djvuPathList.contains(fileLocation)){
 						djvuPathList.add(fileLocation);
 						copyDocuments(timeStamp, networkPath, fileLocation, locale, selectedModel);
@@ -752,7 +964,7 @@ public class CDRomStartConversionImpl {
 					if(isScheduleAborted()) { break; }
 					LabelBean lb = (LabelBean) document.getAttchments()
 							.get(i);
-					String pdfResourcePath = CDRomDAO.getResourcePath(documentId,locale);
+					String pdfResourcePath = publishedVersionFolder(documentId,locale);
 					if (StringUtils.isNotBlank(pdfResourcePath)) {
 						tr.setDocumentId(documentId);
 						tr.setManualType(manualType);
@@ -783,7 +995,7 @@ public class CDRomStartConversionImpl {
 			} 
 			else if (StringUtils.isNotBlank(document.getAttachment())) {
 				String pdfFileName = document.getAttachment();
-				String pdfResourcePath = CDRomDAO.getResourcePath(documentId,locale);
+				String pdfResourcePath = publishedVersionFolder(documentId,locale);
 				if (StringUtils.isNotBlank(pdfResourcePath)) {
 					tr.setDocumentId(documentId);
 					tr.setManualType(manualType);
@@ -825,6 +1037,7 @@ public class CDRomStartConversionImpl {
 				document.setContent(processedContent);
 				
 				
+				long writeStarted = System.currentTimeMillis();
 				Writer fileWriter = new BufferedWriter(new OutputStreamWriter(
 						new FileOutputStream(filePath), "UTF-8"));
 				// FileWriter fileWriter = new FileWriter(filePath);
@@ -885,7 +1098,7 @@ public class CDRomStartConversionImpl {
 						fileWriter.write("<a href=" + '"' + "pdf/"
 								+ lb.getValue() + '"' + ">" + lb.getKey()
 								+ "</a></br>");
-						String pdfResourcePath = CDRomDAO.getResourcePath(documentId,locale);
+						String pdfResourcePath = publishedVersionFolder(documentId,locale);
 						if (StringUtils.isNotBlank(pdfResourcePath)) {
 							processPDFFiles(pdfResourcePath, folderPath,
 									lb.getValue());
@@ -895,6 +1108,8 @@ public class CDRomStartConversionImpl {
 				fileWriter.write("</body></html>");
 				fileWriter.flush();
 				fileWriter.close();
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File write - document HTML (create + write + close)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE,
+						System.currentTimeMillis() - writeStarted, new File(filePath).length());
 				String innerLinkStatus = "Y";
 				if (temp.getKey().equals("0")) {
 					innerLinkStatus = "";
@@ -955,19 +1170,30 @@ public class CDRomStartConversionImpl {
 	}
 
 	private String findOkAsset(List<String> okAssetList) {
-		if (okAssetList != null && okAssetList.size() > 0) {
-			for (int i = 0; i < okAssetList.size(); i++) {
-				if(isScheduleAborted()) { break; }
-				String imagePath = resolveAssetPath(ApplicationProperties
-						.getProperty("cdrom.image.server.path"), okAssetList.get(i));
-				File image = new File(imagePath);
-				if (!image.exists()) {
-					return "N";
+		long started = System.currentTimeMillis();
+		try {
+			if (okAssetList != null && okAssetList.size() > 0) {
+				String imageRoot = ApplicationProperties.getProperty("cdrom.image.server.path");
+				for (int i = 0; i < okAssetList.size(); i++) {
+					if(isScheduleAborted()) { break; }
+					String imagePath = resolveAssetPath(imageRoot, okAssetList.get(i));
+					Boolean exists = okAssetExists.get(imagePath);
+					if (null == exists) {
+						long opStarted = System.currentTimeMillis();
+						exists = Boolean.valueOf(new File(imagePath).exists());
+						com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File exists check - OK asset (first time per image)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, 0L);
+						okAssetExists.put(imagePath, exists);
+					}
+					if (!exists.booleanValue()) {
+						return "N";
+					}
 				}
+				return "Y";
 			}
-			return "Y";
+			return "";
+		} finally {
+			okAssetCheckMs += System.currentTimeMillis() - started;
 		}
-		return "";
 	}
 
 	private LabelBean createImagePathList(String content, String documentId,
@@ -1043,6 +1269,20 @@ public class CDRomStartConversionImpl {
 			List<InnerLinkReportBean> innerLinkReportBean) {
 		
 		List<InnerLinkReportBean> otherManualLists = null;
+		/*
+		 * KAPTURE LINK FORMS (2026-10-30, as the Bulk Extract job): content loaded by Job 10 / DMT carries
+		 * Kapture links, older content may still carry the InfoManager ones - BOTH are handled the legacy way:
+		 *   document link     Kapture  content/<id>[#anchor] (cdrom.innerlink.kapture.pattern, group 1 = id)
+		 *                     legacy   ...index?page=content&id=<id> (processHrefLink, unchanged)
+		 *                     -> <id>.html[#anchor] + the document added to the CD when it is not in it
+		 *   other manual link Kapture  result_mc?question_box= / result_mme?question_box= (cdrom.othermanualink.kapture.*)
+		 *                     legacy   rimtool.othermanualink.mc / .mme (unchanged)
+		 *                     -> its text
+		 * content/ with no id (the document was not found when the content was loaded) is left as it is.
+		 */
+		java.util.regex.Pattern kaptureInnerLink = kaptureInnerLinkPattern();
+		String kaptureOtherManualMc = ApplicationProperties.requireProperty("cdrom.othermanualink.kapture.mc.url.pattern").toLowerCase();
+		String kaptureOtherManualMme = ApplicationProperties.requireProperty("cdrom.othermanualink.kapture.mme.url.pattern").toLowerCase();
 		Document doc = Jsoup.parse(content);
 		Elements link = doc.getElementsByTag("a");
 		int count = 0;
@@ -1064,7 +1304,9 @@ public class CDRomStartConversionImpl {
 				 * 
 				 */
 				if(null!=linkHref && !"".equals(linkHref) && (linkHref.trim().toLowerCase().startsWith(ApplicationProperties.getProperty("rimtool.othermanualink.mc.url.pattern").trim().toLowerCase()) || 
-						linkHref.trim().toLowerCase().startsWith(ApplicationProperties.getProperty("rimtool.othermanualink.mme.url.pattern").trim().toLowerCase()))) 
+						linkHref.trim().toLowerCase().startsWith(ApplicationProperties.getProperty("rimtool.othermanualink.mme.url.pattern").trim().toLowerCase()) ||
+						linkHref.trim().toLowerCase().startsWith(kaptureOtherManualMc) ||
+						linkHref.trim().toLowerCase().startsWith(kaptureOtherManualMme)))
 				{
 					//el.removeAttr("href");
 					//el.attr("href","javascript:void(0);");
@@ -1080,7 +1322,15 @@ public class CDRomStartConversionImpl {
 				}
 				else
 				{
-					String newHref = processHrefLink(linkHref);
+					String anchor = "";
+					String newHref;
+					String[] kaptureLink = kaptureDocumentLink(linkHref, kaptureInnerLink);
+					if (null != kaptureLink) {
+						newHref = kaptureLink[0];
+						anchor = kaptureLink[1];
+					} else {
+						newHref = processHrefLink(linkHref);
+					}
 					if (StringUtils.isNotBlank(newHref)) {
 						if (!documentIdListFromFiles.contains(newHref)) {
 							InnerLinkReportBean temp = new InnerLinkReportBean();
@@ -1098,7 +1348,7 @@ public class CDRomStartConversionImpl {
 						 * replace element href value
 						 */
 						el.removeAttr("href");
-						el.attr("href",newHref+".html");
+						el.attr("href",newHref+".html"+anchor);
 //						content = content.replace(linkHref, newHref + ".html");
 					}
 				}
@@ -1133,6 +1383,78 @@ public class CDRomStartConversionImpl {
 		temp.setKey(String.valueOf(count));
 		temp.setValue(content);
 		return temp;
+	}
+
+	/** cdrom.innerlink.kapture.pattern / cdrom.wd.reflinks.kapture.pattern - compiled once per job */
+	private java.util.regex.Pattern kaptureInnerLinkPattern;
+	private java.util.regex.Pattern kaptureJsLinkPattern;
+
+	private java.util.regex.Pattern kaptureInnerLinkPattern() {
+		if (null == kaptureInnerLinkPattern) {
+			kaptureInnerLinkPattern = java.util.regex.Pattern.compile(
+					ApplicationProperties.requireProperty("cdrom.innerlink.kapture.pattern"), java.util.regex.Pattern.CASE_INSENSITIVE);
+		}
+		return kaptureInnerLinkPattern;
+	}
+
+	/**
+	 * Kapture link to another document: content/SM252326 -> {SM252326, ""}, content/SM252326#id0411 ->
+	 * {SM252326, "#id0411"}. null when the href is not one, or carries no document id (content/ = the
+	 * document was not found when the content was loaded).
+	 */
+	private static String[] kaptureDocumentLink(String href, java.util.regex.Pattern innerLinkPattern) {
+		if (null == href) {
+			return null;
+		}
+		String value = href.trim();
+		java.util.regex.Matcher m = innerLinkPattern.matcher(value);
+		if (!m.find()) {
+			return null;
+		}
+		int hash = value.indexOf('#', m.end(1));
+		return new String[] { m.group(1), hash < 0 ? "" : value.substring(hash) };
+	}
+
+	/**
+	 * KAPTURE DOCUMENT LINKS IN A WD JS LINE (window.js / voltage maps, MC + MME, 2026-10-30, as the Bulk
+	 * Extract job): DMT writes mazdagms3/content/<id> (cdrom.wd.reflinks.kapture.pattern, with or without a
+	 * leading "/") where InfoManager had <context>/index?page=detail_mc|detail_mme&id=<id> (handled by the
+	 * caller, unchanged). Each one is handled as the legacy form: the document is saved into sm_doc and the
+	 * link points to it. mazdagms3/content/ with no id (not mapped by DMT) is left as it is.
+	 */
+	private String rewriteKaptureJsLinks(String line, String docFolder, String locale, String selectedModel, String caller) {
+		if (null == kaptureJsLinkPattern) {
+			String key = ApplicationProperties.requireProperty("cdrom.wd.reflinks.kapture.pattern");
+			if (key.startsWith("/")) {
+				key = key.substring(1);
+			}
+			kaptureJsLinkPattern = java.util.regex.Pattern.compile(
+					"/?" + java.util.regex.Pattern.quote(key) + "([A-Za-z0-9_\\-]+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+		}
+		java.util.regex.Matcher m = kaptureJsLinkPattern.matcher(line);
+		StringBuffer out = null;
+		while (m.find()) {
+			if (null == out) {
+				out = new StringBuffer(line.length() + 64);
+			}
+			String docId = m.group(1);
+			String replacement = m.group(0);
+			try {
+				String xml = CDRomManualsDAO.getDocumentFromDocumentID(docId);
+				ServiceManualDocment document = getParseddocument(xml);
+				if (document != null && saveDocument(document, docFolder, docId, locale, selectedModel)) {
+					replacement = "../sm_doc/" + docId + ".html";
+				}
+			} catch (Exception e) {
+				Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), caller, e);
+			}
+			m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(replacement));
+		}
+		if (null == out) {
+			return line;
+		}
+		m.appendTail(out);
+		return out.toString();
 	}
 
 	private String processHrefLink(String nodeValue) {
@@ -1195,11 +1517,26 @@ public class CDRomStartConversionImpl {
 					// copyPDFDocuments and the CD folder layout + links keep the library/... form
 					document.setDJVUFileLocation(KaptureLibraryPath.withoutKaptureContext(fileLocation));
 				}
+				/*
+				 * OEM DOCUMENTS (2026-10-30). For MC OSM / SM of an OEM model (Isuzu, Toyota, Nissan, Suzuki ...) DMT does not
+				 * load the HTML into Kapture: it copies the material folder to OKAssets and the document carries only
+				 * OEM_FILE_LOCATION (no CONTENT). Handled like a DJVU document (saveFile): the folder is copied into the CD and
+				 * search / table of contents open the HTML itself - but the whole MATERIAL folder is copied, as DMT copied it,
+				 * because the HTML reaches its images / css in the sibling folders.
+				 */
+				if (StringUtils.isBlank(document.getDJVUFileLocation()) && root.getElementsByTagName("OEM_FILE_LOCATION") != null
+						&& root.getElementsByTagName("OEM_FILE_LOCATION").getLength() > 0) {
+					String oemLocation = KaptureLibraryPath.withoutKaptureContext(
+							root.getElementsByTagName("OEM_FILE_LOCATION").item(0).getTextContent().trim()).replace("\\", "/");
+					if (StringUtils.isNotBlank(oemLocation)) {
+						document.setDJVUFileLocation(oemLocation);
+						document.setOemFolder(oemMaterialFolder(oemLocation));
+					}
+				}
 				if (root.getElementsByTagName("ATTACHMENT") != null
 						&& root.getElementsByTagName("ATTACHMENT").getLength() > 0) {
-					String attachmentFileName = root
-							.getElementsByTagName("ATTACHMENT").item(0)
-							.getTextContent();
+					String attachmentFileName = Utilities.getAttachmentFileName(
+							(org.w3c.dom.Element) root.getElementsByTagName("ATTACHMENT").item(0));
 					document.setAttachment(attachmentFileName);
 				}
 			} else {
@@ -1213,6 +1550,20 @@ public class CDRomStartConversionImpl {
 		return document;
 	}
 
+	/**
+	 * /library/MAZDA/<CHANNEL>/<locale>/<model>/<manual>/<facelift>/<material>/.../x.html -> the path up to <material>
+	 * (8 folders), or the file's own folder when the path is shorter.
+	 */
+	private static String oemMaterialFolder(String oemLocation) {
+		String[] seg = oemLocation.replaceAll("^/+", "").split("/");
+		int keep = Math.min(8, seg.length - 1);
+		StringBuilder folder = new StringBuilder();
+		for (int i = 0; i < keep; i++) {
+			folder.append("/").append(seg[i]);
+		}
+		return folder.toString();
+	}
+
 	private void copyDocuments(String timeStamp, String networkPath, String fileLocation, String locale, String selectedModel)
 			throws IOException {
 		String folderPath = networkPath + "/CD_ROM_" + timeStamp + fileLocation;
@@ -1223,8 +1574,24 @@ public class CDRomStartConversionImpl {
 		if (!path.exists()) {
 			if (!path.mkdirs()) {
 				logger.info("getFolderPath :: Failed to create directory");
-			}else
-				copyFolder(source, path);
+			}else {
+				/*
+				 * THE WHOLE SHARED FOLDER IS COPIED BEFORE THE FIRST DOCUMENT OF IT IS COUNTED, so the History
+				 * page shows "Folder Copy" meanwhile (2026-10-30) - processed counts stay put until it is done.
+				 */
+				setCurrentStatus("schedule.current.status.folder.copy.value");
+				long copyStarted = System.currentTimeMillis();
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Folder copy - shared WD / e-WD folder", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+				try {
+					copyFolder(source, path);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
+				logger.info("copyDocuments :: folder {" + sourcePath + "} copied in "
+						+ (System.currentTimeMillis() - copyStarted) + " ms");
+			}
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("WD JS link rewrite (window.js, voltage maps)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED);
+				try {
 				modifyWindowJs(folderPath, fileLocation, locale, selectedModel);
 				/*
 				 * CAL FUNCTION TO MODIFY voltageMAP & voltagelinkMAP JS Files
@@ -1236,8 +1603,24 @@ public class CDRomStartConversionImpl {
 				 * CALL FUNCTION TO MODIFY default_act_main.js
 				 */
 				modifyDefaultActMainJS(folderPath);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+					setCurrentStatus("schedule.current.status.document.value");
+				}
 			}
 		}
+
+	/** Current status of the job and its manual type on the History page (a property key); never stops the job. */
+	private void setCurrentStatus(String statusKey) {
+		if (null == jobDao || null == abortScheduleId) {
+			return;
+		}
+		try {
+			jobDao.updateCurrentProcessingStatus(abortScheduleId, ApplicationProperties.getProperty(statusKey), currentDocType);
+		} catch (Exception e) {
+			Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "setCurrentStatus()", e);
+		}
+	}
 
 	private boolean modifyDefaultActMainJS(String folderPath)
 	{
@@ -1348,6 +1731,9 @@ public class CDRomStartConversionImpl {
 						}catch(Exception e){
 							Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "modifyWindowJs()", e);
 						}
+					}
+					if (!s.contains(indexPath)) {
+						s = rewriteKaptureJsLinks(s, docFolder, locale, selectedModel, "modifyWindowJs()");
 					}
 					totalStr += s;
 					totalStr = totalStr + "\n";
@@ -1474,6 +1860,9 @@ public class CDRomStartConversionImpl {
 							}catch(Exception e){
 								Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "modifyVoltageMapJs()", e);
 							}
+						}
+						if (!s.contains(indexPath)) {
+							s = rewriteKaptureJsLinks(s, docFolder, locale, selectedModel, "modifyVoltageMapJs()");
 						}
 						totalStr += s;
 						totalStr = totalStr + "\n";
@@ -1610,6 +1999,9 @@ public class CDRomStartConversionImpl {
 								Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "modifyVoltageLinkMapJs()", e);
 							}
 						}
+						if (!s.contains(indexPath)) {
+							s = rewriteKaptureJsLinks(s, docFolder, locale, selectedModel, "modifyVoltageLinkMapJs()");
+						}
 						totalStr += s;
 						totalStr = totalStr + "\n";
 					}
@@ -1685,7 +2077,7 @@ public class CDRomStartConversionImpl {
 				fileWriter.write("<a href=" + '"' + "pdf/"
 						+ lb.getValue() + '"' + ">" + lb.getKey()
 						+ "</a></br>");
-				String pdfResourcePath = CDRomDAO.getResourcePath(docId,locale);
+				String pdfResourcePath = publishedVersionFolder(docId,locale);
 				if (StringUtils.isNotBlank(pdfResourcePath)) {
 					processPDFFiles(pdfResourcePath, docFolder,
 							lb.getValue());
@@ -1722,7 +2114,9 @@ public class CDRomStartConversionImpl {
 						.getProperty("cdrom.image.server.path"), imagePath);
 				File source = new File(sourceImage);
 				try {
+					long opStarted = System.currentTimeMillis();
 					FileUtils.copyFileToDirectory(source, dest);
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File copy - image of a WD JS document (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, source.length());
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -1744,64 +2138,143 @@ public class CDRomStartConversionImpl {
 			if (!path.mkdirs()) {
 				logger.info("getFolderPath :: Failed to create directory");
 			}else{
-				copyFolder(source, path);
+				setCurrentStatus("schedule.current.status.folder.copy.value");
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Folder copy - shared PDF folder", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+				try {
+					copyFolder(source, path);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+					setCurrentStatus("schedule.current.status.document.value");
+				}
 			}
 		}
 		
 	}
 
+	/**
+	 * COPIES A FOLDER TREE: directories are created first, then the files are copied
+	 * cdrom.copy.parallel.threads at a time (2026-10-30). On the /s3kapture NFS mount each file costs
+	 * ~0.7 s whatever its size (MC Dev job 849: 5,220 e-WD files = 64 min one after another).
+	 */
 	public void copyFolder(File source, File destination) {
+		List<File[]> pairs = new ArrayList<File[]>();
+		collectFiles(source, destination, pairs);
+		copyFiles(pairs, false, null);
+	}
+
+	private void collectFiles(File source, File destination, List<File[]> pairs) {
+		long opStarted = System.currentTimeMillis();
 		if (source.isDirectory()) {
 			if (!destination.exists()) {
 				destination.mkdirs();
 			}
-
 			String files[] = source.list();
-
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("Folder - list source + create target directory", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted, 0L);
+			if (null == files) {
+				return;
+			}
 			for (String file : files) {
 				if(isScheduleAborted()) { break; }
-				File srcFile = new File(source, file);
-				File destFile = new File(destination, file);
-
-				copyFolder(srcFile, destFile);
+				collectFiles(new File(source, file), new File(destination, file), pairs);
 			}
 		} else {
-			InputStream in = null;
-			OutputStream out = null;
+			pairs.add(new File[] { source, destination });
+		}
+	}
 
+	/** How one copy ended: error null = copied. */
+	private static class CopyOutcome {
+		Exception error;
+		long finishedAt;
+	}
+
+	/** Told about every finished copy, on the copying thread. */
+	private interface CopyListener {
+		void copied(int pair, Exception error);
+	}
+
+	/**
+	 * COPIES {source, target} PAIRS, cdrom.copy.parallel.threads AT A TIME, on threads of this job only
+	 * (named after it, so its log lines stay together). intoDirectory: target is a directory and the file
+	 * keeps its name (FileUtils.copyFileToDirectory, as copyImages always did); else target is the file.
+	 * Stops taking new files once the schedule is aborted.
+	 *
+	 * @return one outcome per pair; null = not copied (aborted)
+	 */
+	private CopyOutcome[] copyFiles(final List<File[]> pairs, final boolean intoDirectory, final CopyListener listener) {
+		final CopyOutcome[] outcomes = new CopyOutcome[pairs.size()];
+		if (pairs.isEmpty()) {
+			return outcomes;
+		}
+		int threads = Math.min(ApplicationProperties.requirePositiveInt("cdrom.copy.parallel.threads"), pairs.size());
+		final String jobThread = Thread.currentThread().getName();
+		final java.util.concurrent.atomic.AtomicInteger next = new java.util.concurrent.atomic.AtomicInteger(0);
+		long started = System.currentTimeMillis();
+		Thread[] workers = new Thread[threads];
+		for (int t = 0; t < threads; t++) {
+			workers[t] = new Thread(new Runnable() {
+				public void run() {
+					while (true) {
+						int i = next.getAndIncrement();
+						if (i >= pairs.size() || isScheduleAborted()) {
+							return;
+						}
+						File source = pairs.get(i)[0];
+						File target = pairs.get(i)[1];
+						CopyOutcome outcome = new CopyOutcome();
+						long opStarted = System.currentTimeMillis();
+						try {
+							if (intoDirectory) {
+								FileUtils.copyFileToDirectory(source, target);
+							} else {
+								logger.info("copyFolder :: Source File :: >" + source.getAbsolutePath()
+										+ " :: Destination File :: >" + target.getAbsolutePath());
+								java.nio.file.Files.copy(source.toPath(), target.toPath(),
+										java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+							}
+						} catch (Exception e) {
+							outcome.error = e;
+							Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(),
+									intoDirectory ? "processImages()" : "copyFolder()", e);
+						}
+						outcome.finishedAt = new Date().getTime();
+						long opMs = outcome.finishedAt - opStarted;
+						long bytes = (null == outcome.error) ? (intoDirectory ? new File(target, source.getName()).length() : target.length()) : 0L;
+						com.mazda.gms3.cdrom.bean.CDRomJobTimings.op(intoDirectory ? "File copy - image (one file)" : "File copy - folder copy (one file)",
+								com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, opMs, bytes);
+						outcomes[i] = outcome;
+						if (null != listener) {
+							listener.copied(i, outcome.error);
+						}
+					}
+				}
+			}, jobThread + "_copy" + (t + 1));
+			workers[t].start();
+		}
+		for (Thread worker : workers) {
 			try {
-				logger.info("copyFolder :: Else Con :: Source File :: >"+ source.getAbsolutePath());
-				logger.info("copyFolder :: Else Con :: Destination File :: >"+ destination.getAbsolutePath());
-				in = new FileInputStream(source);
-				out = new FileOutputStream(destination);
-
-				byte[] buffer = new byte[1024];
-
-				int length;
-				while ((length = in.read(buffer)) > 0) {
-					if(isScheduleAborted()) { break; }
-					out.write(buffer, 0, length);
-				}
-			} catch (Exception e) {
-				try {
-					if(null!=in)
-					{
-						in.close();
-					}
-				} catch (IOException e1) {
-					Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "copyFolder()", e1);
-				}
-
-				try {
-					if(null!=out)
-					{
-						out.close();
-					}
-				} catch (IOException e1) {
-					Utilities.printStackTraceToLogs(CDRomStartConversionImpl.class.getName(), "copyFolder()", e1);
+				worker.join();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				logger.info("copyFiles :: interrupted while waiting for the copy threads.");
+				break;
+			}
+		}
+		int copied = 0;
+		int failed = 0;
+		for (CopyOutcome outcome : outcomes) {
+			if (null != outcome) {
+				if (null == outcome.error) {
+					copied++;
+				} else {
+					failed++;
 				}
 			}
 		}
+		logger.info("copyFiles :: " + pairs.size() + " files on " + threads + " threads :: " + copied + " copied, "
+				+ failed + " failed, " + (pairs.size() - copied - failed) + " not copied (abort) in "
+				+ (System.currentTimeMillis() - started) + " ms");
+		return outcomes;
 	}
 
 	private void parseAttachment(String root, ServiceManualDocment document,
@@ -1818,9 +2291,8 @@ public class CDRomStartConversionImpl {
 					String title = eElement
 							.getElementsByTagName("ATTACHMENT_TITLE").item(0)
 							.getTextContent();
-					String attachment = eElement
-							.getElementsByTagName("ATTACHMENT").item(0)
-							.getTextContent();
+					String attachment = Utilities.getAttachmentFileName(
+							(org.w3c.dom.Element) eElement.getElementsByTagName("ATTACHMENT").item(0));
 					/*
 					 * add this only when attachment is not null
 					 */

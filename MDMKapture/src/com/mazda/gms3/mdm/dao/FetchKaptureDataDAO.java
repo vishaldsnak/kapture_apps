@@ -3,6 +3,7 @@ package com.mazda.gms3.mdm.dao;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -865,6 +866,39 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 		return map;
 	}
 
+	/*
+	 * THE PARENT REFKEY COLUMN OF k_article_category IS NOT THE SAME ON EVERY KAPTURE DATABASE.
+	 * Kapture writes the misspelled parentcategroryrefkey; SC Dev also carries parentcategoryrefkey,
+	 * MC Dev does not (a hard COALESCE of both fails there with "Unknown column"). The table's real
+	 * columns are read once and whichever exist are used.
+	 */
+	private static String parentRefKeyColumn = null;
+
+	private static synchronized String parentRefKeyColumn(Connection conn) throws SQLException {
+		if (null == parentRefKeyColumn) {
+			boolean misspelled = false;
+			boolean correct = false;
+			PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM " + T_ARTICLE_CATEGORY + " WHERE 1=0");
+			ResultSet rs = pstmt.executeQuery();
+			ResultSetMetaData md = rs.getMetaData();
+			for (int i = 1; i <= md.getColumnCount(); i++) {
+				String column = md.getColumnName(i).toLowerCase();
+				misspelled = misspelled || "parentcategroryrefkey".equals(column);
+				correct = correct || "parentcategoryrefkey".equals(column);
+			}
+			rs.close();
+			pstmt.close();
+			if (misspelled && correct) {
+				parentRefKeyColumn = "COALESCE(parentcategroryrefkey, parentcategoryrefkey)";
+			} else if (misspelled || correct) {
+				parentRefKeyColumn = misspelled ? "parentcategroryrefkey" : "parentcategoryrefkey";
+			} else {
+				throw new SQLException(T_ARTICLE_CATEGORY + " has neither parentcategroryrefkey nor parentcategoryrefkey.");
+			}
+		}
+		return parentRefKeyColumn;
+	}
+
 	/**
 	 * KAPTURE REPLACEMENT FOR FetchIMDataDAO.prepareViewContentData() - the MNAO View Content
 	 * popup. Applicable to MNAO locales only, as before.
@@ -1038,7 +1072,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			 */
 			ArrayList<IMCategoryDetails> categoriesList = new ArrayList<IMCategoryDetails>();
 			sql = "SELECT categoryrefkey, categoryname, mastercategoryrefkey,"
-					+ " COALESCE(parentcategroryrefkey, parentcategoryrefkey) AS parentrefkey"
+					+ " " + parentRefKeyColumn(conn) + " AS parentrefkey"
 					+ " FROM " + T_ARTICLE_CATEGORY + " WHERE article_id = ? AND locale = ?";
 			pstmt = conn.prepareStatement(sql);
 			pstmt.setString(1, docDetails.getDocumentId());

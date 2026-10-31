@@ -47,6 +47,8 @@ import com.mazda.gms3.mdm.utils.AbortCheck;
 
 public class CDRomScheduleServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
+	/** The parallel jobs check and the insert of the new schedule run under this lock (two clicks at once). */
+	private static final Object SCHEDULE_LOCK = new Object();
 
 	static Logger logger = LogManager.getLogger(CDRomScheduleServlet.class);
 	String wslId = "";
@@ -412,7 +414,36 @@ public class CDRomScheduleServlet extends HttpServlet {
 				
 				schDetails.setItemsList(finalItemsList);
 				
-				Long scheduleId = CDRomDAO.createSchedule(schDetails);
+				/*
+				 * PARALLEL CD JOBS CAP (2026-10-30, as DMT JobRules): at most cdrom.max.parallel.jobs CD jobs
+				 * Pending / Processing at once. Each job copies its files on cdrom.copy.parallel.threads threads,
+				 * so this also bounds the load on the /s3kapture mount. Finished, failed and aborted jobs do not count.
+				 */
+				Long scheduleId = null;
+				synchronized (SCHEDULE_LOCK)
+				{
+					try
+					{
+						int maxJobs = ApplicationProperties.requirePositiveInt("cdrom.max.parallel.jobs");
+						List<String> activeJobs = CDRomDAO.getActiveExtractionJobs();
+						if (activeJobs.size() >= maxJobs)
+						{
+							logger.info("scheduleJobOperation :: refused - " + activeJobs.size() + " CD jobs Pending / Processing, limit "
+									+ maxJobs + " :: " + activeJobs);
+							sessionBean.setErrorMessage(msgProps.getMessage(new String[] { String.valueOf(maxJobs),
+									String.join(" / ", activeJobs) }, "error.job.limit.reached"));
+							return false;
+						}
+					}
+					catch (Exception e)
+					{
+						// the cap cannot be checked - nothing is scheduled
+						Utilities.printStackTraceToLogs(CDRomScheduleServlet.class.getName(), "scheduleJobOperation()", e);
+						sessionBean.setErrorMessage(msgProps.getProperty("error.job.schedule.failure"));
+						return false;
+					}
+					scheduleId = CDRomDAO.createSchedule(schDetails);
+				}
 				if(null!=scheduleId && scheduleId>0)
 				{
 					logger.info("scheduleJobOperation :: Job {"+schDetails.getScheduleName()+"} Scheduled Successfully.");
@@ -445,6 +476,9 @@ public class CDRomScheduleServlet extends HttpServlet {
 					String threadId = ApplicationProperties.getProperty("schedule.name.key") + String.valueOf(scheduleId);
 					final CDRomSearchBean searchBean = getSessionBean(request);
 					final CDRomStartConversionImpl startConvImpl = new CDRomStartConversionImpl();
+					// the user id is a SERVLET field shared by every request - read it once here, so a second
+					// user scheduling a CD while this job runs cannot change whose job this is
+					final String jobWslId = wslId;
 					final String scheduleName = ApplicationProperties.getProperty("schedule.name.key")+ timeStamp+ "_"+ String.valueOf(scheduleId);
 					
 					final CDRomUtil cdromUtil = new CDRomUtil();
@@ -459,9 +493,29 @@ public class CDRomScheduleServlet extends HttpServlet {
 					final String abortScheduleId = String.valueOf(scheduleIdForJob);
 					AbortCheck cdAbortCheck = new AbortCheck()
 					{
+						/*
+						 * THROTTLED like CDRomStartConversionImpl.isScheduleAborted - the zip asks once per
+						 * 1 KB written, and one DB round trip each (~360 ms on MC Dev) made a zip take hours.
+						 * An abort is sticky and is noticed within ~11 s (a check costs ~733 ms on MC Dev, so the
+						 * interval runs from the END of a check - from the start, every call went to the DB).
+						 */
+						private boolean aborted = false;
+						private long lastCheck = 0L;
 						public boolean isAborted()
 						{
-							return CDRomDAO.isAborted(abortScheduleId);
+							if(aborted)
+							{
+								return true;
+							}
+							long now = System.currentTimeMillis();
+							// 10 s from the END of the last check - see CDRomStartConversionImpl.ABORT_CHECK_INTERVAL_MS
+							if(now - lastCheck < 10000L)
+							{
+								return false;
+							}
+							aborted = CDRomDAO.isAborted(abortScheduleId);
+							lastCheck = System.currentTimeMillis();
+							return aborted;
 						}
 					};
 					cdromUtil.setAbortCheck(cdAbortCheck);
@@ -472,10 +526,16 @@ public class CDRomScheduleServlet extends HttpServlet {
 							synchronized (startConvImpl) {
 								logger.info("Thread starts here for schedule id : "
 										+ String.valueOf(scheduleIdForJob));
+								/*
+								 * WHERE THIS JOB SPENDS ITS TIME (2026-10-30) - summary logged just before the job ends
+								 * (and on abort / error, in the finally below). See CDRomJobTimings.
+								 */
+								final com.mazda.gms3.cdrom.bean.CDRomJobTimings jobTimings = com.mazda.gms3.cdrom.bean.CDRomJobTimings.start(scheduleName);
+								try {
 
 								cdromUtil.getDocumentData(locale, carLineCode,
 										vdsCode, vinStartRange, wmiCode,scheduleTimeStamp,
-										modelName, wslId, startConvImpl, networkPath,
+										modelName, jobWslId, startConvImpl, networkPath,
 										keywordSearchList, viewContentList,
 										firstLevelCatList, searchBean, okAssetReportBean,
 										innerLinkReportBean, transactionReportBean,
@@ -514,7 +574,12 @@ public class CDRomScheduleServlet extends HttpServlet {
 													"");
 
 											// call function to identify applicable vin list
-											applicableVINList = cdromDAO.getApplicableVINList(docList, modelNameEng, carLineCode,wmiCode,locale);
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Applicable VIN list (DB)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB);
+											try {
+												applicableVINList = cdromDAO.getApplicableVINList(docList, modelNameEng, carLineCode,wmiCode,locale);
+											} finally {
+												com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+											}
 										}
 										docList=  null;
 
@@ -526,22 +591,37 @@ public class CDRomScheduleServlet extends HttpServlet {
 										 * thread at whatever point the user clicked and none of it ran.
 										 */
 										if(CDRomDAO.isAborted(abortScheduleId)) { return; }
-										cdromUtil.copyHTML(scheduleTimeStamp, networkPath, applicableVINList,locale);
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Copy HTML viewer files", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+										try {
+											cdromUtil.copyHTML(scheduleTimeStamp, networkPath, applicableVINList,locale);
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
 										//	CDRomUtil.createJson(keywordSearchList, viewContentList,
 										//	scheduleTimeStamp, firstLevelCatList, networkPath,
 										//	modelName, carLineCode, vdsCode, vinStartRange,
 										//	selectedManualTypesAll, searchBean);
 
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Create JSON (search / view files)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED);
+										try {
 										cdromUtil.createJson(keywordSearchList, viewContentList,
 												scheduleTimeStamp, firstLevelCatList, networkPath,
 												modelName, carLineCode, vdsCode, vinStartRange,
 												searchBean, itemsListForSchedule,locale,wmiCode);
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Create reports (Excel)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.MIXED);
+										try {
 										cdromUtil.createReports(networkPath, scheduleTimeStamp,
 												okAssetReportBean, innerLinkReportBean,
-												transactionReportBean, wslId, scheduleName,
+												transactionReportBean, jobWslId, scheduleName,
 												locale, modelName, carLineCode, wmiCode,
 												vdsCode, vinStartRange,
 												documentFailureReportBean);
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
 										cdromDAO.updateCurrentProcessingStatus(
 												String.valueOf(scheduleIdForJob),
 												ApplicationProperties
@@ -555,9 +635,20 @@ public class CDRomScheduleServlet extends HttpServlet {
 										 */
 										if(CDRomDAO.isAborted(abortScheduleId)) { return; }
 										cdromZip.initialize(networkPath+ "/CD_ROM_" + scheduleTimeStamp + ".zip", networkPath	+ "/CD_ROM_" + scheduleTimeStamp);
-										cdromZip.generateFileList(new File(networkPath	+ "/CD_ROM_" + scheduleTimeStamp));
-										boolean zipFlag = cdromZip.zipIt(networkPath + "/CD_ROM_" + scheduleTimeStamp
-												+ ".zip");
+										boolean zipFlag;
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Zip - CD folder (list files)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+										try {
+											cdromZip.generateFileList(new File(networkPath	+ "/CD_ROM_" + scheduleTimeStamp));
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Zip - CD folder (read, compress, write the zip)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+										try {
+											zipFlag = cdromZip.zipIt(networkPath + "/CD_ROM_" + scheduleTimeStamp
+													+ ".zip");
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
 										String zipFileName = networkPath + "/CD_ROM_"
 												+ scheduleTimeStamp + ".zip";
 										
@@ -591,11 +682,18 @@ public class CDRomScheduleServlet extends HttpServlet {
 //												networkPath + "/CD_ROM_" + scheduleTimeStamp
 //												+ "_Reports.zip", networkPath
 //												+ "/CD_ROM_" + scheduleTimeStamp + "_Reports");
+										com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Zip - reports", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+										try {
 										cdromReportZip.generateFileList(new File(networkPath
 												+ "/CD_ROM_" + scheduleTimeStamp + "_Reports"));
 										cdromReportZip.zipIt(networkPath + "/CD_ROM_"
 												+ scheduleTimeStamp + "_Reports.zip");
-										
+										} finally {
+											com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+										}
+										// the summary goes out BEFORE the job is marked finished
+										jobTimings.logSummary(logger);
+
 										cdromDAO.updateCurrentProcessingStatus(
 												String.valueOf(scheduleIdForJob),
 												ApplicationProperties
@@ -629,6 +727,7 @@ public class CDRomScheduleServlet extends HttpServlet {
 													.getProperty("schedule.status.failure.value"));
 										}
 									} else {
+										jobTimings.logSummary(logger);
 										cdromDAO.updateCurrentProcessingStatus(
 												String.valueOf(scheduleIdForJob),
 												ApplicationProperties
@@ -647,6 +746,7 @@ public class CDRomScheduleServlet extends HttpServlet {
 									logger.info("scheduleJob :: ################ Exception ################");
 									Utilities.printStackTraceToLogs(CDRomDAO.class.getName(),
 											"scheduleJob()", e);
+									jobTimings.logSummary(logger);
 									/*
 									 * Complete Job & Mark Status as Failure
 									 */
@@ -670,6 +770,11 @@ public class CDRomScheduleServlet extends HttpServlet {
 									}
 									
 									logger.info("scheduleJob :: ################ Exception ################");
+								}
+								} finally {
+									// aborted / ended early: the summary still goes out (once)
+									jobTimings.logSummary(logger);
+									com.mazda.gms3.cdrom.bean.CDRomJobTimings.clear();
 								}
 							}
 						}

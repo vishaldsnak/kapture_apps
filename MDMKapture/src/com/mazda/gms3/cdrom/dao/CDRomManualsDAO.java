@@ -1,6 +1,7 @@
 package com.mazda.gms3.cdrom.dao;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -12,6 +13,7 @@ import org.apache.commons.lang.StringUtils;
 import com.mazda.gms3.cdrom.bean.KeyWordSearchBean;
 import com.mazda.gms3.cdrom.bean.LabelBean;
 import com.mazda.gms3.cdrom.bean.ViewContentBean;
+import com.mazda.gms3.mdm.dao.KapturePublishedContentDAO;
 import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
@@ -45,17 +47,40 @@ public class CDRomManualsDAO extends DBConnectionHelper {
 			if (null != documentIdList && documentIdList.size() > 0 && null!=locale && !"".equals(locale))
 			{
 				String localeToCheck = locale.trim().replace("-", "_");
+				long started = System.currentTimeMillis();
+				/*
+				 * THE NEWEST PUBLISHED VERSION OF EVERY DOCUMENT, LOOKED UP IN BATCHES - one query per
+				 * 500 documents instead of one CMS connection + query per document (~495 ms each on
+				 * MC Dev). null = the batch lookup failed, so each document is looked up on its own.
+				 */
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Pre-read - published versions (Kapture CMS DB, batched)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB);
+				java.util.Map<String, KapturePublishedContentDAO.PublishedVersion> versions;
+				try {
+					versions = KapturePublishedContentDAO.findLatestPublishedBatch(documentIdList, localeToCheck);
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
+				logger.info("getDocumentRecordIdAndXMLForManual :: published versions looked up for "
+						+ documentIdList.size() + " documents in " + (System.currentTimeMillis() - started)
+						+ " ms" + (null == versions ? " - BATCH FAILED, one lookup per document" : ""));
 				/*
 				 * ITERATE LIST AND FOR EACH DOCUMENT ID USING LOCALE SEARCH FOR THE NEWEST
 				 * PUBLISHED VERSION - ONLY THESE DOCUMENTS WILL BE COUNTED AS ACTUAL DOCUMENTS
 				 */
+				com.mazda.gms3.cdrom.bean.CDRomJobTimings.begin("Pre-read - document XML (read from the content store)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE);
+				try {
 				for (String docId : documentIdList) {
 					if(null==docId || "".equals(docId.trim()))
 					{
 						continue;
 					}
-					LabelBean clDetails = CDRomKaptureContentDAO
-							.getPublishedChannelNode(docId.trim(), localeToCheck);
+					long opStarted = System.currentTimeMillis();
+					LabelBean clDetails = (null == versions)
+							? CDRomKaptureContentDAO.getPublishedChannelNode(docId.trim(), localeToCheck)
+							: CDRomKaptureContentDAO.getPublishedChannelNode(docId.trim(), localeToCheck,
+									versions.get(docId.trim().toLowerCase()));
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("File read - document XML (one file)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.FILE, System.currentTimeMillis() - opStarted,
+							null == clDetails || null == clDetails.getValue() ? 0L : clDetails.getValue().length());
 					if(null!=clDetails)
 					{
 						// the caller reads the document id off extraAttribute - kept as it was
@@ -68,6 +93,11 @@ public class CDRomManualsDAO extends DBConnectionHelper {
 								+ docId.trim() + "} / {" + localeToCheck + "} - not added to the CD.");
 					}
 				}
+				} finally {
+					com.mazda.gms3.cdrom.bean.CDRomJobTimings.end();
+				}
+				logger.info("getDocumentRecordIdAndXMLForManual :: " + docList.size() + " of "
+						+ documentIdList.size() + " documents read in " + (System.currentTimeMillis() - started) + " ms");
 			}
 		} catch (Exception e) {
 			logger.info("getDocumentRecordIdAndXMLForManual :: ################ Exception ################");
@@ -128,6 +158,207 @@ public class CDRomManualsDAO extends DBConnectionHelper {
 		logger.info("getDocumentID :: called for record id {" + key + "} - this lookup is obsolete,"
 				+ " the document id is carried on LabelBean. Returning blank.");
 		return "";
+	}
+
+	/** Documents per IN (...) list in the batch lookups below. */
+	private static final int LOOKUP_CHUNK = 500;
+
+	/** input ids by trimmed lower-case key, first spelling kept, blanks dropped */
+	private static java.util.LinkedHashMap<String, String> lookupKeys(List<String> documentIds) {
+		java.util.LinkedHashMap<String, String> keys = new java.util.LinkedHashMap<String, String>();
+		if (null != documentIds) {
+			for (String id : documentIds) {
+				if (null != id && !"".equals(id.trim()) && !keys.containsKey(id.trim().toLowerCase())) {
+					keys.put(id.trim().toLowerCase(), id.trim());
+				}
+			}
+		}
+		return keys;
+	}
+
+	private static String placeholders(int n) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < n; i++) {
+			sb.append(i == 0 ? "?" : ",?");
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * getKeyWordSearchDetails FOR MANY DOCUMENTS AT ONCE - same table, same row, one query per
+	 * LOOKUP_CHUNK documents instead of one per document (~360 ms each on MC Dev).
+	 *
+	 * @return trimmed lower-case document id -> bean (a document with no row is absent);
+	 *         null when the lookup failed - the caller then asks per document.
+	 */
+	public static java.util.Map<String, KeyWordSearchBean> getKeyWordSearchDetailsBatch(List<String> documentIds,
+			String vinLocale, String docType) {
+		long started = System.currentTimeMillis();
+		java.util.Map<String, KeyWordSearchBean> result = new java.util.HashMap<String, KeyWordSearchBean>();
+		java.util.LinkedHashMap<String, String> keys = lookupKeys(documentIds);
+		if (keys.isEmpty()) {
+			return result;
+		}
+		vinLocale = vinLocale.replace('-', '_');
+		String tableName;
+		if (vinLocale.trim().toLowerCase().equals(ApplicationProperties.getProperty("ja_jp").trim().toLowerCase())
+				|| vinLocale.trim().toLowerCase().equals(ApplicationProperties.getProperty("en_jp").trim().toLowerCase())) {
+			// MC MARKET LOCALE
+			tableName = "gms3_vc_japan_vin_details";
+		} else {
+			// MME MARKET LOCALE
+			tableName = "gms3_vc_mme_vin_dtl_" + Utilities.tableLocale(vinLocale);
+		}
+		List<String> ids = new ArrayList<String>(keys.values());
+		Connection conn = null;
+		try {
+			conn = getConnection();
+			for (int from = 0; from < ids.size(); from += LOOKUP_CHUNK) {
+				List<String> chunk = ids.subList(from, Math.min(from + LOOKUP_CHUNK, ids.size()));
+				String sql = "Select TRIM(vc_vin_document_id) AS doc_id, vc_vin_document_title,"
+						+ "  vc_vin_category_name_1, vc_vin_category_name_2, vc_vin_category_name_3 "
+						+ " from " + tableName + " "
+						+ "  where TRIM(vc_vin_document_id) IN (" + placeholders(chunk.size()) + ")"
+						+ " GROUP BY TRIM(vc_vin_document_id), vc_vin_document_title, vc_vin_category_name_1, "
+						+ " vc_vin_category_name_2, vc_vin_category_name_3";
+				PreparedStatement pstmt = null;
+				ResultSet rs = null;
+				try {
+					pstmt = conn.prepareStatement(sql);
+					for (int i = 0; i < chunk.size(); i++) {
+						pstmt.setString(i + 1, chunk.get(i));
+					}
+					rs = pstmt.executeQuery();
+					while (rs.next()) {
+						String key = (null == rs.getString("doc_id") ? "" : rs.getString("doc_id").trim().toLowerCase());
+						// the first row of a document, as getKeyWordSearchDetails takes it
+						if (!keys.containsKey(key) || result.containsKey(key)) {
+							continue;
+						}
+						KeyWordSearchBean keyBean = new KeyWordSearchBean();
+						keyBean.setDocumentId(keys.get(key));
+						keyBean.setTitle(rs.getString("vc_vin_document_title"));
+						keyBean.setESICat1(rs.getString("vc_vin_category_name_1"));
+						keyBean.setESICat2(rs.getString("vc_vin_category_name_2"));
+						keyBean.setESICat3(rs.getString("vc_vin_category_name_3"));
+						keyBean.setManualType(docType);
+						result.put(key, keyBean);
+					}
+				} finally {
+					if (null != rs)
+						rs.close();
+					if (null != pstmt)
+						pstmt.close();
+				}
+			}
+		} catch (Exception e) {
+			Utilities.printStackTraceToLogs(CDRomManualsDAO.class.getName(), "getKeyWordSearchDetailsBatch()", e);
+			return null;
+		} finally {
+			if (null != conn) {
+				try {
+					conn.close();
+				} catch (Exception ignore) {
+					// nothing useful to do here
+				}
+			}
+		}
+		logger.info("getKeyWordSearchDetailsBatch :: " + tableName + " :: " + result.size() + " of " + keys.size()
+				+ " documents found in " + (System.currentTimeMillis() - started) + " ms");
+		return result;
+	}
+
+	/**
+	 * getViewDetailsFromCDRom FOR MANY DOCUMENTS AT ONCE - the same two tables in the same order (the
+	 * first table that has the document wins), one query per table per LOOKUP_CHUNK documents.
+	 *
+	 * @return trimmed lower-case document id -> bean (a document with no row is absent);
+	 *         null when the lookup failed - the caller then asks per document.
+	 */
+	public static java.util.Map<String, ViewContentBean> getViewDetailsFromCDRomBatch(List<String> documentIds,
+			String locale) {
+		long started = System.currentTimeMillis();
+		java.util.Map<String, ViewContentBean> result = new java.util.HashMap<String, ViewContentBean>();
+		java.util.LinkedHashMap<String, String> keys = lookupKeys(documentIds);
+		if (keys.isEmpty() || null == locale || "".equals(locale)) {
+			return result;
+		}
+		String tableName;
+		if (locale.replace("-", "_").trim().toLowerCase().equals(ApplicationProperties.getProperty("ja_jp").trim().toLowerCase())
+				|| locale.replace("-", "_").trim().toLowerCase().equals(ApplicationProperties.getProperty("en_jp").trim().toLowerCase())) {
+			// MC MARKET LOCALE
+			tableName = "gms3_dmt_mc_newm_cd_data,gms3_dmt_mc_cd_data";
+		} else {
+			// MME MARKET LOCALE
+			tableName = "gms3_dmt_" + Utilities.tableLocale(locale) + "_nm_cd_data";
+			tableName += ",gms3_dmt_" + Utilities.tableLocale(locale) + "_cd_data";
+		}
+		Connection conn = null;
+		try {
+			conn = getConnection();
+			for (String table : tableName.split(",")) {
+				// only the documents the earlier table did not have
+				List<String> ids = new ArrayList<String>();
+				for (java.util.Map.Entry<String, String> e : keys.entrySet()) {
+					if (!result.containsKey(e.getKey())) {
+						ids.add(e.getValue());
+					}
+				}
+				for (int from = 0; from < ids.size(); from += LOOKUP_CHUNK) {
+					List<String> chunk = ids.subList(from, Math.min(from + LOOKUP_CHUNK, ids.size()));
+					String sql = "SELECT dc_im_doc_id, dc_title, dc_cd_dispord_name_level_1,dc_cd_dispord_name_level_2, dc_cd_dispord_name_level_3, dc_cd_dispord_name_level_4, "
+							+ " dc_cd_dispord_name_level_5,dc_cd_dispord_name_level_6,dc_cd_dispord_name_level_7,"
+							+ " dc_sequence_no FROM " + table + " WHERE dc_im_doc_id IN (" + placeholders(chunk.size()) + ")";
+					PreparedStatement pstmt = null;
+					ResultSet rs = null;
+					try {
+						pstmt = conn.prepareStatement(sql);
+						for (int i = 0; i < chunk.size(); i++) {
+							pstmt.setString(i + 1, chunk.get(i));
+						}
+						rs = pstmt.executeQuery();
+						while (rs.next()) {
+							String key = (null == rs.getString("dc_im_doc_id") ? "" : rs.getString("dc_im_doc_id").trim().toLowerCase());
+							// the first row of a document, as getViewDetailsFromCDRom takes it
+							if (!keys.containsKey(key) || result.containsKey(key)) {
+								continue;
+							}
+							ViewContentBean viewBean = new ViewContentBean();
+							viewBean.setDocumentId(keys.get(key));
+							viewBean.setTitle(rs.getString("dc_title"));
+							viewBean.setSequencenumber(rs.getString("dc_sequence_no"));
+							viewBean.setDisplayLevel1(rs.getString("dc_cd_dispord_name_level_1"));
+							viewBean.setDisplayLevel2(rs.getString("dc_cd_dispord_name_level_2"));
+							viewBean.setDisplayLevel3(rs.getString("dc_cd_dispord_name_level_3"));
+							viewBean.setDisplayLevel4(rs.getString("dc_cd_dispord_name_level_4"));
+							viewBean.setDisplayLevel5(rs.getString("dc_cd_dispord_name_level_5"));
+							viewBean.setDisplayLevel6(rs.getString("dc_cd_dispord_name_level_6"));
+							viewBean.setDisplayLevel7(rs.getString("dc_cd_dispord_name_level_7"));
+							result.put(key, viewBean);
+						}
+					} finally {
+						if (null != rs)
+							rs.close();
+						if (null != pstmt)
+							pstmt.close();
+					}
+				}
+			}
+		} catch (Exception e) {
+			Utilities.printStackTraceToLogs(CDRomManualsDAO.class.getName(), "getViewDetailsFromCDRomBatch()", e);
+			return null;
+		} finally {
+			if (null != conn) {
+				try {
+					conn.close();
+				} catch (Exception ignore) {
+					// nothing useful to do here
+				}
+			}
+		}
+		logger.info("getViewDetailsFromCDRomBatch :: " + tableName + " :: " + result.size() + " of " + keys.size()
+				+ " documents found in " + (System.currentTimeMillis() - started) + " ms");
+		return result;
 	}
 
 	public static KeyWordSearchBean getKeyWordSearchDetails(String documentId,

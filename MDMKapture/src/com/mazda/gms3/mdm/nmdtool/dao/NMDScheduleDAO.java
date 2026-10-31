@@ -614,6 +614,21 @@ public class NMDScheduleDAO extends DBConnectionHelper{
 	}
 
 	
+	/**
+	 * HISTORY / EXPORT DATE FILTER - [start of fromDate, start of the day after toDate), bound as
+	 * timestamps through the driver (DMTKapture ScheduleDAO pattern). DATE_FORMAT on the stored value
+	 * compared the database's clock with the application's date, so a row late in the day fell on
+	 * the next date and was missing until To Date was moved a day on.
+	 */
+	private static Timestamp[] dayRange(String fromDate, String toDate) throws java.text.ParseException {
+		java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("yyyy-MM-dd");
+		day.setLenient(false);
+		java.util.Calendar to = java.util.Calendar.getInstance();
+		to.setTime(day.parse(toDate.trim()));
+		to.add(java.util.Calendar.DATE, 1);
+		return new Timestamp[] { new Timestamp(day.parse(fromDate.trim()).getTime()), new Timestamp(to.getTimeInMillis()) };
+	}
+
 	public static List<NMDJobDetails> getJobsList(String fromDate, String toDate)
 	{
 		List<NMDJobDetails> jobsList = null;
@@ -629,11 +644,17 @@ public class NMDScheduleDAO extends DBConnectionHelper{
 				
 			if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
 			{
-				sql = sql+" AND DATE_FORMAT(a.nmd_job_start_time,'%Y-%m-%d') BETWEEN '"+fromDate+"' AND '"+toDate+"' ";
+				sql = sql+" AND a.nmd_job_start_time >= ? AND a.nmd_job_start_time < ? ";
 			}
 			sql+= " ORDER BY a.nmd_job_id DESC";
 			logger.info("getJobsList :: Sql :: >"+ sql);
 			pstmt = conn.prepareStatement(sql);
+			if(null!=fromDate && !"".equals(fromDate) && null!=toDate && !"".equals(toDate))
+			{
+				Timestamp[] range = dayRange(fromDate, toDate);
+				pstmt.setTimestamp(1, range[0]);
+				pstmt.setTimestamp(2, range[1]);
+			}
 			rs = pstmt.executeQuery();
 			NMDJobDetails jd = null;
 			int count=0;

@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import com.mazda.gms3.cdrom.bean.CDRomJobTimings;
 import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.rmitool.dao.RMIExportTransactionDAO;
@@ -61,10 +62,11 @@ public class RMIExportScheduleImpl {
 	 * thread any more, so the worker stops itself by reading the status the screen already wrote.
 	 *
 	 * Throttled: the answer is cached for ABORT_CHECK_INTERVAL_MS and latches once aborted, so a
-	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is half a second
-	 * behind the click - the rest of any delay is the operation already in flight.
+	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is ~11 s
+	 * behind the click (2026-10-30: 10 s from the END of the last check - one check costs ~733 ms on
+	 * MC Dev, so 500 ms from the START sent every call to the DB) - the rest of any delay is the operation already in flight.
 	 */
-	private static final long ABORT_CHECK_INTERVAL_MS = 500L;
+	private static final long ABORT_CHECK_INTERVAL_MS = 10000L;
 
 	private long lastAbortCheckTime = 0L;
 
@@ -87,19 +89,24 @@ public class RMIExportScheduleImpl {
 		{
 			return false;
 		}
-		lastAbortCheckTime = now;
 		scheduleAborted = RMIExportToolDAO.isAborted(abortScheduleId);
 		if(scheduleAborted==true)
 		{
 			logger.info("isScheduleAborted :: SCHEDULE {"+abortScheduleId+"} WAS ABORTED FROM THE"
 					+" SCREEN. Stopping after the item in flight.");
 		}
+		// the next check is due ABORT_CHECK_INTERVAL_MS after this one ENDED
+		lastAbortCheckTime = System.currentTimeMillis();
 		return scheduleAborted;
 	}
 	public void startProcessing(RMIExportToolScheduleDetails schDetails)
 	{
 		// remember the schedule so the abort check works in the helpers
 		abortScheduleId = String.valueOf(schDetails.getScheduleId());
+		// where the job spends its time - TIMING SUMMARY logged at the end, as CD Creation (CDRomJobTimings)
+		CDRomJobTimings jobTimings = CDRomJobTimings.start(schDetails.getScheduleName(), "RMI EXPORT JOB",
+				"Export folder: "+ApplicationProperties.getProperty("rmitool.working.dir.folder.path")
+				+" | reports: "+ApplicationProperties.getProperty("rmitool.reports.folder.path"));
 		String threadId = null;
 		try
 		{
@@ -138,7 +145,17 @@ public class RMIExportScheduleImpl {
 					/*
 					 * call Function for itemsProcessing
 					 */
-					startItemsProcessing(itemDetails);
+					CDRomJobTimings.begin("Export documents - "+itemDetails.getChannelName()
+							+(null!=itemDetails.getDocumentType() && !"".equals(itemDetails.getDocumentType()) ? " / "+itemDetails.getDocumentType() : "")
+							+" ("+(null==itemDetails.getDocumentIdsList() ? 0 : itemDetails.getDocumentIdsList().size())+" documents)", CDRomJobTimings.MIXED);
+					try
+					{
+						startItemsProcessing(itemDetails);
+					}
+					finally
+					{
+						CDRomJobTimings.end();
+					}
 					itemDetails = null;
 				}
 				itemDetails = null;
@@ -164,9 +181,18 @@ public class RMIExportScheduleImpl {
 					 * 		PREPARE ITS RELATIVE PATH AND REPLACE IT WITH SORUCE PATH IN THE <A> TAGS
 					 * 		REWRITE THE XML IN THE RMI TOOL WORKING DIRECTORY
 					 */
-					startInnerLinkProcessing(path);
+					CDRomJobTimings.begin("Inner links - rewrite exported XMLs", CDRomJobTimings.FILE);
+					try
+					{
+						startInnerLinkProcessing(path);
+					}
+					finally
+					{
+						CDRomJobTimings.end();
+					}
 				}
 
+				CDRomJobTimings.begin("View content reports (xlsx)", CDRomJobTimings.FILE);
 				/*
 				 * GENERATE CHANNEL WISE VIEW CONTNET LIST REPORT
 				 */
@@ -188,6 +214,7 @@ public class RMIExportScheduleImpl {
 					printUtils.printSIChannelViewContentReport(siViewContentList, String.valueOf(schDetails.getScheduleId()));
 				}
 				
+				CDRomJobTimings.end();
 				String customScheduleErrorMessage = null;
 
 				/*
@@ -204,7 +231,9 @@ public class RMIExportScheduleImpl {
 				 */
 				if(isScheduleAborted()) { return; }
 
+				CDRomJobTimings.begin("XML zip", CDRomJobTimings.FILE);
 				boolean createWDZipFlag = printUtils.createWorkingDirZip(path, String.valueOf(schDetails.getScheduleId()));
+				CDRomJobTimings.end();
 				if (createWDZipFlag == true) 
 				{
 					logger.info("startProcessing() :: XML Files Zipped Successfully.");
@@ -222,6 +251,7 @@ public class RMIExportScheduleImpl {
 				 * PRINT REPORTS
 				 * AND GENERATE ZIP FILE OF REPORTS
 				 */
+				CDRomJobTimings.begin("Reports (xlsx) + reports zip", CDRomJobTimings.FILE);
 				if(null!=transactionList && transactionList.size()>0)
 				{
 					printUtils.printTransactionReport(transactionList, String.valueOf(schDetails.getScheduleId()), transactionDAO);
@@ -247,6 +277,7 @@ public class RMIExportScheduleImpl {
 				 * call function to generate zip file
 				 */
 				boolean bool = printUtils.createReportsZip(path, String.valueOf(schDetails.getScheduleId()));
+				CDRomJobTimings.end();
 				if (bool == true) 
 				{
 					logger.info("startProcessing() :: Reports Zipped Successfully.");
@@ -264,6 +295,7 @@ public class RMIExportScheduleImpl {
 				 * UPDATE SCHEDULE STATUS NOW - PROCESSING STATUS AS COMPLETED AND 
 				 * COMPLETION STATUS BASED ON anyErrorReceivedDuringCompleteSchedule FLAG VALUE
 				 */
+				CDRomJobTimings.begin("Status update + notification e-mail", CDRomJobTimings.MIXED);
 				String schStatus=null;
 				if(anyErrorReceivedDuringCompleteSchedule==true)
 				{
@@ -291,6 +323,7 @@ public class RMIExportScheduleImpl {
 				 */
 				sendEmailNotification(String.valueOf(schDetails.getScheduleId()), schStatus, schDetails.getScheduleName(), schDetails.getWslId());
 				schStatus = null;
+				CDRomJobTimings.end();
 			}
 			else
 			{
@@ -314,6 +347,11 @@ public class RMIExportScheduleImpl {
 			// close all active connection & client objects
 			try
 			{
+				// History counts are buffered (RMIExportTransactionDAO.addCount) - write what is left, aborted jobs included
+				transactionDAO.flushCounts();
+				// TIMING SUMMARY of this job (aborted jobs included) - see CDRomJobTimings
+				jobTimings.logSummary(logger);
+				CDRomJobTimings.clear();
 				if(null!=transactionDAO.conn)
 				{
 					logger.info(" ******************** RMIExportScheduleImpl :: CLOSING DB CONNECTION OBJECT. ***********************");
@@ -357,6 +395,10 @@ public class RMIExportScheduleImpl {
 				 * UPDATE ITEM PROCESSING STATUS TO PROCESSING AND COMPLETION STATUS TO NULL
 				 */
 				transactionDAO.updateItemProcessingStatus(ScheduleConstants.STATUS_PROCESSING, null,  itemDetails.getItemId());
+				// view content rows for the whole item, batched (was one SELECT per document) - see prefetchViewContentDetails
+				transactionDAO.prefetchViewContentDetails(itemDetails.getDocumentIdsList(), itemDetails.getLocale(), itemDetails.getModel(), itemDetails.getCarlineCode());
+				// published versions for the whole item, batched (was one CMS query per document) - see prefetchPublishedVersions
+				rmiUtils.prefetchPublishedVersions(itemDetails.getDocumentIdsList(), itemDetails.getLocale());
 
 				String documentId=null;
 				int count=0;
@@ -386,6 +428,8 @@ public class RMIExportScheduleImpl {
 				String wiringDiagramDocumentIdForOkAssetsMovement=null;
 				RMIExportToolInnerLinkDetails inrLkDetails  =null;
 				List<MMEViewContentDetails> viewContentListForDoucment=  null;
+				// OEM material folders of this item (rmiUtils.oemMaterialFolder) - copied into the export after the documents
+				java.util.LinkedHashSet<String> oemMaterialFolders = new java.util.LinkedHashSet<String>();
 				for(int a=0;a<itemDetails.getDocumentIdsList().size();a++)
 				{
 					if(isScheduleAborted()) { break; }
@@ -450,7 +494,14 @@ public class RMIExportScheduleImpl {
 							 *  3.) IDENTIFY ESI CATEGORY NODES AND ADD THEIR TYPE, E.G. - ESI CATEGORY / VIN / CVC CATEGORY ETC
 							 *  4.) TRANSFORM THE REMAINING XML TO STRING 
 							 */
+							long xmlReadStarted = System.currentTimeMillis();
 							xmlFilteredData = rmiUtils.getXMLFilteredData(documentXMLFile, newItemDetails.getChannelName());
+							CDRomJobTimings.op("XML read + node filter (one document)", CDRomJobTimings.MIXED, System.currentTimeMillis()-xmlReadStarted, documentXMLFile.length());
+							String oemFolder = rmiUtils.oemMaterialFolder(xmlFilteredData, documentId);
+							if(null!=oemFolder)
+							{
+								oemMaterialFolders.add(oemFolder);
+							}
 							if(null!=xmlFilteredData && !"".equals(xmlFilteredData))
 							{
 								/*
@@ -534,6 +585,7 @@ public class RMIExportScheduleImpl {
 												attachmentReplacementPath+=newItemDetails.getDocumentId()+"/"+attachmentDetails.getName();
 
 												xmlFilteredData = xmlFilteredData.replace("<![CDATA["+attachmentDetails.getName()+"]]>", "<![CDATA["+attachmentReplacementPath+"]]>");
+												xmlFilteredData = Utilities.replaceAttachmentFilePath(xmlFilteredData, attachmentDetails.getName(), attachmentReplacementPath);
 												attachmentReplacementPath= null;
 											}
 											attachmentDetails = null;
@@ -644,7 +696,7 @@ public class RMIExportScheduleImpl {
 									/*
 									 * PERFORM PDFS OPERATION FOR THE FILTERED DOCUMENT XML DATA
 									 */
-									docAttachmentsList = rmiUtils.readInlinePDFs(xmlFilteredData, newItemDetails);
+									docAttachmentsList = rmiUtils.readInlinePDFs(xmlFilteredData, newItemDetails, documentXMLFile.getParent());
 									if(null!=docAttachmentsList && docAttachmentsList.size()>0)
 									{
 										// add to fileTransactionList
@@ -898,7 +950,8 @@ public class RMIExportScheduleImpl {
 												// replace & symbol with its html code before replacing in XML File
 //												inrLkDetails.setSrcHrefPath(inrLkDetails.getSrcHrefPath().replace("&", "&amp;"));
 //												logger.info("------------- src path after :: >"+ inrLkDetails.getSrcHrefPath());
-												xmlFilteredData = xmlFilteredData.replace(inrLkDetails.getSrcHrefPath(), inrLkDetails.getPathToBeReplaced());
+												// raw (legacy CDATA) or XML-escaped (Kapture) - see replaceRichTextFragment
+												xmlFilteredData = RMIExportToolUtils.replaceRichTextFragment(xmlFilteredData, inrLkDetails.getSrcHrefPath(), inrLkDetails.getPathToBeReplaced());
 											}
 											inrLkDetails = null;
 										}
@@ -906,7 +959,11 @@ public class RMIExportScheduleImpl {
 									otherManualLinksList = null;
 									
 									// WRITE FILE
+									// library paths in the legacy form /library/... (Kapture sends /content/library/...) - see KaptureLibraryPath
+									xmlFilteredData = com.mazda.gms3.mdm.utils.KaptureLibraryPath.xmlLibraryPathsWithoutKaptureContext(xmlFilteredData);
+									long xmlWriteStarted = System.currentTimeMillis();
 									writeFlag = FileReadWriteUtil.writeFile(xmlFilteredData.getBytes(), actualWriteFolderPath);
+									CDRomJobTimings.op("File write - document XML (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-xmlWriteStarted, xmlFilteredData.length());
 									if(writeFlag==true)
 									{
 										/*
@@ -1210,7 +1267,15 @@ public class RMIExportScheduleImpl {
 									 * START COPYING DIRECTORY
 									 */
 									File destDir = new File(destPath);
-									copyDirectory(sourceDir, destDir, itemDetails);
+									CDRomJobTimings.begin("WD OkAssets folder copy", CDRomJobTimings.FILE);
+									try
+									{
+										copyDirectory(sourceDir, destDir, itemDetails);
+									}
+									finally
+									{
+										CDRomJobTimings.end();
+									}
 									destDir = null;
 								}
 								else
@@ -1280,6 +1345,12 @@ public class RMIExportScheduleImpl {
 					}
 				}
 				wdOkAssetsListForItems = null;
+				// OEM documents of this item: their material folders into the export's OkAssets (see RMIExportToolUtils.oemMaterialFolder)
+				if(!oemMaterialFolders.isEmpty() && copyOemMaterialFolders(itemDetails, oemMaterialFolders))
+				{
+					anyErrorFound = true;
+				}
+				oemMaterialFolders = null;
 
 				/*
 				 * UPDATE ITEM PROCESSING STATUS AS COMPLETED AND BASED ON ANY ERROR FOUND FLAG & ANY INNER LINK FOUND FLAG, UPDATE COMPLETION STATUS AS SUCCESS / FAILURE
@@ -1458,15 +1529,17 @@ public class RMIExportScheduleImpl {
 										{
 											// set INNERLINK PROCESSING STATUS AS SUCCESS
 											innerLinkDetails.setProcessingStatus(ScheduleConstants.STATUS_SUCCESS);
-											// replace innerLink Path in documentXMLContent
-											documentXMLContent = documentXMLContent.replace(innerLinkDetails.getSrcHrefPath(), innerLinkDetails.getPathToBeReplaced());
+											// the target IS part of this export (report: Success)
+											// INNER LINKS ARE PASSED AS THEY ARE (2026-10-30): legacy index?page=content&id=<id> and Kapture content/<id>
+											// stay exactly as the content has them - the XML is not changed; the report shows the href unchanged
+											innerLinkDetails.setPathToBeReplaced(innerLinkDetails.getSrcHrefPath());
 										}
 										else
 										{
-											// MAKE SUCH LINKS AS DEAD LINKS
-											innerLinkDetails.setPathToBeReplaced("#");
-											// replace innerLink Path in documentXMLContent
-											documentXMLContent = documentXMLContent.replace(innerLinkDetails.getSrcHrefPath(), innerLinkDetails.getPathToBeReplaced());
+											// the target is NOT part of this export (report: Failure) - the link is NOT made a dead link either
+											// INNER LINKS ARE PASSED AS THEY ARE (2026-10-30): legacy index?page=content&id=<id> and Kapture content/<id>
+											// stay exactly as the content has them - the XML is not changed; the report shows the href unchanged
+											innerLinkDetails.setPathToBeReplaced(innerLinkDetails.getSrcHrefPath());
 											// FAILED TO FIND INNER LINK DOCUMENT - UPDATE PROCESSING STATUS FOR LINK AS FAILURE & UPDATE FAILURE INNERLINK COUNT
 											innerLinkDetails.setProcessingStatus(ScheduleConstants.STATUS_FAILURE);
 											innerLinkDetails.setErrorMessage("FAILED TO FIND INNERLINK DOCUMENT id XML IN THE EXPORTED DIRECTORY. PLEASE CONTACT IT ADMIN SUPPORT FOR MORE DETAIL.");
@@ -1665,6 +1738,86 @@ public class RMIExportScheduleImpl {
 		}
 	}
 
+	/*
+	 * OEM MATERIAL FOLDERS (2026-10-30): each folder once per job, from OKAssets into
+	 * <export>/<scheduleId>/OkAssets/library/MAZDA/<CHANNEL>/<locale>/<model>/<manual>/<facelift>/<material> - the same
+	 * place and the same copy as the WD model folder, so the /library/... path in the XML resolves under OkAssets.
+	 * Files go to the files report as OKASSETS_OEM_FILES and into the OK assets counts. true = some file failed.
+	 */
+	private final java.util.Set<String> oemFoldersCopied = new java.util.HashSet<String>();
+
+	private boolean copyOemMaterialFolders(RMIExportToolItemDetails itemDetails, java.util.Set<String> folders)
+	{
+		boolean anyFailure = false;
+		String source = ApplicationProperties.getProperty("rmitool.okassets.source.dir.path");
+		if(!source.endsWith("/"))
+		{
+			source+="/";
+		}
+		source+=ApplicationProperties.getProperty("rmitool.library.dir.name")+"/"+ApplicationProperties.getProperty("rmitool.mazda.dir.name")+"/";
+		String okAssetsDirPath = ApplicationProperties.getProperty("rmitool.okassets.dir.sub.path");
+		if(!okAssetsDirPath.startsWith("/"))
+		{
+			okAssetsDirPath="/"+okAssetsDirPath;
+		}
+		if(!okAssetsDirPath.endsWith("/"))
+		{
+			okAssetsDirPath+="/";
+		}
+		CDRomJobTimings.begin("OEM OkAssets folder copy (OSM / SM location documents)", CDRomJobTimings.FILE);
+		try
+		{
+			for(String folder : folders)
+			{
+				if(isScheduleAborted()) { break; }
+				if(!oemFoldersCopied.add(itemDetails.getScheduleId()+"/"+folder.toLowerCase()))
+				{
+					continue;
+				}
+				File sourceDir = new File(source+folder);
+				if(!sourceDir.isDirectory())
+				{
+					logger.info("copyOemMaterialFolders :: No OKAssets folder {"+sourceDir.getAbsolutePath()+"} for the OEM documents of "
+							+itemDetails.getLocale()+" >> "+itemDetails.getModel()+" >> "+itemDetails.getChannelName());
+					anyFailure = true;
+					continue;
+				}
+				String destPath = rmiUtils.createFolderStructure(itemDetails.getScheduleId()+okAssetsDirPath+folder+"/", ApplicationProperties.getProperty("rmitool.working.dir.folder.path"));
+				if(null==destPath || "".equals(destPath))
+				{
+					logger.info("copyOemMaterialFolders :: Failed to create the OkAssets folder for {"+folder+"}.");
+					anyFailure = true;
+					continue;
+				}
+				logger.info("copyOemMaterialFolders :: Copying OEM material folder {"+sourceDir.getAbsolutePath()+"} to {"+destPath+"}.");
+				wdOkAssetsListForItems = null;
+				copyDirectory(sourceDir, new File(destPath), itemDetails);
+				if(null!=wdOkAssetsListForItems)
+				{
+					for(RMIExportToolAttachmentDetails attDetails : wdOkAssetsListForItems)
+					{
+						attDetails.setAttachmentType("OKASSETS_OEM_FILES");
+						boolean success = ScheduleConstants.STATUS_SUCCESS.equals(attDetails.getProcessingStatus());
+						transactionDAO.updateOKAssetsCount(String.valueOf(itemDetails.getScheduleId()), String.valueOf(itemDetails.getItemId()),
+								success ? ScheduleConstants.STATUS_SUCCESS : ScheduleConstants.STATUS_FAILURE);
+						anyFailure |= !success;
+					}
+					if(null==fileTransactionList)
+					{
+						fileTransactionList = new ArrayList<RMIExportToolAttachmentDetails>();
+					}
+					fileTransactionList.addAll(wdOkAssetsListForItems);
+				}
+				wdOkAssetsListForItems = null;
+			}
+		}
+		finally
+		{
+			CDRomJobTimings.end();
+		}
+		return anyFailure;
+	}
+
 	private void copyDirectoryImpl(File sourceDir, File destDir,RMIExportToolItemDetails itemDetails) 
 	{
 		// ABORTED FROM THE SCREEN - do no further work.
@@ -1770,7 +1923,9 @@ public class RMIExportScheduleImpl {
 			}
 			sourceChannel = new FileInputStream(sourceFile).getChannel();
 			destChannel = new FileOutputStream(destFile).getChannel();
+			long copyStarted = System.currentTimeMillis();
 			sourceChannel.transferTo(0, sourceChannel.size(), destChannel);
+			CDRomJobTimings.op("File copy - WD OkAssets file (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-copyStarted, sourceChannel.size());
 			logger.info("copySingleFile :: COPY FILE :: From :: >"+ sourceFile.getAbsolutePath()+" To :: >"+ destFile.getAbsolutePath() );
 			/*
 			 * PREPARE FILES DATA 

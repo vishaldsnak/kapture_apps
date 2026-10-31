@@ -389,6 +389,31 @@ public class Utilities {
 		return "";
 	}
 
+	/**
+	 * THE FILE NAME OF AN ATTACHMENT ELEMENT. Legacy XML holds the name itself. Kapture XML holds fileName, fileExtension,
+	 * attachmentTitle, filePath and fileType inside it: fileName may come without the extension and filePath points at the
+	 * staging version, so the name is the last segment of filePath - the same file sits beside the content XML in the
+	 * published version folder.
+	 */
+	public static String getAttachmentFileName(Element e) {
+		org.w3c.dom.NodeList filePath = e.getElementsByTagName("filePath");
+		if (filePath.getLength() > 0) {
+			String path = filePath.item(0).getTextContent().trim().replace('\\', '/');
+			return path.substring(path.lastIndexOf('/') + 1);
+		}
+		return getCharacterDataFromElement(e);
+	}
+
+	/** Kapture XML: writes the exported location of attachment {fileName} into its filePath (legacy XML has no filePath: unchanged). */
+	public static String replaceAttachmentFilePath(String xml, String fileName, String newPath) {
+		return xml.replaceAll("(?<=<filePath>)[^<]*[/\\\\]" + java.util.regex.Pattern.quote(xmlEscapeAttachment(fileName)) + "(?=</filePath>)",
+				java.util.regex.Matcher.quoteReplacement(xmlEscapeAttachment(newPath)));
+	}
+
+	private static String xmlEscapeAttachment(String value) {
+		return value.replace("&", "&amp;").replace("<", "&lt;");
+	}
+
 
 	/**
 	 * THE LOCALE, IN THE FORM A TABLE NAME USES: lowercase, hyphen turned into underscore.

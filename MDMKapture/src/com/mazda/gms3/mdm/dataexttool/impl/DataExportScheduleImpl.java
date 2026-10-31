@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import com.mazda.gms3.cdrom.bean.CDRomJobTimings;
 import com.mazda.gms3.mdm.logging.LogManager;
 import com.mazda.gms3.mdm.logging.Logger;
 import com.mazda.gms3.mdm.dataexttool.dao.DataExportTransactionDAO;
@@ -62,10 +63,11 @@ public class DataExportScheduleImpl {
 	 * thread any more, so the worker stops itself by reading the status the screen already wrote.
 	 *
 	 * Throttled: the answer is cached for ABORT_CHECK_INTERVAL_MS and latches once aborted, so a
-	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is half a second
-	 * behind the click - the rest of any delay is the operation already in flight.
+	 * fast loop cannot turn this into a query per iteration. Worst case the check itself is ~11 s
+	 * behind the click (2026-10-30: 10 s from the END of the last check - one check costs ~733 ms on
+	 * MC Dev, so 500 ms from the START sent every call to the DB) - the rest of any delay is the operation already in flight.
 	 */
-	private static final long ABORT_CHECK_INTERVAL_MS = 500L;
+	private static final long ABORT_CHECK_INTERVAL_MS = 10000L;
 
 	private long lastAbortCheckTime = 0L;
 
@@ -88,19 +90,24 @@ public class DataExportScheduleImpl {
 		{
 			return false;
 		}
-		lastAbortCheckTime = now;
 		scheduleAborted = DataExportToolDAO.isAborted(abortScheduleId);
 		if(scheduleAborted==true)
 		{
 			logger.info("isScheduleAborted :: SCHEDULE {"+abortScheduleId+"} WAS ABORTED FROM THE"
 					+" SCREEN. Stopping after the item in flight.");
 		}
+		// the next check is due ABORT_CHECK_INTERVAL_MS after this one ENDED
+		lastAbortCheckTime = System.currentTimeMillis();
 		return scheduleAborted;
 	}
 	public void startProcessing(DataExportToolScheduleDetails schDetails)
 	{
 		// remember the schedule so the abort check works in the helpers
 		abortScheduleId = String.valueOf(schDetails.getScheduleId());
+		// where the job spends its time - TIMING SUMMARY logged at the end, as CD Creation (CDRomJobTimings)
+		CDRomJobTimings jobTimings = CDRomJobTimings.start(schDetails.getScheduleName(), "MNAO DATA EXPORT JOB",
+				"Export folder: "+ApplicationProperties.getProperty("dataexttool.working.dir.folder.path")
+				+" | reports: "+ApplicationProperties.getProperty("dataexttool.reports.folder.path"));
 		String threadId = null;
 		String zipFilePathForEmailNotif=null;
 		try
@@ -140,7 +147,17 @@ public class DataExportScheduleImpl {
 					/*
 					 * call Function for itemsProcessing
 					 */
-					startItemsProcessing(itemDetails);
+					CDRomJobTimings.begin("Export documents - "+itemDetails.getChannelName()
+							+(null!=itemDetails.getDocumentType() && !"".equals(itemDetails.getDocumentType()) ? " / "+itemDetails.getDocumentType() : "")
+							+" ("+(null==itemDetails.getDocumentIdsList() ? 0 : itemDetails.getDocumentIdsList().size())+" documents)", CDRomJobTimings.MIXED);
+					try
+					{
+						startItemsProcessing(itemDetails);
+					}
+					finally
+					{
+						CDRomJobTimings.end();
+					}
 					itemDetails = null;
 				}
 				itemDetails = null;
@@ -169,9 +186,18 @@ public class DataExportScheduleImpl {
 					 * 		PREPARE ITS RELATIVE PATH AND REPLACE IT WITH SORUCE PATH IN THE <A> TAGS
 					 * 		REWRITE THE XML IN THE RMI TOOL WORKING DIRECTORY
 					 */
-					startInnerLinkProcessing(path);
+					CDRomJobTimings.begin("Inner links - rewrite exported XMLs", CDRomJobTimings.FILE);
+					try
+					{
+						startInnerLinkProcessing(path);
+					}
+					finally
+					{
+						CDRomJobTimings.end();
+					}
 				}
 
+				CDRomJobTimings.begin("View content reports (xlsx)", CDRomJobTimings.FILE);
 				/*
 				 * GENERATE CHANNEL WISE VIEW CONTNET LIST REPORT
 				 */
@@ -195,9 +221,12 @@ public class DataExportScheduleImpl {
 					printUtils.printSIChannelViewContentVINReport(siViewContentList, String.valueOf(schDetails.getScheduleId()));
 				}
 				
+				CDRomJobTimings.end();
 				String customScheduleErrorMessage = null;
 
+				CDRomJobTimings.begin("XML zip", CDRomJobTimings.FILE);
 				boolean createWDZipFlag = printUtils.createWorkingDirZip(path, String.valueOf(schDetails.getScheduleId()), schDetails.getScheduleName());
+				CDRomJobTimings.end();
 				if (createWDZipFlag == true) 
 				{
 					logger.info("startProcessing() :: XML Files Zipped Successfully.");
@@ -238,6 +267,7 @@ public class DataExportScheduleImpl {
 				 * PRINT REPORTS
 				 * AND GENERATE ZIP FILE OF REPORTS
 				 */
+				CDRomJobTimings.begin("Reports (xlsx) + reports zip", CDRomJobTimings.FILE);
 				if(null!=transactionList && transactionList.size()>0)
 				{
 					/*
@@ -277,6 +307,7 @@ public class DataExportScheduleImpl {
 				 * call function to generate zip file
 				 */
 				boolean bool = printUtils.createReportsZip(path, String.valueOf(schDetails.getScheduleName()));
+				CDRomJobTimings.end();
 				if (bool == true) 
 				{
 					logger.info("startProcessing() :: Reports Zipped Successfully.");
@@ -314,6 +345,7 @@ public class DataExportScheduleImpl {
 				 * UPDATE SCHEDULE STATUS NOW - PROCESSING STATUS AS COMPLETED AND 
 				 * COMPLETION STATUS BASED ON anyErrorReceivedDuringCompleteSchedule FLAG VALUE
 				 */
+				CDRomJobTimings.begin("Status update + notification e-mail", CDRomJobTimings.MIXED);
 				String schStatus=null;
 				if(anyErrorReceivedDuringCompleteSchedule==true)
 				{
@@ -341,6 +373,7 @@ public class DataExportScheduleImpl {
 				 */
 				sendEmailNotification(String.valueOf(schDetails.getScheduleId()), schStatus, schDetails.getScheduleName(), schDetails.getWslId(), zipFilePathForEmailNotif);
 				schStatus = null;
+				CDRomJobTimings.end();
 			}
 			else
 			{
@@ -364,6 +397,11 @@ public class DataExportScheduleImpl {
 			// close all active connection & client objects
 			try
 			{
+				// History counts are buffered (DataExportTransactionDAO.addCount) - write what is left, aborted jobs included
+				transactionDAO.flushCounts();
+				// TIMING SUMMARY of this job (aborted jobs included) - see CDRomJobTimings
+				jobTimings.logSummary(logger);
+				CDRomJobTimings.clear();
 				if(null!=transactionDAO.conn)
 				{
 					logger.info(" ******************** DataExportScheduleImpl :: CLOSING DB CONNECTION OBJECT. ***********************");
@@ -409,6 +447,10 @@ public class DataExportScheduleImpl {
 				 * UPDATE ITEM PROCESSING STATUS TO PROCESSING AND COMPLETION STATUS TO NULL
 				 */
 				transactionDAO.updateItemProcessingStatus(ScheduleConstants.STATUS_PROCESSING, null,  itemDetails.getItemId());
+				// view content rows for the whole item, batched (was two SELECTs per document) - see prefetchViewContentDetails
+				transactionDAO.prefetchViewContentDetails(itemDetails.getDocumentIdsList(), itemDetails.getLocale(), itemDetails.getModel());
+				// published versions for the whole item, batched (was one CMS query per document) - see prefetchPublishedVersions
+				dataExportUtils.prefetchPublishedVersions(itemDetails.getDocumentIdsList(), itemDetails.getLocale());
 
 				String documentId=null;
 				int count=0;
@@ -506,7 +548,9 @@ public class DataExportScheduleImpl {
 							 *  3.) IDENTIFY ESI CATEGORY NODES AND ADD THEIR TYPE, E.G. - ESI CATEGORY / VIN / CVC CATEGORY ETC
 							 *  4.) TRANSFORM THE REMAINING XML TO STRING 
 							 */
+							long xmlReadStarted = System.currentTimeMillis();
 							xmlFilteredData = dataExportUtils.getXMLFilteredData(documentXMLFile, newItemDetails.getChannelName());
+							CDRomJobTimings.op("XML read + node filter (one document)", CDRomJobTimings.MIXED, System.currentTimeMillis()-xmlReadStarted, documentXMLFile.length());
 							if(null!=xmlFilteredData && !"".equals(xmlFilteredData))
 							{
 								/*
@@ -594,6 +638,7 @@ public class DataExportScheduleImpl {
 												attachmentReplacementPath+=newItemDetails.getDocumentId()+"/"+attachmentDetails.getName();
 
 												xmlFilteredData = xmlFilteredData.replace("<![CDATA["+attachmentDetails.getName()+"]]>", "<![CDATA["+attachmentReplacementPath+"]]>");
+												xmlFilteredData = Utilities.replaceAttachmentFilePath(xmlFilteredData, attachmentDetails.getName(), attachmentReplacementPath);
 												attachmentReplacementPath= null;
 											}
 											attachmentDetails = null;
@@ -704,7 +749,7 @@ public class DataExportScheduleImpl {
 									/*
 									 * PERFORM PDFS OPERATION FOR THE FILTERED DOCUMENT XML DATA
 									 */
-									docAttachmentsList = dataExportUtils.readInlinePDFs(xmlFilteredData, newItemDetails);
+									docAttachmentsList = dataExportUtils.readInlinePDFs(xmlFilteredData, newItemDetails, documentXMLFile.getParent());
 									if(null!=docAttachmentsList && docAttachmentsList.size()>0)
 									{
 										// add to fileTransactionList
@@ -958,7 +1003,8 @@ public class DataExportScheduleImpl {
 												// replace & symbol with its html code before replacing in XML File
 //												inrLkDetails.setSrcHrefPath(inrLkDetails.getSrcHrefPath().replace("&", "&amp;"));
 //												logger.info("------------- src path after :: >"+ inrLkDetails.getSrcHrefPath());
-												xmlFilteredData = xmlFilteredData.replace(inrLkDetails.getSrcHrefPath(), inrLkDetails.getPathToBeReplaced());
+												// raw (legacy CDATA) or XML-escaped (Kapture) - see replaceRichTextFragment
+												xmlFilteredData = DataExportToolUtils.replaceRichTextFragment(xmlFilteredData, inrLkDetails.getSrcHrefPath(), inrLkDetails.getPathToBeReplaced());
 											}
 											inrLkDetails = null;
 										}
@@ -966,7 +1012,11 @@ public class DataExportScheduleImpl {
 									otherManualLinksList = null;
 									
 									// WRITE FILE
+									// library paths in the legacy form /library/... (Kapture sends /content/library/...) - see KaptureLibraryPath
+									xmlFilteredData = com.mazda.gms3.mdm.utils.KaptureLibraryPath.xmlLibraryPathsWithoutKaptureContext(xmlFilteredData);
+									long xmlWriteStarted = System.currentTimeMillis();
 									writeFlag = FileReadWriteUtil.writeFile(xmlFilteredData.getBytes(), actualWriteFolderPath);
+									CDRomJobTimings.op("File write - document XML (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-xmlWriteStarted, xmlFilteredData.length());
 									if(writeFlag==true)
 									{
 										/*
@@ -1271,7 +1321,15 @@ public class DataExportScheduleImpl {
 									 * START COPYING DIRECTORY
 									 */
 									File destDir = new File(destPath);
-									copyDirectory(sourceDir, destDir, itemDetails);
+									CDRomJobTimings.begin("WD OkAssets folder copy", CDRomJobTimings.FILE);
+									try
+									{
+										copyDirectory(sourceDir, destDir, itemDetails);
+									}
+									finally
+									{
+										CDRomJobTimings.end();
+									}
 									destDir = null;
 								}
 								else
@@ -1522,15 +1580,17 @@ public class DataExportScheduleImpl {
 										{
 											// set INNERLINK PROCESSING STATUS AS SUCCESS
 											innerLinkDetails.setProcessingStatus(ScheduleConstants.STATUS_SUCCESS);
-											// replace innerLink Path in documentXMLContent
-											documentXMLContent = documentXMLContent.replace(innerLinkDetails.getSrcHrefPath(), innerLinkDetails.getPathToBeReplaced());
+											// the target IS part of this export (report: Success)
+											// INNER LINKS ARE PASSED AS THEY ARE (2026-10-30): legacy index?page=content&id=<id> and Kapture content/<id>
+											// stay exactly as the content has them - the XML is not changed; the report shows the href unchanged
+											innerLinkDetails.setPathToBeReplaced(innerLinkDetails.getSrcHrefPath());
 										}
 										else
 										{
-											// MAKE SUCH LINKS AS DEAD LINKS
-											innerLinkDetails.setPathToBeReplaced("#");
-											// replace innerLink Path in documentXMLContent
-											documentXMLContent = documentXMLContent.replace(innerLinkDetails.getSrcHrefPath(), innerLinkDetails.getPathToBeReplaced());
+											// the target is NOT part of this export (report: Failure) - the link is NOT made a dead link either
+											// INNER LINKS ARE PASSED AS THEY ARE (2026-10-30): legacy index?page=content&id=<id> and Kapture content/<id>
+											// stay exactly as the content has them - the XML is not changed; the report shows the href unchanged
+											innerLinkDetails.setPathToBeReplaced(innerLinkDetails.getSrcHrefPath());
 											// FAILED TO FIND INNER LINK DOCUMENT - UPDATE PROCESSING STATUS FOR LINK AS FAILURE & UPDATE FAILURE INNERLINK COUNT
 											innerLinkDetails.setProcessingStatus(ScheduleConstants.STATUS_FAILURE);
 											innerLinkDetails.setErrorMessage("FAILED TO FIND INNERLINK DOCUMENT id XML IN THE EXPORTED DIRECTORY. PLEASE CONTACT IT ADMIN SUPPORT FOR MORE DETAIL.");
@@ -1834,7 +1894,9 @@ public class DataExportScheduleImpl {
 			}
 			sourceChannel = new FileInputStream(sourceFile).getChannel();
 			destChannel = new FileOutputStream(destFile).getChannel();
+			long copyStarted = System.currentTimeMillis();
 			sourceChannel.transferTo(0, sourceChannel.size(), destChannel);
+			CDRomJobTimings.op("File copy - WD OkAssets file (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-copyStarted, sourceChannel.size());
 			logger.info("copySingleFile :: COPY FILE :: From :: >"+ sourceFile.getAbsolutePath()+" To :: >"+ destFile.getAbsolutePath() );
 			/*
 			 * PREPARE FILES DATA 

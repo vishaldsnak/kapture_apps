@@ -7,7 +7,10 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.sql.PreparedStatement;
 
 import com.mazda.gms3.mdm.dao.CategoryProcessingDAO;
@@ -32,6 +35,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 
 	public void updateHardJobFailure(long scheduleId)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try
@@ -168,6 +172,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 	
 	public void updateScheduleProcessingStatus(String processingStatus, String completionStatus,String scheduleId, boolean updateFinishTime)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		/*
 		 * AN ABORTED SCHEDULE IS FINISHED - DO NOT OVERWRITE ITS STATUS.
 		 *
@@ -349,6 +354,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 
 	public void updateItemProcessingStatus(String processingStatus, String completionStatus, long itemId)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		PreparedStatement pstmt = null;
 		try
 		{
@@ -397,6 +403,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 
 	public void updateTotalInnerLinksCounts(long itemId,long scheduleId, long count)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try
@@ -468,10 +475,63 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 	}
 
 
-	public void updateProcessingCount(String scheduleId, String itemId, String status)
+	/*
+	 * RUNNING COUNTS, BUFFERED PER JOB (2026-10-30, same as CD Creation - CDRomDAO.addCount).
+	 * Every document, every image / attachment / PDF and every inner link used to bump its History
+	 * counters with SELECT + UPDATE on the schedule row and again on the item row - 4 round trips plus
+	 * the isValid pings, ~1.3 s on MC Dev - so a document with one image spent ~2.6 s on counters alone
+	 * (same code as RMI job 302: ~4 s per document). Each job has its own DataExportTransactionDAO (DataExportScheduleImpl.startProcessing),
+	 * so the deltas live on this instance and are written as "col = COALESCE(col,0) + ?" at most every
+	 * COUNT_FLUSH_INTERVAL_MS (10 s), and always before a status change, the inner-link total, a report summary
+	 * and at the end of the job (flushCounts). History lags the job by a few seconds at most.
+	 */
+	// 10 s, not the CD's 3 s: a flush is 2-3 round trips (~0.5-1 s on MC Dev) and documents here take ~0.2 s
+	private static final long COUNT_FLUSH_INTERVAL_MS = 10000L;
+	private final LinkedHashMap<String, Long> pendingCounts = new LinkedHashMap<String, Long>();
+	private long lastCountFlush = System.currentTimeMillis();
+
+	/** Adds 1 to each column, all before any flush - so success|failure and total move together. */
+	private synchronized void addCount(String scheduleId, String itemId, String caller, String... columns)
 	{
-		Statement stmt = null;
-		ResultSet rs = null;
+		if(null==scheduleId || "".equals(scheduleId.trim()))
+		{
+			logger.info(caller+" :: Schedule id as Parameter is null.");
+			return;
+		}
+		for(String column : columns)
+		{
+			String key = scheduleId.trim()+"\u0001"+(null==itemId ? "" : itemId.trim())+"\u0001"+column;
+			Long current = pendingCounts.get(key);
+			pendingCounts.put(key, Long.valueOf((null==current ? 0L : current.longValue())+1L));
+		}
+		if(System.currentTimeMillis()-lastCountFlush >= COUNT_FLUSH_INTERVAL_MS)
+		{
+			flushCounts();
+		}
+	}
+
+	/** Writes every buffered count: one UPDATE per schedule row, one per item row. */
+	public synchronized void flushCounts()
+	{
+		lastCountFlush = System.currentTimeMillis();
+		if(pendingCounts.isEmpty())
+		{
+			return;
+		}
+		// row key "scheduleId\u0001itemId" (itemId blank = the schedule row) -> column -> delta
+		LinkedHashMap<String, LinkedHashMap<String, Long>> rows = new LinkedHashMap<String, LinkedHashMap<String, Long>>();
+		for(Map.Entry<String, Long> e : pendingCounts.entrySet())
+		{
+			String[] k = e.getKey().split("\u0001", -1);
+			addTo(rows, k[0]+"\u0001", k[2], e.getValue());
+			if(!"".equals(k[1]))
+			{
+				addTo(rows, k[0]+"\u0001"+k[1], k[2], e.getValue());
+			}
+		}
+		pendingCounts.clear();
+		long flushStarted = System.currentTimeMillis();
+		PreparedStatement pstmt = null;
 		try
 		{
 			try
@@ -485,102 +545,79 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 				// increment connectionCount by 1
 				connectionCount++;
 			}
-
-			String sql="";
-			// UPDATE SUCCESS / FAILURE COUNT FOR SCHEDULE
-			int count=0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
+			for(Map.Entry<String, LinkedHashMap<String, Long>> row : rows.entrySet())
 			{
-				sql = "SELECT mde_sch_success_docs AS COUNT FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
+				String[] k = row.getKey().split("\u0001", -1);
+				boolean itemRow = !"".equals(k[1]);
+				StringBuilder sql = new StringBuilder("UPDATE ").append(itemRow ? "gms3_mdm_mde_tool_sch_it" : "gms3_mdm_mde_tool_sch").append(" SET ");
+				int c = 0;
+				for(String column : row.getValue().keySet())
+				{
+					sql.append(c++ > 0 ? ", " : "").append(column).append("=COALESCE(").append(column).append(",0)+?");
+				}
+				sql.append(" WHERE mde_sch_id=?").append(itemRow ? " AND mde_sch_item_id=?" : "");
+				pstmt = conn.prepareStatement(sql.toString());
+				int i = 1;
+				for(Long delta : row.getValue().values())
+				{
+					pstmt.setLong(i++, delta.longValue());
+				}
+				pstmt.setLong(i++, Long.parseLong(k[0]));
+				if(itemRow)
+				{
+					pstmt.setLong(i, Long.parseLong(k[1]));
+				}
+				pstmt.executeUpdate();
+				pstmt.close();pstmt = null;
 			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_failure_docs AS COUNT FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_success_docs="+count+" WHERE mde_sch_id= "+scheduleId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_failure_docs="+count+" WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
-			// UPDATE SUCCESS / FAILURE COUNT FOR ITEM
-			count=0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT mde_sch_success_docs AS COUNT FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_failure_docs AS COUNT FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_success_docs="+count+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_failure_docs="+count+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
 		}
 		catch(Exception e)
 		{
-			Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateProcessingCount()", e);
+			Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "flushCounts()", e);
 		}
 		finally
 		{
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - History count update (buffered, every 10 s)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis()-flushStarted, 0L);
 			try
 			{
-				if(null!=stmt)
-					stmt.close();
+				if(null!=pstmt)
+					pstmt.close();
 			}
 			catch(SQLException re)
 			{
-				Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateProcessingCount()", re);
+				Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "flushCounts()", re);
 			}
-			scheduleId = null;
+		}
+	}
+
+	private static void addTo(LinkedHashMap<String, LinkedHashMap<String, Long>> rows, String rowKey, String column, Long delta)
+	{
+		LinkedHashMap<String, Long> columns = rows.get(rowKey);
+		if(null==columns)
+		{
+			columns = new LinkedHashMap<String, Long>();
+			rows.put(rowKey, columns);
+		}
+		Long current = columns.get(column);
+		columns.put(column, Long.valueOf((null==current ? 0L : current.longValue())+delta.longValue()));
+	}
+
+	public void updateProcessingCount(String scheduleId, String itemId, String status)
+	{
+		// BUFFERED - see addCount
+		if(status.equals(ScheduleConstants.STATUS_SUCCESS))
+		{
+			addCount(scheduleId, itemId, "updateProcessingCount()", "mde_sch_success_docs");
+		}
+		else if(status.equals(ScheduleConstants.STATUS_FAILURE))
+		{
+			addCount(scheduleId, itemId, "updateProcessingCount()", "mde_sch_failure_docs");
 		}
 	}
 
 	public void updateItemInnerLinkProcessingStatus(String processingStatus, String completionStatus, long itemId)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		PreparedStatement pstmt = null;
 		try
 		{
@@ -629,112 +666,14 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 
 	public void updateInnerLinkProcessingCount(String scheduleId, String itemId, String status)
 	{
-		Statement stmt = null;
-		ResultSet rs = null;
-		try
+		// BUFFERED - see addCount
+		if(status.equals(ScheduleConstants.STATUS_SUCCESS))
 		{
-			try
-			{
-				conn.isValid(0);
-			}
-			catch(Exception  e)
-			{
-				// connection is either null or not active - re-initialize connection object
-				conn = getConnection();
-				// increment connectionCount by 1
-				connectionCount++;
-			}
-
-			String sql="";
-			// UPDATE SUCCESS / FAILURE COUNT FOR SCHEDULE
-			int count=0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT mde_sch_inlk_success AS COUNT FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_inlk_failure AS COUNT FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_inlk_success="+count+" WHERE mde_sch_id= "+scheduleId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_inlk_failure="+count+" WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
-			// UPDATE SUCCESS / FAILURE COUNT FOR ITEM
-			count=0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT mde_sch_inlk_success AS COUNT FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_inlk_failure AS COUNT FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_inlk_success="+count+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_inlk_failure="+count+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
+			addCount(scheduleId, itemId, "updateInnerLinkProcessingCount()", "mde_sch_inlk_success");
 		}
-		catch(Exception e)
+		else if(status.equals(ScheduleConstants.STATUS_FAILURE))
 		{
-			Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateInnerLinkProcessingCount()", e);
-		}
-		finally
-		{
-			try
-			{
-				if(null!=stmt)
-					stmt.close();
-			}
-			catch(SQLException re)
-			{
-				Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateInnerLinkProcessingCount()", re);
-			}
-			scheduleId = null;
+			addCount(scheduleId, itemId, "updateInnerLinkProcessingCount()", "mde_sch_inlk_failure");
 		}
 	}
 
@@ -811,125 +750,20 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 	
 	public void updateOKAssetsCount(String scheduleId, String itemId, String status)
 	{
-		Statement stmt = null;
-		ResultSet rs = null;
-		try
+		// BUFFERED - see addCount
+		if(status.equals(ScheduleConstants.STATUS_SUCCESS))
 		{
-			try
-			{
-				conn.isValid(0);
-			}
-			catch(Exception  e)
-			{
-				// connection is either null or not active - re-initialize connection object
-				conn = getConnection();
-				// increment connectionCount by 1
-				connectionCount++;
-			}
-
-			String sql="";
-			// UPDATE SUCCESS / FAILURE COUNT FOR SCHEDULE
-			int count=0;
-			int totalCount=0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT mde_sch_okassets_success AS COUNT,mde_sch_okassets_total AS TOTAL FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_okassets_failure AS COUNT,mde_sch_okassets_total AS TOTAL FROM gms3_mdm_mde_tool_sch WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-				totalCount= rs.getInt("TOTAL");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// add 1 to totalCount
-			totalCount= totalCount+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_okassets_success="+count+",mde_sch_okassets_total="+totalCount+" WHERE mde_sch_id= "+scheduleId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch SET mde_sch_okassets_failure="+count+",mde_sch_okassets_total="+totalCount+" WHERE mde_sch_id= "+scheduleId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
-			// UPDATE SUCCESS / FAILURE COUNT FOR ITEM
-			count=0;
-			totalCount= 0;
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "SELECT mde_sch_okassets_success AS COUNT,mde_sch_okassets_total AS TOTAL FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "SELECT mde_sch_okassets_failure AS COUNT,mde_sch_okassets_total AS TOTAL FROM gms3_mdm_mde_tool_sch_it WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery(sql);
-			if(rs.next())
-			{
-				count = rs.getInt("COUNT");
-				totalCount = rs.getInt("TOTAL");
-			}
-			rs.close();rs=null;
-			stmt.close();stmt=null;
-			sql = null;
-
-			// add 1 to count
-			count = count+1;
-			// add 1 to totalCount
-			totalCount= totalCount+1;
-			// update count back in DATABASE TABLE
-			if(status.equals(ScheduleConstants.STATUS_SUCCESS))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_okassets_success="+count+",mde_sch_okassets_total="+totalCount+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			else if(status.equals(ScheduleConstants.STATUS_FAILURE))
-			{
-				sql = "UPDATE gms3_mdm_mde_tool_sch_it SET mde_sch_okassets_failure="+count+",mde_sch_okassets_total="+totalCount+" WHERE mde_sch_id= "+scheduleId+" AND mde_sch_item_id="+itemId;
-			}
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql);
-			stmt.close();stmt=null;
-			sql = null;
-
+			addCount(scheduleId, itemId, "updateOKAssetsCount()", "mde_sch_okassets_success", "mde_sch_okassets_total");
 		}
-		catch(Exception e)
+		else if(status.equals(ScheduleConstants.STATUS_FAILURE))
 		{
-			Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateOKAssetsCount()", e);
-		}
-		finally
-		{
-			try
-			{
-				if(null!=stmt)
-					stmt.close();
-			}
-			catch(SQLException re)
-			{
-				Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "updateOKAssetsCount()", re);
-			}
-			scheduleId = null;
+			addCount(scheduleId, itemId, "updateOKAssetsCount()", "mde_sch_okassets_failure", "mde_sch_okassets_total");
 		}
 	}
 
 	public void createReportSummary(DataExportToolReportSummaryDetails summaryDetails)
 	{
+		flushCounts(); // buffered running counts first - see addCount
 		PreparedStatement pstmt = null;
 		try
 		{
@@ -1016,9 +850,214 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 		return emailId;
 	}
 
+	/*
+	 * VIEW CONTENT DETAILS, PREFETCHED PER ITEM (2026-10-30, same as RMIExportTransactionDAO).
+	 * getViewContentDetails ran two SELECTs per document (model year + VIN, ~0.4 s each on MC Dev).
+	 * prefetchViewContentDetails reads the whole item VIEW_CONTENT_CHUNK documents at a time - same
+	 * tables, same columns, same locale filter, model year rows first then VIN rows as before - and
+	 * getViewContentDetails hands each document its rows once. A document that was not prefetched, is
+	 * asked for a second time, or a prefetch that failed goes to the DB exactly as before.
+	 */
+	private static final int VIEW_CONTENT_CHUNK = 500;
+	// lower-case document id -> rows (empty = the document has no view content rows)
+	private HashMap<String, List<MNAOViewContentDetails>> viewContentPrefetched = null;
+	private String viewContentPrefetchedLocale = null;
+
+	public void prefetchViewContentDetails(List<?> documentIds, String locale, String modelName)
+	{
+		viewContentPrefetched = null;
+		viewContentPrefetchedLocale = null;
+		if(null==documentIds || documentIds.isEmpty() || null==locale)
+		{
+			return;
+		}
+		long started = System.currentTimeMillis();
+		locale = locale.replace("-", "_");
+		// lower-case id -> id as the item lists it (the SI check below reads it, as before)
+		LinkedHashMap<String, String> ids = new LinkedHashMap<String, String>();
+		for(Object id : documentIds)
+		{
+			String documentId = String.valueOf(id);
+			if(!ids.containsKey(documentId.toLowerCase()))
+			{
+				ids.put(documentId.toLowerCase(), documentId);
+			}
+		}
+		HashMap<String, List<MNAOViewContentDetails>> modelYearRows = new HashMap<String, List<MNAOViewContentDetails>>();
+		HashMap<String, List<MNAOViewContentDetails>> vinRows = new HashMap<String, List<MNAOViewContentDetails>>();
+		List<String> idList = new ArrayList<String>(ids.values());
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		int queries = 0;
+		int rows = 0;
+		try
+		{
+			try
+			{
+				conn.isValid(0);
+			}
+			catch(Exception  e)
+			{
+				// connection is either null or not active - re-initialize connection object
+				conn = getConnection();
+				// increment connectionCount by 1
+				connectionCount++;
+			}
+			for(int pass=0;pass<2;pass++)
+			{
+				boolean modelYear = (pass==0);
+				String idColumn = modelYear ? "vc_my_document_id" : "vc_vin_document_id";
+				for(int from=0;from<idList.size();from+=VIEW_CONTENT_CHUNK)
+				{
+					List<String> chunk = idList.subList(from, Math.min(from+VIEW_CONTENT_CHUNK, idList.size()));
+					StringBuilder sql = new StringBuilder("SELECT * FROM ")
+							.append(modelYear ? "gms3_vc_model_year_details" : "gms3_vc_vin_details")
+							.append(" WHERE ").append(idColumn).append(" IN (");
+					for(int i=0;i<chunk.size();i++)
+					{
+						sql.append(i>0 ? ",?" : "?");
+					}
+					sql.append(") AND ").append(modelYear ? "vc_my_locale" : "vc_vin_locale").append("=?");
+					pstmt = conn.prepareStatement(sql.toString());
+					int p = 1;
+					for(String id : chunk)
+					{
+						pstmt.setString(p++, id);
+					}
+					pstmt.setString(p, locale);
+					rs = pstmt.executeQuery();
+					queries++;
+					while(rs.next())
+					{
+						String key = String.valueOf(rs.getString(idColumn)).toLowerCase();
+						String documentId = ids.get(key);
+						if(null==documentId)
+						{
+							continue;
+						}
+						HashMap<String, List<MNAOViewContentDetails>> target = modelYear ? modelYearRows : vinRows;
+						if(!target.containsKey(key))
+						{
+							target.put(key, new ArrayList<MNAOViewContentDetails>());
+						}
+						MNAOViewContentDetails details = modelYear ? readModelYearRow(rs, documentId.startsWith("SI"), modelName)
+								: readVinRow(rs, documentId.startsWith("SI"), modelName);
+						// viewContentType as MODEL_YEAR / VIN, as getViewContentDetails sets it
+						details.setViewContentType(modelYear ? "MODEL_YEAR" : "VIN");
+						target.get(key).add(details);
+						rows++;
+					}
+					rs.close();rs=null;
+					pstmt.close();pstmt=null;
+				}
+			}
+			HashMap<String, List<MNAOViewContentDetails>> prefetched = new HashMap<String, List<MNAOViewContentDetails>>();
+			for(String key : ids.keySet())
+			{
+				List<MNAOViewContentDetails> docRows = new ArrayList<MNAOViewContentDetails>();
+				if(modelYearRows.containsKey(key))
+				{
+					docRows.addAll(modelYearRows.get(key));
+				}
+				if(vinRows.containsKey(key))
+				{
+					docRows.addAll(vinRows.get(key));
+				}
+				prefetched.put(key, docRows);
+			}
+			viewContentPrefetched = prefetched;
+			viewContentPrefetchedLocale = locale;
+			logger.info("prefetchViewContentDetails :: "+prefetched.size()+" documents, "+queries+" queries, "+rows+" rows in "+(System.currentTimeMillis()-started)+" ms");
+			com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - view content details (batched, 500 documents per query)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis()-started, 0L);
+		}
+		catch(Exception e)
+		{
+			// fall back to two SELECTs per document
+			Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "prefetchViewContentDetails()", e);
+		}
+		finally
+		{
+			try
+			{
+				if(null!=rs)
+					rs.close();
+				if(null!=pstmt)
+					pstmt.close();
+			}
+			catch(SQLException re)
+			{
+				Utilities.printStackTraceToLogs(DataExportTransactionDAO.class.getName(), "prefetchViewContentDetails()", re);
+			}
+		}
+	}
+
+	private static MNAOViewContentDetails readModelYearRow(ResultSet rs, boolean siDocument, String modelName) throws SQLException
+	{
+		MNAOViewContentDetails details = new MNAOViewContentDetails();
+		// COMMON VARIABLES
+		details.setDocumentId(rs.getString("vc_my_document_id"));
+		details.setLocale(rs.getString("vc_my_locale"));
+		details.setProcessingModelForMNAODataExport(modelName);
+		details.setModel(rs.getString("vc_my_model"));
+		details.setYear(rs.getString("vc_my_year"));
+		details.setCatNameLevel1(rs.getString("vc_my_esi_cat_name_1"));
+		details.setCatNameLevel2(rs.getString("vc_my_esi_cat_name_2"));
+		details.setCatNameLevel3(rs.getString("vc_my_esi_cat_name_3"));
+		details.setTitle(rs.getString("vc_my_document_title"));
+		details.setImDocLastModifiedDate(rs.getTimestamp("vc_my_doc_last_modified_date"));
+		details.setDocumentType(rs.getString("vc_my_document_type"));
+		details.setDocumentTypeName(rs.getString("vc_my_document_type_name"));
+		details.setDocumentSubType(rs.getString("vc_my_document_subtype"));
+		details.setDocumentSubTypeName(rs.getString("vc_my_document_subtype_name"));
+		// DOCUMENT SPECIFIC VARIABLES
+		if(siDocument)
+		{
+			details.setSiNumber(rs.getString("vc_my_si_number"));
+		}
+		return details;
+	}
+
+	private static MNAOViewContentDetails readVinRow(ResultSet rs, boolean siDocument, String modelName) throws SQLException
+	{
+		MNAOViewContentDetails details = new MNAOViewContentDetails();
+		// COMMON VARIABLES
+		details.setDocumentId(rs.getString("vc_vin_document_id"));
+		details.setProcessingModelForMNAODataExport(modelName);
+		details.setLocale(rs.getString("vc_vin_locale"));
+		details.setWmiCode(rs.getString("vc_vin_wmi_code"));
+		details.setVdsCode(rs.getString("vc_vin_vds_code"));
+		details.setVisStartRange(rs.getString("vc_vin_vis_start_range"));
+		details.setVisEndRange(rs.getString("vc_vin_vis_end_range"));
+		details.setCatNameLevel1(rs.getString("vc_vin_esi_cat_name_1"));
+		details.setCatNameLevel2(rs.getString("vc_vin_esi_cat_name_2"));
+		details.setCatNameLevel3(rs.getString("vc_vin_esi_cat_name_3"));
+		details.setTitle(rs.getString("vc_vin_document_title"));
+		details.setImDocLastModifiedDate(rs.getTimestamp("vc_vin_doc_last_modified_date"));
+		details.setDocumentType(rs.getString("vc_vin_document_type"));
+		details.setDocumentTypeName(rs.getString("vc_vin_document_type_name"));
+		details.setDocumentSubType(rs.getString("vc_vin_document_subtype"));
+		details.setDocumentSubTypeName(rs.getString("vc_vin_document_subtype_name"));
+		// DOCUMENT SPECIFIC VARIABLES
+		if(siDocument)
+		{
+			details.setSiNumber(rs.getString("vc_vin_si_number"));
+		}
+		return details;
+	}
+
 	public List<MNAOViewContentDetails> getViewContentDetails(String documentId, String locale,String modelName)
 	{
+		if(null!=viewContentPrefetched && null!=documentId && null!=locale && locale.replace("-", "_").equals(viewContentPrefetchedLocale))
+		{
+			List<MNAOViewContentDetails> prefetchedRows = viewContentPrefetched.remove(documentId.toLowerCase());
+			if(null!=prefetchedRows)
+			{
+				logger.info("getViewContentDetails :: {"+documentId+"} :: "+prefetchedRows.size()+" rows (prefetched).");
+				return prefetchedRows.isEmpty() ? null : prefetchedRows;
+			}
+		}
 		logger.info("getViewContentDetails :: > Start Fetching ViewContentDetails.");
+		long viewContentStarted = System.currentTimeMillis();
 		List<MNAOViewContentDetails> viewContentList = null;
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
@@ -1057,27 +1096,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 			MNAOViewContentDetails details = null;
 			while(rs.next())
 			{
-				details = new MNAOViewContentDetails();
-				// COMMON VARIABLES
-				details.setDocumentId(rs.getString("vc_my_document_id"));
-				details.setLocale(rs.getString("vc_my_locale"));
-				details.setProcessingModelForMNAODataExport(modelName);
-				details.setModel(rs.getString("vc_my_model"));
-				details.setYear(rs.getString("vc_my_year"));
-				details.setCatNameLevel1(rs.getString("vc_my_esi_cat_name_1"));
-				details.setCatNameLevel2(rs.getString("vc_my_esi_cat_name_2"));
-				details.setCatNameLevel3(rs.getString("vc_my_esi_cat_name_3"));
-				details.setTitle(rs.getString("vc_my_document_title"));
-				details.setImDocLastModifiedDate(rs.getTimestamp("vc_my_doc_last_modified_date"));
-				details.setDocumentType(rs.getString("vc_my_document_type"));
-				details.setDocumentTypeName(rs.getString("vc_my_document_type_name"));
-				details.setDocumentSubType(rs.getString("vc_my_document_subtype"));
-				details.setDocumentSubTypeName(rs.getString("vc_my_document_subtype_name"));
-				// DOCUMENT SPECIFIC VARIABLES
-				if(documentId.startsWith("SI"))
-				{
-					details.setSiNumber(rs.getString("vc_my_si_number"));
-				}
+				details = readModelYearRow(rs, documentId.startsWith("SI"), modelName);
 				
 				if(null==viewContentList || viewContentList.size()<=0)
 				{
@@ -1106,29 +1125,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 			rs = pstmt.executeQuery();
 			while(rs.next())
 			{
-				details = new MNAOViewContentDetails();
-				// COMMON VARIABLES
-				details.setDocumentId(rs.getString("vc_vin_document_id"));
-				details.setProcessingModelForMNAODataExport(modelName);
-				details.setLocale(rs.getString("vc_vin_locale"));
-				details.setWmiCode(rs.getString("vc_vin_wmi_code"));
-				details.setVdsCode(rs.getString("vc_vin_vds_code"));
-				details.setVisStartRange(rs.getString("vc_vin_vis_start_range"));
-				details.setVisEndRange(rs.getString("vc_vin_vis_end_range"));
-				details.setCatNameLevel1(rs.getString("vc_vin_esi_cat_name_1"));
-				details.setCatNameLevel2(rs.getString("vc_vin_esi_cat_name_2"));
-				details.setCatNameLevel3(rs.getString("vc_vin_esi_cat_name_3"));
-				details.setTitle(rs.getString("vc_vin_document_title"));
-				details.setImDocLastModifiedDate(rs.getTimestamp("vc_vin_doc_last_modified_date"));
-				details.setDocumentType(rs.getString("vc_vin_document_type"));
-				details.setDocumentTypeName(rs.getString("vc_vin_document_type_name"));
-				details.setDocumentSubType(rs.getString("vc_vin_document_subtype"));
-				details.setDocumentSubTypeName(rs.getString("vc_vin_document_subtype_name"));
-				// DOCUMENT SPECIFIC VARIABLES
-				if(documentId.startsWith("SI"))
-				{
-					details.setSiNumber(rs.getString("vc_vin_si_number"));
-				}
+				details = readVinRow(rs, documentId.startsWith("SI"), modelName);
 				
 				if(null==viewContentList || viewContentList.size()<=0)
 				{
@@ -1171,6 +1168,7 @@ public class DataExportTransactionDAO extends DBConnectionHelper{
 		{
 			logger.info("getViewContentDetails :: > End Fetching ViewContentDetails.No Rows Fetched. ");
 		}
+		com.mazda.gms3.cdrom.bean.CDRomJobTimings.op("DB - view content details (one document, fallback)", com.mazda.gms3.cdrom.bean.CDRomJobTimings.DB, System.currentTimeMillis()-viewContentStarted, 0L);
 		return viewContentList;
 	}
 
