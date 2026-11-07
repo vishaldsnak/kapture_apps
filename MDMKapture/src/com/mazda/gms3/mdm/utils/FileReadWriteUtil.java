@@ -14,9 +14,6 @@ public class FileReadWriteUtil {
 
 	private static final Logger logger = Logger
 			.getLogger(FileReadWriteUtil.class.getName());
-	
-	
-	private static InputStream inputStream;
 
 	/**
 	 * Function will write the File at passed File path
@@ -77,16 +74,15 @@ public class FileReadWriteUtil {
 //					logger.info("readFile :: Parameter received; File Exists.");
 					// calculate fileLength
 					int fileLength = (int) file.length();
-					inputStream = new FileInputStream(file);
-					// initialize byte[] object with passing the size as file
-					// length
-					data = new byte[fileLength];
-					// read all the bytes from inputStream and set in byte[]
-					// array
-					inputStream.read(data, 0, fileLength);
-
-					// set inputStream to null
-					inputStream = null;
+					// the stream stays local: export jobs running at the same time read through here
+					try (InputStream inputStream = new FileInputStream(file)) {
+						// initialize byte[] object with passing the size as file
+						// length
+						data = new byte[fileLength];
+						// read all the bytes from inputStream and set in byte[]
+						// array
+						inputStream.readNBytes(data, 0, fileLength);
+					}
 				} else {
 					logger.info("readFile :: Parameter received; File Not Found.");
 					// set data to null

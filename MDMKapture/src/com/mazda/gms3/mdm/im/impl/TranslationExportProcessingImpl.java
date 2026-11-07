@@ -473,7 +473,8 @@ public class TranslationExportProcessingImpl extends Thread{
 							if(null!=nodesList && nodesList.getLength()>0)
 							{
 								node = (Node)nodesList.item(0);
-								val = getCharacterDataFromElement((Element)node);
+								// rich text escaped twice in Kapture - the translator gets HTML, not &lt;p&gt;; see ExportXmlCData
+								val = com.mazda.gms3.mdm.utils.ExportXmlCData.decodeDoubleEscaped(getCharacterDataFromElement((Element)node));
 								// append this to identified XML
 								identifiedXML+= "<"+conNodes[a].trim()+">";
 								identifiedXML+="<![CDATA[";
@@ -485,6 +486,11 @@ public class TranslationExportProcessingImpl extends Thread{
 								identifiedXML+= "</"+conNodes[a].trim()+">";
 								val = null;
 								node=null;
+							}
+							else
+							{
+								// Kapture omits a field the document does not have; the file still carries every node, empty
+								identifiedXML+= "<"+conNodes[a].trim()+"><![CDATA[]]></"+conNodes[a].trim()+">";
 							}
 							nodesList=  null;
 						}

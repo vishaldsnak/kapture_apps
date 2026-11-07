@@ -468,6 +468,9 @@ public class TranslationImportProcessingImpl extends Thread{
 	{
 		try
 		{
+			// getContentDetails() replaces the XML with the document's current content; the uploaded
+			// file has to go back on the details, because prepareXML() and the title update read it there
+			String uploadedXml = details.getXml();
 			// here since the document is PARENT DOCUMENT so no need of sending PARENT LOCALE
 			details = getContentDetails(details);
 
@@ -475,10 +478,12 @@ public class TranslationImportProcessingImpl extends Thread{
 			{
 				if(FetchKaptureDataDAO.isDocumentCheckedOut(details.getDocumentId())==false)
 				{
+					String currentXml = details.getXml();
+					details.setXml(uploadedXml);
 					/*
 					 * PERFORM XML OPERATION - merge the translated fields into the current content
 					 */
-					String mergedXml = prepareXML(details, details.getXml());
+					String mergedXml = prepareXML(details, currentXml);
 
 					TranslationKaptureService.TranslationResult before =
 							(TranslationKaptureService.TranslationResult) details.getReadResult();

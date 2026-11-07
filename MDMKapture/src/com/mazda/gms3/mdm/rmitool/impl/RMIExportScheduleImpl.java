@@ -961,9 +961,11 @@ public class RMIExportScheduleImpl {
 									// WRITE FILE
 									// library paths in the legacy form /library/... (Kapture sends /content/library/...) - see KaptureLibraryPath
 									xmlFilteredData = com.mazda.gms3.mdm.utils.KaptureLibraryPath.xmlLibraryPathsWithoutKaptureContext(xmlFilteredData);
+									// values in CDATA as in the legacy export - last, every replace above works on the escaped text; see ExportXmlCData
+									xmlFilteredData = com.mazda.gms3.mdm.utils.ExportXmlCData.withCData(xmlFilteredData, newItemDetails.getChannelName());
 									long xmlWriteStarted = System.currentTimeMillis();
-									writeFlag = FileReadWriteUtil.writeFile(xmlFilteredData.getBytes(), actualWriteFolderPath);
-									CDRomJobTimings.op("File write - document XML (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-xmlWriteStarted, xmlFilteredData.length());
+									writeFlag = null!=xmlFilteredData && FileReadWriteUtil.writeFile(xmlFilteredData.getBytes(), actualWriteFolderPath);
+									CDRomJobTimings.op("File write - document XML (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-xmlWriteStarted, null==xmlFilteredData ? 0L : xmlFilteredData.length());
 									if(writeFlag==true)
 									{
 										/*

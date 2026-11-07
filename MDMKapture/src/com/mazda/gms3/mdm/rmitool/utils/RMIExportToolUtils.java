@@ -475,6 +475,11 @@ public class RMIExportToolUtils {
 						 * The round trip through a String is how this always worked - kept as it
 						 * was rather than rewritten, so the output is built the same way.
 						 */
+						// rich text escaped twice in Kapture - back to one level first, so its images and links are identified; see ExportXmlCData
+						if(document.getElementsByTagName(channelName).getLength()>0)
+						{
+							com.mazda.gms3.mdm.utils.ExportXmlCData.decodeDoubleEscaped(document.getElementsByTagName(channelName).item(0));
+						}
 						xmlData= Utilities.transformString(document);
 
 						DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();

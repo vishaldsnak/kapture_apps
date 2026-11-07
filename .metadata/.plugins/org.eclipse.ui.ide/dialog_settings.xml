@@ -8,6 +8,7 @@
 		<item key="WizardProjectsImportPage.STORE_HIDE_CONFLICTING_PROJECTS_ID" value="false"/>
 		<item key="WizardProjectsImportPage.STORE_SKIP_DOT_FOLDERS" value="true"/>
 		<list key="WizardProjectsImportPage.STORE_DIRECTORIES">
+			<item value="D:\WD\Workspaces\Kaputre_KAuthor"/>
 			<item value="D:\WD\Kapture_WD\SourceCode_Migrated"/>
 		</list>
 		<list key="WizardProjectsImportPage.STORE_ARCHIVES">
@@ -26,5 +27,9 @@
 		<item key="DIALOG_WIDTH" value="552"/>
 		<item key="DIALOG_HEIGHT" value="396"/>
 		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-18|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
+	</section>
+	<section name="ChooseWorkspaceDialogSettings">
+		<item key="DIALOG_X_ORIGIN" value="352"/>
+		<item key="DIALOG_Y_ORIGIN" value="131"/>
 	</section>
 </section>
