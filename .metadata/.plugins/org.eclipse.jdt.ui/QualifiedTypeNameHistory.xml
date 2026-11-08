@@ -2,4 +2,5 @@
 <qualifiedTypeNameHistroy>
     <fullyQualifiedTypeName name="com.mazda.gms3.mdm.vo.RoleDetails"/>
     <fullyQualifiedTypeName name="com.mazda.gms3.mdm.utils.MessageProperties"/>
+    <fullyQualifiedTypeName name="java.lang.Override"/>
 </qualifiedTypeNameHistroy>

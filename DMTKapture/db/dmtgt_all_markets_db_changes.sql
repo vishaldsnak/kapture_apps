@@ -31,7 +31,8 @@
 --      A3 MME          vc_content_status on the 14 gms3_vc_mme_vin_dtl_<locale> tables
 --      A4 MNAO         dc_facelift_folder_name on gms3_dmt_<loc>_imdoc; new tables gms3_dmt_<loc>_dispord
 --                      and gms3_dmt_<loc>_esicat; vc_content_status + display order columns on
---                      gms3_vc_vin_details / gms3_vc_model_year_details; index gms3_dmt_en_ca_imdoc_n2
+--                      gms3_vc_vin_details / gms3_vc_model_year_details; index gms3_dmt_en_ca_imdoc_n2;
+--                      index gms3_vc_model_year_details_n4 (document id + locale, as gms3_vc_vin_details_n2)
 --   B. Data
 --      B1 all markets  vc_content_status = 'Published' on rows still without a status
 --      B2 MNAO         dc_facelift_folder_name = 'FL0000' on existing document rows
@@ -559,6 +560,14 @@ ALTER TABLE kapture_dc.gms3_vc_model_year_details
 -- A4.5 Source path index on gms3_dmt_en_ca_imdoc (en_us / es_mx / fr_ca have it already)
 -- ---------------------------------------------------------------------------------------------
 CREATE INDEX gms3_dmt_en_ca_imdoc_n2 ON kapture_dc.gms3_dmt_en_ca_imdoc ((TRIM(LOWER(dc_source_network_loc))));
+
+-- ---------------------------------------------------------------------------------------------
+-- A4.6 Document + locale index on gms3_vc_model_year_details - the same shape as gms3_vc_vin_details_n2
+--    (Oracle GMS3_VC_VIN_DETAILS_N2). The View Content writers delete a document's rows with
+--    trim(vc_my_document_id) = ? AND trim(vc_my_locale) = ? (kauthor-api job MNAOViewContentModelYear, MDM);
+--    without it every such delete scans the whole table.
+-- ---------------------------------------------------------------------------------------------
+CREATE INDEX gms3_vc_model_year_details_n4 ON kapture_dc.gms3_vc_model_year_details ((TRIM(vc_my_document_id)), (LOWER(TRIM(vc_my_locale))));
 
 -- ---------------------------------------------------------------------------------------------
 -- B1. All markets: view content rows still without a status -> 'Published'

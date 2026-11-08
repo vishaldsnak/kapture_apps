@@ -106,3 +106,13 @@
 2026-11-04 06:04:55.417: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-11-04 06:04:55.417: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
 2026-11-05 01:16:30.676: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-07 09:54:17.709: [INFO] CurrentProfilePath: D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-11-07 09:54:17.710: [INFO] Profiles total count: 1
+2026-11-07 09:54:17.710: [INFO] Profile: name=Profile 1 path=D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-11-04T06:05:09.216Z
+2026-11-07 09:54:17.710: [INFO] LastUsedProfileDir: D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-11-07 09:54:17.710: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=D:\WD\Workspaces\Kapture_Apps\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-11-04T06:05:09.216Z
+2026-11-07 09:54:17.710: [INFO] OnDoneLoading sync enabled: 0
+2026-11-07 09:54:17.710: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-11-07 09:54:17.710: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-11-07 09:54:17.710: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-11-07 10:58:29.166: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
