@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><content contentid="d64b6f61-1c2e-4eca-b849-c33825699a68"><displayOn>2026-10-25T14:00:23.838504Z</displayOn><sourceFileName>id071100909000.ent</sourceFileName><sourceIdentifier>en-UK\NewM_CX-5_km\WM\FL0000\E-WZE-69P1_XML\ent.gms3\id071100909000.ent</sourceIdentifier><title><![CDATA[BLOWER MOTOR INSPECTION]]></title><type><![CDATA[SERVICE_MANUALS]]></type><categoriesESITreeLabels><![CDATA[ESI,Heater, Ventilation & Air Conditioning (Hvac),Basic System]]></categoriesESITreeLabels><isUpdateArticle>true</isUpdateArticle><dateAdded>24/10/2026 14:21:33</dateAdded><publishedVersion>2.0</publishedVersion><translatedLocale>en_UK</translatedLocale><DOCUMENTID><![CDATA[SM251673]]></DOCUMENTID><articleId>SM251673</articleId><dateModified>26/10/2026 00:14:26</dateModified><articleState>Published</articleState><pubFlag>false</pubFlag><createdDate>24/10/2026 14:21:33</createdDate><legacyDocumentId>SM251673</legacyDocumentId><articleVersion>2.0</articleVersion><SERVICE_MANUALS><DJVU_FILE_LOCATION/><TITLE><![CDATA[BLOWER MOTOR INSPECTION]]></TITLE><CONTENT><![CDATA[<hr /> 
+<p align="right" class="servinfo-title-id">id071100909000</p> 
+<p class="list">1.Remove the blower motor. (See <font class="extxref-label"><a href="content/SM252686">BLOWER MOTOR REMOVAL/INSTALLATION</a></font>.)</p> 
+<p class="list"></p> 
+<p class="list">2.Connect the 12 V battery voltage to blower motor terminal B and ground to terminal A, and verify that the blower motor operates smoothly.</p> 
+<p class="list"> </p> 
+<table class="figure-flame-non"> 
+ <tbody> 
+  <tr> 
+   <td> 
+    <table bordercolor="black" cellspacing="0" class="figure-non-float"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/OkAssets/library/MAZDA/SERVICE_MANUALS/en_UK/image/ac5wzw00021084.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      ac5wzw00021084 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<dl> 
+ <dd> 
+  <div class="list">
+    • If the operation is abnormal, replace the blower motor. (See 
+   <font class="extxref-label"><a href="content/SM252686">BLOWER MOTOR REMOVAL/INSTALLATION</a></font>.) 
+  </div> 
+ </dd> 
+</dl> 
+<p></p> 
+<link href="/library/MAZDA/GMS3_CUSTOM/mazda-css-mme.css" type="text/css" rel="stylesheet" />]]></CONTENT></SERVICE_MANUALS><primaryLocale>en_UK</primaryLocale><CATEGORIES><CATEGORY><NAME><![CDATA[Workshop Manual]]></NAME><REFERENCE_KEY><![CDATA[WORKSHOP_MANUAL]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[SERVICE_MANUAL_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[CX-5 KM YCM-KM**B***-100001-ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[KMYCMKM__B___100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[CARLINE_VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[SKYACTIV-G 2.5 (WITH CYLINDER DEACTIVATION)]]></NAME><REFERENCE_KEY><![CDATA[E54]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[ENGINE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[FW6A(X)-EL]]></NAME><REFERENCE_KEY><![CDATA[M38]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[TRANSMISSION_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[2WD]]></NAME><REFERENCE_KEY><![CDATA[D01]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[DRIVELINE_AXLE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[4WD]]></NAME><REFERENCE_KEY><![CDATA[D02]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[DRIVELINE_AXLE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[5HB]]></NAME><REFERENCE_KEY><![CDATA[B05]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[BODY_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Basic System]]></NAME><REFERENCE_KEY><![CDATA[071100]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[ESI]]></TYPE></CATEGORY></CATEGORIES></content>

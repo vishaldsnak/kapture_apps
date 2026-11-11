@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><content contentid="5481c2d8-ab1b-4dd0-8eb6-a6bd23ca50fb"><displayOn>2026-09-09T13:05:50.688706140Z</displayOn><sourceFileName>content_d91087f5e1f64248b4222e88b5178231.xml</sourceFileName><sourceIdentifier>sites/MAZDA/content/staging/SERVICE_INFORMATION/107000/SI107921/en_US/3.0</sourceIdentifier><title><![CDATA[09-039/16 - 2016 CX-5 - REAR CONSOLE LID DOES NOT LOCK]]></title><type><![CDATA[SERVICE_INFORMATION]]></type><categoriesESITreeLabels><![CDATA[ESI Category,Body and Accessories,Interior Trim]]></categoriesESITreeLabels><isUpdateArticle>true</isUpdateArticle><dateAdded>09/09/2026 12:59:23</dateAdded><publishedVersion>1.0</publishedVersion><translatedLocale>en_US</translatedLocale><SERVICE_INFORMATION><BULLETIN_NOTES><![CDATA[<br /> <a name="M09-03916si001"></a> <h4>BULLETIN NOTE</h4><p class="red">This bulletin supersedes the previously issued bulletin(s) listed below. The changes are noted in Red beside the change bars.</p><br /><br /><table border="1" cellpadding="0" cellspacing="@colsep" bordercolor="#CCCCCC" frame="box" rules="all"> 
+ <tbody valign="" align="" cellspacing="1" rowspan=""> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Previous TSBs: </p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Date(s) Issued: </p></td> 
+  </tr> 
+  <tr align="" valign="" class="red" cellspacing="" rowspan=""> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>09-039/16</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>06/14/16</p></td> 
+  </tr> 
+ </tbody> 
+</table><br /><a name="M09-03916si002"></a><h4>APPLICABLE MODEL(S)/VINS</h4><p>2016 CX-5 vehicles with VINs lower than <span class="red">JM3KE******863583 (produced before September 1, 2016)</span></p><a name="M09-03916si003"></a>]]></BULLETIN_NOTES><CALIBRATION/><PARTS_INFORMATION><![CDATA[<br /><br /><table border="1" cellpadding="0" cellspacing="@colsep" bordercolor="#CCCCCC" frame="box" rules="all"> 
+ <tbody valign="" align="" cellspacing="1" rowspan=""> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Part Number</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Description</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Qty.</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Notes</p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p class="red">KA0G-64-45YA-02</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Lock, Console Lid</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>1</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>---</p></td> 
+  </tr> 
+ </tbody> 
+</table><br /><a name="M09-03916si006"></a>]]></PARTS_INFORMATION><DESCRIPTION><![CDATA[<p>Some vehicles may have a rear console lid that cannot be locked due to a broken latch (A).</p><p align="center"> <img align="absmiddle" border="0" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/3209a.JPG" /></p><p>The rear console lid latch may be broken by excessive force applied to the lid. To eliminate this concern, the shape of the rear console lid latch has been changed to increase its strength.</p><p>Customers having this concern should have their vehicle repaired using the following repair procedure.</p><a name="M09-03916si004"></a>]]></DESCRIPTION><CAMPAIGN_TYPE><DISPLAY><![CDATA[None]]></DISPLAY><GUID><![CDATA[6a25dda4290940049496c90960dc66e0]]></GUID><VALUE><![CDATA[NONE]]></VALUE></CAMPAIGN_TYPE><TSB_NUMBER><![CDATA[09-039/16]]></TSB_NUMBER><SERVICE_INFORMATION_TYPE><DISPLAY><![CDATA[Technical Service Bulletin]]></DISPLAY><GUID><![CDATA[ef6acaab260d4cae87ae1e55ca3c1000]]></GUID><VALUE><![CDATA[TECHNICAL_SERVICE_BULLETIN]]></VALUE></SERVICE_INFORMATION_TYPE><ATTACHMENTS/><TSB_ISSUE_DATE><![CDATA[2016-06-14 05:00:00 PDT]]></TSB_ISSUE_DATE><TITLE><![CDATA[09-039/16 - 2016 CX-5 - REAR CONSOLE LID DOES NOT LOCK]]></TITLE><REPAIR_PROCEDURE><![CDATA[<blockquote>
+  1. Verify the customer concern. 
+</blockquote><blockquote>
+  2. Remove the console lid and inner cover according to the instructions on MS3 online or the Workshop Manual (section 09-17 
+ <a href="content/SM150972">CONSOLE LID REMOVAL/INSTALLATION</a>). 
+ <p> <b><font color="#254164">NOTE: </font></b>Apply protective tape (A) to the tip of a screwdriver. Insert the screwdriver into the space between the console lid and the inner cover.</p> 
+ <p align="center"> <img align="absmiddle" border="0" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/3209b.JPG" /></p> 
+</blockquote><blockquote>
+  3. Pull out the pin using pliers. 
+ <p align="center"> <img align="absmiddle" border="0" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/3209c.JPG" /></p> 
+</blockquote><blockquote>
+  4. Remove the spring (A) and the console lid lock (B). 
+ <p align="center"> <img align="absmiddle" border="0" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/3209d.JPG" /></p> 
+</blockquote><blockquote>
+  5. Install a new (modified) console lid lock, then the other removed parts in reverse order. 
+ <p> <b><font color="#254164">NOTE: </font></b>Verify that the lock can move smoothly before installing the console lid onto the inner cover.</p> 
+</blockquote><blockquote>
+  6. Verify the repair. 
+</blockquote><a name="M09-03916si005"></a>]]></REPAIR_PROCEDURE><WARRANTY_INFORMATION><![CDATA[<p> <b><font color="#254164">NOTE: </font></b> </p><blockquote> 
+ <ul> 
+  <li><p>This warranty information applies only to verified customer complaints on vehicles eligible for warranty repair.</p></li> 
+  <li><p>This repair will be covered under Mazda’s New Vehicle Limited Warranty term.</p></li> 
+  <li><p>Additional diagnostic time cannot be claimed for this repair.</p></li> 
+  <li><p>This TSB can be performed by D329 Mazda Certified Lube Technicians.</p></li> 
+ </ul> 
+</blockquote><p></p><br /><br /><table border="1" cellpadding="0" cellspacing="@colsep" bordercolor="#CCCCCC" frame="box" rules="all"> 
+ <tbody valign="" align="center" cellspacing="1" rowspan=""> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Warranty Type</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>A </p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Symptom Code</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>42 </p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Damage Code</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>9A </p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Part Number Main Cause</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p class="red">KA0G-64-45YA-02 </p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Quantity</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>1</p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>Operation Number / Labor Hours:</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>XXM3NXRX / 0.3 Hrs.</p></td> 
+  </tr> 
+  <tr valign="" align="" cellspacing="" rowspan=""> 
+   <td valign="" align="left" cellspacing="" rowspan="" colspan="NaN"><p>TSB can be performed by D329 Mazda Certified Lube Technicians:</p></td> 
+   <td valign="" align="center" cellspacing="" rowspan="" colspan="NaN"><p>Yes</p></td> 
+  </tr> 
+ </tbody> 
+</table><br /><br /><br />]]></WARRANTY_INFORMATION></SERVICE_INFORMATION><DOCUMENTID><![CDATA[SI107921]]></DOCUMENTID><articleId>SI107921</articleId><dateModified>09/09/2026 13:05:51</dateModified><articleState>Published</articleState><pubFlag>true</pubFlag><createdDate>09/09/2026 12:59:23</createdDate><legacyDocumentId>SI107921</legacyDocumentId><articleVersion>1.0</articleVersion><publishedDate>2026-09-09T13:05:51.134056195Z</publishedDate><primaryLocale>en_US</primaryLocale><CATEGORIES><CATEGORY><NAME><![CDATA[None]]></NAME><REFERENCE_KEY><![CDATA[CVC_FI8A3E00]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[CVC]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[CX5 2016]]></NAME><REFERENCE_KEY><![CDATA[CX5_2016]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[MODEL_YEAR]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Technical Service Bulletin]]></NAME><REFERENCE_KEY><![CDATA[TECHNICAL_SERVICE_BULLETIN]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[SERVICE_INFORMATION_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM1KE0000G0000000863583]]></NAME><REFERENCE_KEY><![CDATA[JM1KE0000G0000000863583]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Interior Trim]]></NAME><REFERENCE_KEY><![CDATA[091700]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[ESI]]></TYPE></CATEGORY></CATEGORIES></content>

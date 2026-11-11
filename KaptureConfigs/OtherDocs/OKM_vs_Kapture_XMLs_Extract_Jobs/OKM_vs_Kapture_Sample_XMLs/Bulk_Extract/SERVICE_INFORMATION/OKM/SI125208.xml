@@ -1,0 +1,156 @@
+<CONTENT><MASTERIDENTIFIER><![CDATA[16-004/26 - UPDATED SOFTWARE RELEASE FOR COCKPIT DOMAIN CONTROLLER (CDC) AND DATA COMMUNICATION MODULE (DCM)]]></MASTERIDENTIFIER><DOCUMENTID><![CDATA[SI125208]]></DOCUMENTID><LOCALECODE><![CDATA[en_US]]></LOCALECODE><VERSION>30.0</VERSION><CREATEDATE>2026-04-21 15:40:06 Etc/GMT</CREATEDATE><LASTMODIFIEDDATE>10/15/2026</LASTMODIFIEDDATE><PUBLISHEDDATE>10/15/2026</PUBLISHEDDATE><SERVICE_INFORMATION><TITLE><![CDATA[16-004/26 - UPDATED SOFTWARE RELEASE FOR COCKPIT DOMAIN CONTROLLER (CDC) AND DATA COMMUNICATION MODULE (DCM)]]></TITLE><SA_NUMBER/><MTIPS_NUMBER/><TSB_NUMBER><![CDATA[16-004/26]]></TSB_NUMBER><CAMPAIGN_NUMBER/><TSB_ISSUE_DATE><![CDATA[2026-07-26 15:00:00 Etc/GMT]]></TSB_ISSUE_DATE><RECALL_NUMBERS><RECALL_NUMBER/></RECALL_NUMBERS><BULLETIN_NOTES SECURITY="TECHNICIAN+AFTERMARKET"><![CDATA[<span style="color:Red;">This TSB has been superceded by <a href="/REF_DOCUMENTS/SI125340/SI125340.xml">SSPE2 AND MSP67</a>.</span>
+<table border="1" cellpadding="4" cellspacing="0" style="width:550px;">
+	<tbody>
+		<tr>
+			<td align="center">Previous TSBs:</td>
+			<td align="center">Date(s) Issued:</td>
+		</tr>
+		<tr>
+			<td style="text-align: center;">16-004/26</td>
+			<td align="center"><span style="color:Red;">06/24/26, </span>05/19/26 and 05/06/2026</td>
+		</tr>
+	</tbody>
+</table>
+<br />
+<strong>APPLICABLE MODEL(S)/VINS</strong><br />
+2026 CX-5]]></BULLETIN_NOTES><DESCRIPTION><![CDATA[<p>The release notes outlined below provide an overview of bug fixes, feature improvements, and updates included in the&nbsp;latest DCM and CDC software updates. The latest version of software contains all the updates of the previous versions.</p>
+<strong><u>For DCM:</u><br />
+Version KLAS-67CK3-L fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>The system is in OTA reprogramming available mode</li>
+</ul>
+<strong>Version KLAS-67CK3-K fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>Google-related functions (e.g., voice recognition), smartphone-based remote-control operations,&nbsp;and connected services may not function.</li>
+	<li>Remote-control operations (e.g., door lock and hazard light activation) and vehicle status&nbsp;monitoring via the MyMazda App may not be available.</li>
+</ul>
+<strong>Version KLAS-67CK3-J fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>A beep sound is emitted from near the SOS switch (further improvement).</li>
+	<li>Google-related functions, such as voice recognition, smartphone remote operations, and&nbsp;connected service subscriptions are not available.</li>
+	<li>The volume of the beep sound when a DCM malfunction is detected has been&nbsp;reduced.</li>
+</ul>
+<strong>Version KLAS-67CK3-K fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>Google-related functions (e.g., voice recognition), smartphone-based remote-control operations,&nbsp;and connected services may not function.</li>
+	<li>Remote-control operations (e.g., door lock and hazard light activation) and vehicle status&nbsp;monitoring via the MyMazda App may not be available.</li>
+</ul>
+<strong>Version KLAS-67CK3-H fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>12 V Battery discharged.</li>
+</ul>
+<strong>Version KLAS-67CK3-G fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>The pictograph antenna icon on the upper part of the center display shows a globe with a slash mark.</li>
+</ul>
+<img alt="" src="/library/MAZDA/GMS3/MC/SI/en_jp/image/SI125208a.jpg" />
+<ul>
+	<li>DCM internal battery malfunction&nbsp;(DTC B1477:00, B1477:16 are stored).</li>
+	<li>The SOS button illuminates red.</li>
+	<li>Remote operation may fail.</li>
+	<li>A beep sound may be emitted from the DCM.</li>
+	<li>Improvements for communication stability.</li>
+</ul>
+
+<p><strong><u>For CDC:</u><br />
+Versions KLAS-66CD1-D (VIP), KLEJ-66CD2-F&nbsp;(PVM) and KL**-66CD3-G&nbsp;(GVM)&nbsp;fixes these software errors (bugs):</strong></p>
+
+<ul>
+	<li>Communication in the Cockpit Domain Controller (CDC) and Data Communication Module&nbsp;(DCM), may be interrupted, making the connected&nbsp;services unavailable. The interruption may&nbsp;cause the master warning light to illuminatea and audible warning from the emergency call&nbsp;speaker.</li>
+	<li>Due to an improper communication control program in the CDC and DCM, may prevent OTA&nbsp;software updates to be completed. In addition, if an OTA software update is successfully&nbsp;completed, the vehicle&#39;s software configuration status may not be correctly transmitted to the&nbsp;server, which may prevent notification of subsequent software updates. Successfully completed&nbsp;OTA software updates may not properly sync with Mazda&rsquo;s servers potentially preventing future&nbsp;OTA updates.</li>
+</ul>
+<strong>Versions KLAS-66CD1-D (VIP), KLEJ-66CD2-E (PVM) and KL**-66CD3-F (GVM)&nbsp;fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>SOS button illuminates red and emits a beep sound immediately after IG ON (DTC U2701:89 is&nbsp;stored), with an additional update.</li>
+	<li>Text updated in the &ldquo;Data Communication Information&rdquo; screen under Settings &gt; Privacy &gt; Data&nbsp;Communication.</li>
+</ul>
+<strong>Versions KLAS-66CD1-D (VIP), KLEJ-66CD2-D (PVM) and KL**-66CD3-E (GVM)&nbsp;fixes these software errors (bugs):</strong>
+
+<ul>
+	<li>SOS button illuminates red and emits a beep sound immediately after IG ON&nbsp;(DTC U2701:89 is&nbsp;stored).</li>
+	<li>The pictograph antenna icon on the upper part of the center display shows a globe symbol.</li>
+	<li>Mazda Connect takes approximately 10 seconds to boot up after engine start, causing a&nbsp;noticeable delay on the display.</li>
+	<li>The display remains black on startup (Reverse camera displays normally when Reverse gear is&nbsp;engaged).</li>
+	<li>Minor improvements for enhanced operational stability and product quality.</li>
+	<li>Apple CarPlay&reg; fails to auto-connect.</li>
+</ul>
+&nbsp;
+
+<p><span style="color:#ffffff;"><span style="font-size:8px;">SI1252</span></span></p>
+]]></DESCRIPTION><REPAIR_PROCEDURE><![CDATA[<span style="color:Red;">This TSB has been superceded by <a href="/REF_DOCUMENTS/SI125340/SI125340.xml">SSPE2 AND MSP67</a>.</span>]]></REPAIR_PROCEDURE><CALIBRATION/><PARTS_INFORMATION/><WARRANTY_INFORMATION><![CDATA[<span style="color:Red;"><strong>Warranty for this TSB valid through July 27, 2026.</strong></span><br />
+<strong>NOTE:</strong>
+<ul>
+	<li>This warranty information applies only to verified customer complaints on vehicles eligible for warranty repair.</li>
+	<li>This repair will be covered under Mazda&rsquo;s New Vehicle Limited Warranty term.</li>
+	<li>Additional diagnostic time cannot be claimed for this repair.</li>
+	<li>Both part numbers and labor operations must be completed and charged on the claim</li>
+	<li>Software updates will be checked and claim will be rejected or debited if found to be incomplete.</li>
+	<li><strong>TWO CLAIMS ARE REQUIRED: ONE FOR CDC AND ANOTHER FOR DCM&nbsp;(INTERIM PROCESS)</strong></li>
+</ul>
+
+<table border="1" cellpadding="4" cellspacing="0">
+	<tbody>
+		<tr>
+			<td width="50%">Warranty Type</td>
+			<td align="center" width="50%">A</td>
+		</tr>
+		<tr>
+			<td>Symptom Code</td>
+			<td align="center">64</td>
+		</tr>
+		<tr>
+			<td>Damage Code</td>
+			<td align="center">9W</td>
+		</tr>
+		<tr>
+			<td>Part Number Main Cause</td>
+			<td align="center">5555-RP-CDC&nbsp;</td>
+		</tr>
+		<tr>
+			<td>Quantity</td>
+			<td align="center">0</td>
+		</tr>
+		<tr>
+			<td>Operation Number / Labor Hours:</td>
+			<td align="center">XXX71XFX&nbsp;/ 0.5 Hrs. (CDC)</td>
+		</tr>
+	</tbody>
+</table>
+&nbsp;
+
+<table border="1" cellpadding="4" cellspacing="0">
+	<tbody>
+		<tr>
+			<td width="50%">Warranty Type</td>
+			<td align="center" width="50%">A</td>
+		</tr>
+		<tr>
+			<td>Symptom Code</td>
+			<td align="center">64</td>
+		</tr>
+		<tr>
+			<td>Damage Code</td>
+			<td align="center">9W</td>
+		</tr>
+		<tr>
+			<td>Part Number Main Cause</td>
+			<td align="center">5555-RP-DCM</td>
+		</tr>
+		<tr>
+			<td>Quantity</td>
+			<td align="center">0</td>
+		</tr>
+		<tr>
+			<td>Operation Number / Labor Hours:</td>
+			<td align="center">XXX6EAFX&nbsp;/ 0.5 Hrs. (DCM)</td>
+		</tr>
+	</tbody>
+</table>
+]]></WARRANTY_INFORMATION><FIRST_PUBLICATION_DATE><![CDATA[2026-05-05 15:00:00 Etc/GMT]]></FIRST_PUBLICATION_DATE><LEGACY_ID/><INTERNAL_DOCUMENT_REFERENCE_NUMBER><![CDATA[2T32061122]]></INTERNAL_DOCUMENT_REFERENCE_NUMBER><ATTACHMENTS><ATTACHMENT_TITLE/><ATTACHMENT/><PDF_ATTACHMENTS><LEGACY_PDF/><REVISION_HISTORY/><OTHER_PDF/></PDF_ATTACHMENTS></ATTACHMENTS><SHOW_AS_NEWS_FOR_WEEKS/><EXPIRATION_DATE/><OTHER_REFERENCE_FILE_ATTACHMENT/><MC_AUTHORIZATION_NUMBER SECURITY="TECHNICIAN"/><CAMPAIGN_ATTACHMENTS><CAMPAIGN_ATTACHMENT_TITLE SECURITY="TECHNICIAN"/><CAMPAIGN_ATTACHMENT SECURITY="TECHNICIAN"/></CAMPAIGN_ATTACHMENTS><SIGNATURE><NAME/><ATTACHMENT_FOR_SIGNATURE_IMAGE/><INITIATOR_DESIGNATION/><INITIATOR_DEPARTMENT/><INITIATOR_GROUP/><COMPANY_NAME/><ADDRESS/><TELEPHONE_NO/><FAX/></SIGNATURE><MD_LETTER_ATTACHMENT/></SERVICE_INFORMATION></CONTENT>

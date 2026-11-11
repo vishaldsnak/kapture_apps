@@ -1,0 +1,1784 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<SERVICE_MANUALS><DOCUMENTID><![CDATA[SM208074]]></DOCUMENTID><LOCALE><![CDATA[cs_CZ]]></LOCALE><TITLE><![CDATA[DTC P0A94:00 [SKYACTIV-G 2.0, SKYACTIV-G 2.5]]]></TITLE><CONTENT><![CDATA[<hr /> 
+<p class="servinfo-title-id" align="right">id0102h4004400</p> 
+<br clear="all" /> 
+<a name="id0102h400440001"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Details On DTCs</p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">DESCRIPTION</p> </th> 
+   <th id="" align="left" colspan="2"> <p class="thead">DC-DC converter: control circuit signal error (Without i-ELOOP)</p> <p class="thead">DC-DC converter (i-ELOOP): control circuit signal error (With i-ELOOP)</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center" rowspan="5"> 
+    <div class="tbody"> 
+     <span>DETECTION CONDITION</span> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Determination conditions 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list-title">
+      Without i-ELOOP 
+    </div> 
+    <div class="list">
+      • Internal malfunction signal from DC-DC converter via front body control module (FBCM) is received.(CAN/LIN communication). 
+    </div> 
+    <div class="list">
+      • Input signal from the DC-DC converter limits the pressure increase time. 
+    </div> 
+    <div class="list">
+      • Input signal from the DC-DC converter does not implement pressure increase after a pressure increase command to the DC-DC converter. 
+    </div> 
+    <div class="list-title">
+      With i-ELOOP 
+    </div> 
+    <div class="list">
+      • Internal malfunction signal from DC-DC converter (i-ELOOP) is received. 
+    </div> 
+    <div class="list">
+      • Condition in which DC-DC converter (i-ELOOP) output voltage, based on demand voltage of PCM, is low continues. 
+    </div> 
+    <div class="list">
+      • When PCM outputs drive command signal for each type of relay in DC-DC converter (i-ELOOP), relay condition signal returned from DC-DC converter (i-ELOOP) differs from drive command, or not returned 
+    </div> 
+    <div class="list">
+      • Condition in which DC-DC converter (i-ELOOP) 2A terminal current value of 30 A or more continues 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Preconditions 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • Not applicable 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Drive cycle 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • 1 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Self test type 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • CMDTC self test 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Sensor used 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • Not applicable 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody"> 
+     <span>FAIL-SAFE FUNCTION</span> 
+    </div> </td> 
+   <td id="" align="left" colspan="2"> 
+    <div class="list">
+      • Inhibits engine-stop by operating the i-stop function. 
+    </div> 
+    <div class="list">
+      • The following fail-safe differ depending on the type of malfunction (with i-ELOOP) 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― Transition to i-ELOOP bypass mode. 
+      </div> 
+      <div class="list">
+        ― i-ELOOP bypass mode inhibited. 
+      </div> 
+     </dd> 
+    </dl> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody"> 
+     <span>VEHICLE STATUS WHEN DTCs ARE OUTPUT</span> 
+    </div> </td> 
+   <td id="" align="left" colspan="2"> 
+    <div class="list">
+      • Illuminates the i-stop warning light (amber) 
+    </div> 
+    <div class="list">
+      • The following vehicle conditions differ depending on the type of malfunction 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― Illuminates the master warning light 
+      </div> 
+      <div class="list">
+        ― Illuminates the charging system warning light 
+      </div> 
+      <div class="list">
+        ― The pre-charge mode is implemented after the engine is started. (with i-ELOOP) 
+      </div> 
+     </dd> 
+    </dl> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody"> 
+     <span>POSSIBLE CAUSE</span> 
+    </div> </td> 
+   <td id="" align="left" colspan="2"> 
+    <div class="list-title">
+      Without i-ELOOP 
+    </div> 
+    <div class="list">
+      • Connector or terminal malfunction of the following parts: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM 
+      </div> 
+      <div class="list">
+        ― Battery 
+      </div> 
+      <div class="list">
+        ― DC-DC converter 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Short to ground in wiring harness between the following terminals: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― DC-DC converter terminal L—DCDC 50 A fuse 
+      </div> 
+      <div class="list">
+        ― DCDC 50 A fuse 
+      </div> 
+      <div class="list">
+        ― Battery positive terminal—DCDC 50 A fuse 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Open circuit in wiring harness between the following terminals: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― DC-DC converter terminal L—DCDC 50 A fuse 
+      </div> 
+      <div class="list">
+        ― DCDC 50 A fuse 
+      </div> 
+      <div class="list">
+        ― Battery positive terminal—DCDC 50 A fuse 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Battery malfunction 
+    </div> 
+    <div class="list">
+      • DC-DC converter malfunction 
+    </div> 
+    <div class="list">
+      • Front body control module (FBCM) malfunction 
+    </div> 
+    <div class="list">
+      • PCM malfunction 
+    </div> 
+    <div class="list-title">
+      With i-ELOOP 
+    </div> 
+    <div class="list">
+      • Connector or terminal malfunction of the following parts: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM 
+      </div> 
+      <div class="list">
+        ― Battery 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Short to ground in wiring harness between the following terminals: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1F—PCM 2P 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1G—PCM 2W 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1I—PCM 2L 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Open circuit in wiring harness between the following terminals: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1F—PCM 2P 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1G—PCM 2W 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1I—PCM 2L 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • High-power load, non-genuine part installed to line connected to DC-DC converter (i-ELOOP) terminal 2A 
+    </div> 
+    <div class="list">
+      • DC-DC converter (i-ELOOP) malfunction 
+    </div> 
+    <div class="list">
+      • PCM malfunction 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440002"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>System Wiring Diagram</p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440003"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>Without i-ELOOP</p> 
+<table class="figure-flame-non"> 
+ <tbody> 
+  <tr> 
+   <td> 
+    <table class="figure-non-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/library/MAZDA/SERVICE_MANUALS/cs_cz/image/am6zzw00011830.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      am6zzw00011830 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440004"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>With i-ELOOP</p> 
+<table class="figure-flame-non"> 
+ <tbody> 
+  <tr> 
+   <td> 
+    <table class="figure-non-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/library/MAZDA/SERVICE_MANUALS/cs_cz/image/am6zzw00012000.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      am6zzw00012000 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440005"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Function Explanation (DTC Detection Outline)</p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440006"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>Without i-ELOOP</p> 
+<dl> 
+ <dd> 
+  <div class="list">
+    • The DC-DC converter is equipped with a boost function to stabilize the power supply to the vehicle’s electrical devices when the engine is restarted by i-stop. If the DC-DC converter does not operate, the supply voltage to the vehicle’s electrical devices decreases. In this diagnostic, the response condition of the DC-DC converter to the boost demand from the PCM, or the boost by the on-board diagnostic function of the DC-DC converter is not detected, and verification of vehicle malfunctions/safety assurance is performed. 
+  </div> 
+ </dd> 
+</dl> 
+<p></p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440007"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>With i-ELOOP</p> 
+<dl> 
+ <dd> 
+  <div class="list">
+    • With the DC-DC converter (i-ELOOP) function, the PCM performs malfunction determination, and verification of vehicle malfunctions/safety assurance is performed. 
+  </div> 
+  <dl> 
+   <dd class="list"> 
+    <div class="list">
+      ― The DC-DC converter (i-ELOOP) is equipped with a voltage lowering function which supplies power to the 12 V line from the 25 V line. If this function does not operate, it may not be possible to supply power to the vehicle’s electrical devices. In this diagnostic, the system detects whether the DC-DC converter (i-ELOOP) can respond to the command voltage from the PCM, or it detects a malfunction in the voltage lowering circuit based on the on-board diagnostic of the DC-DC converter (i-ELOOP). 
+    </div> 
+    <div class="list">
+      ― The DC-DC converter (i-ELOOP) is equipped with a discharge circuit which discharges a certain amount of capacitor voltage when the ignition is switched off. If this function does not operate, the capacitor may deteriorate. In this diagnostic, a discharge circuit malfunction condition is detected in the DC-DC converter (i-ELOOP), and a malfunction is determined by the PCM. 
+    </div> 
+    <div class="list">
+      ― The DC-DC converter (i-ELOOP) is equipped with a bypass circuit which supplies voltage generated by the generator to the 12 V line. If this function does not operate, a power supply shortage may occur. In this diagnostic, a bypass circuit malfunction condition is detected in the DC-DC converter (i-ELOOP), and a malfunction is determined by the PCM. In addition, a malfunction is determined by the PCM from a mismatch with the response signal of the DC-DC converter (i-ELOOP) in relation to the bypass relay drive command signal from the PCM. 
+    </div> 
+    <div class="list">
+      ― To stabilize the power supply of the vehicle’s electrical devices when the engine is restarted by i-stop, the DC-DC converter (i-ELOOP) is equipped with a function which disconnects the power supply of the instrument cluster from the battery and supplies electricity directly through the DC-DC converter (i-ELOOP). If this function does not operate, the power supplied to the vehicle’s electrical devices when the engine is restarted by i-stop could decrease. In this diagnostic, an i-stop relay circuit malfunction condition is detected in the DC-DC converter (i-ELOOP), and a malfunction is determined by the PCM. In addition, a malfunction is determined by the PCM from a mismatch with the response signal of the DC-DC converter (i-ELOOP) in relation to the bypass relay drive command signal from the PCM. 
+    </div> 
+    <div class="list">
+      ― The DC-DC converter (i-ELOOP) monitors the input/output voltage and the output current, and the PCM performs charge/discharge control of the generator based on each of the signals to assure the vehicle’s power supply. If the output current of the DC-DC converter (i-ELOOP) exceeds the assurance value of the internal circuit, or each input/output value indicates an abnormal value, normal supply of electricity may not be possible. In this diagnostic, each input/output terminal of the DC-DC converter (i-ELOOP) is detected as an abnormal value/exceeding assurance value, and a malfunction is determined by the PCM. 
+    </div> 
+   </dd> 
+  </dl> 
+ </dd> 
+</dl> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440008"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Repeatability Verification Procedure</p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440009"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>Without i-ELOOP</p> 
+<dl> 
+ <dd> 
+  <div class="list">
+    1. Clear the DTC from the PCM memory using the M-MDS. (See 
+   <font class="extxref-label"><a href="content/">CLEARING DTC [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+  </div> 
+  <div class="list">
+    2. Start the engine. 
+  </div> 
+  <div class="list">
+    3. Stop the engine by operating the i-stop function. 
+  </div> 
+ </dd> 
+</dl> 
+<p></p> 
+<br clear="all" /> 
+<p> <a name="id0102h400440010"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>With i-ELOOP</p> 
+<dl> 
+ <dd> 
+  <div class="list">
+    1. Clear the DTC from the PCM memory using the M-MDS. (See 
+   <font class="extxref-label"><a href="content/">CLEARING DTC [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+  </div> 
+  <div class="list">
+    2. Start the engine. 
+  </div> 
+  <div class="list">
+    3. Leave for 30 s while idling with no electrical load. 
+  </div> 
+  <div class="list">
+    4. Leave for 30 s while idling with high electrical load. 
+  </div> 
+  <div class="list">
+    5. Stop the engine by operating the i-stop function. 
+  </div> 
+ </dd> 
+</dl> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440011"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>PID Item/Simulation Item Used In Diagnosis</p> 
+<div class="list">
+  • Not applicable 
+</div> 
+<br clear="all" /> 
+<a name="id0102h400440012"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Function Inspection Using M-MDS (Without i-ELOOP)</p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">STEP</p> </th> 
+   <th id="" align="center"> <p class="thead">INSPECTION</p> </th> 
+   <th id="" align="center"> <p class="thead">RESULTS</p> </th> 
+   <th id="" align="center"> <p class="thead">ACTION</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY RELATED SERVICE INFORMATION AVAILABILITY 
+    </div> 
+    <div class="list">
+      • Verify related Service Information availability. 
+    </div> 
+    <div class="list">
+      • Is any related Service Information available? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform repair or diagnosis according to the available Service Information. 
+    </div> 
+    <div class="list">
+      • If the vehicle is not repaired, go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF BATTERY VOLTAGE IS FALSELY RECOGNIZED BY DTC RELATED CAN OR LIN COMMUNICATION 
+    </div> 
+    <div class="list">
+      • Perform the PCM and front body control module (FBCM) DTC inspection using the M-MDS. (See 
+     <font class="extxref-label"><a href="content/">ON-BOARD DIAGNOSTIC TEST [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) (See 
+     <font class="extxref-label"><a href="content/">DTC INSPECTION [FRONT BODY CONTROL MODULE (FBCM)]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Are DTCs related CAN or LIN communication recorded? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the malfunctioning part according to the applicable DTC troubleshooting. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC TABLE [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC TABLE [FRONT BODY CONTROL MODULE (FBCM)]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the troubleshooting procedure to perform the procedure from Step 1. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF THE CURRENT SENSOR IS MISIDENTIFYING MALFUNCTIONS DUE TO A FBCM MALFUNCTION 
+    </div> 
+    <div class="list">
+      • Perform the front body control module (FBCM) DTC inspection using the M-MDS. (See 
+     <font class="extxref-label"><a href="content/">DTC INSPECTION [FRONT BODY CONTROL MODULE (FBCM)]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is the PENDING CODE for this DTC present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the malfunctioning part according to the applicable DTC troubleshooting. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC TABLE [FRONT BODY CONTROL MODULE (FBCM)]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the troubleshooting procedure to perform the procedure from Step 1. 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440013"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Troubleshooting Diagnostic Procedure (Without i-ELOOP)</p> 
+<div class="list-title">
+  Intention of troubleshooting procedure 
+</div> 
+<div class="list">
+  • Step 1 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Perform a unit inspection of the battery. 
+  </div> 
+ </dd> 
+</dl> 
+<div class="list">
+  • Step 2—8 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verify if a malfunction is occurring due to a malfunction in each signal transmission and the boost demand line. 
+  </div> 
+ </dd> 
+</dl> 
+<div class="list">
+  • Step 9—10 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verify that primary malfunction is resolved and there are no other malfunctions. 
+  </div> 
+ </dd> 
+</dl> 
+<p clear="all"> </p> 
+<p class="table-title">Diagnostic Procedure</p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">STEP</p> </th> 
+   <th id="" align="center" colspan="2"> <p class="thead">INSPECTION</p> </th> 
+   <th id="" align="center"> <p class="thead">ACTION</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT BATTERY 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off. 
+    </div> 
+    <div class="list">
+      • Inspect the battery. (See 
+     <font class="extxref-label"><a href="content/">BATTERY INSPECTION [SKYACTIV-G 2.0, SKYACTIV-G 2.5 (WITHOUT i-stop)]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is there any malfunction? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Recharge or replace the battery, then go to Step 8. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">BATTERY RECHARGING [SKYACTIV-G 2.0, SKYACTIV-G 2.5 (WITHOUT i-stop)]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">BATTERY RECHARGING [SKYACTIV-G 2.0, SKYACTIV-G 2.5 (WITHOUT i-stop)]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT DC-DC CONVERTER CONNECTOR CONDITION 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off. 
+    </div> 
+    <div class="list">
+      • Disconnect the DC-DC converter connector. 
+    </div> 
+    <div class="list">
+      • Inspect for poor connection (such as damaged/pulled-out pins, corrosion). 
+    </div> 
+    <div class="list">
+      • Is there any malfunction? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the connector and/or terminals, then go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT DC-DC CONVERTER POWER SUPPLY CIRCUIT FOR SHORT TO GROUND OR OPEN CIRCUIT 
+    </div> 
+    <div class="list">
+      • Verify that the DC-DC converter connector is disconnected. 
+    </div> 
+    <div class="list">
+      • Measure the voltage at the DC-DC converter terminal L (wiring harness-side). 
+    </div> 
+    <div class="list">
+      • Is the voltage 
+     <span>B+</span>? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Inspect the DCDC 50 A fuse. 
+    </div> 
+    <div class="list">
+      • If the fuse is blown: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― Repair or replace the wiring harness for a possible short to ground. 
+      </div> 
+      <div class="list">
+        ― Replace the fuse. 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • If the fuse is deteriorated: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― Replace the fuse. 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • If the fuse is normal: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― Repair or replace the wiring harness for a possible open circuit. 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="tbody">
+      Go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      4 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT DC-DC CONVERTER SIGNAL CIRCUIT FOR SHORT TO GROUND 
+    </div> 
+    <div class="list">
+      • Verify that the DC-DC converter connector is disconnected. 
+    </div> 
+    <div class="list">
+      • Inspect for continuity between DC-DC converter terminal F (wiring harness-side) and body ground. 
+    </div> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      If the short to ground circuit could be detected in the wiring harness: 
+    </div> 
+    <div class="list">
+      • Repair or replace the wiring harness for a possible short to ground. 
+    </div> 
+    <div class="tbody">
+      If the short to ground circuit could not be detected in the wiring harness: 
+    </div> 
+    <div class="list">
+      • Replace the PCM (short to ground in the PCM internal circuit). (See 
+     <font class="extxref-label"><a href="content/">PCM REMOVAL/INSTALLATION [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      5 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT PCM CONNECTOR CONDITION 
+    </div> 
+    <div class="list">
+      • Disconnect the PCM connector. 
+    </div> 
+    <div class="list">
+      • Inspect for poor connection (such as damaged/pulled-out pins, corrosion). 
+    </div> 
+    <div class="list">
+      • Is there any malfunction? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the connector and/or terminals, then go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      6 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT DC-DC CONVERTER SIGNAL CIRCUIT FOR SHORT TO POWER SUPPLY 
+    </div> 
+    <div class="list">
+      • Verify that the DC-DC converter and PCM connectors are disconnected. 
+    </div> 
+    <div class="list">
+      • Switch the ignition ON (engine off or on). 
+    </div> 
+    <div class="list">
+      • Measure the voltage at the DC-DC converter terminal F (wiring harness-side). 
+    </div> 
+    <div class="list">
+      • Is the voltage 
+     <span>0 V</span>? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the wiring harness for a possible short to power supply, then go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      7 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      INSPECT DC-DC CONVERTER SIGNAL CIRCUIT FOR OPEN CIRCUIT 
+    </div> 
+    <div class="list">
+      • Verify that the DC-DC converter and PCM connectors are disconnected. 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off. 
+    </div> 
+    <div class="list">
+      • Inspect for continuity between DC-DC converter terminal F (wiring harness-side) and PCM terminal 2P (wiring harness-side). 
+    </div> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repair or replace the wiring harness for a possible open circuit, then go to Step 8. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      8 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      VERIFY DTC TROUBLESHOOTING COMPLETED 
+    </div> 
+    <div class="list">
+      • Make sure to reconnect all disconnected connectors. 
+    </div> 
+    <div class="list">
+      • Clear the DTC from the PCM memory using the M-MDS. (See 
+     <font class="extxref-label"><a href="content/">AFTER REPAIR PROCEDURE [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Perform the KOER self test. (See 
+     <font class="extxref-label"><a href="content/">KOEO/KOER SELF TEST [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is the same DTC present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace the DC-DC converter, and then perform Step 8 again. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DC-DC CONVERTER REMOVAL/INSTALLATION [SKYACTIV-G 2.0, SKYACTIV-G 2.5 (WITHOUT i-ELOOP)]</a></font>.) 
+    </div> 
+    <div class="list">
+      • If the malfunction recurs, replace the PCM. (See 
+     <font class="extxref-label"><a href="content/">PCM REMOVAL/INSTALLATION [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      9 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      VERIFY AFTER REPAIR PROCEDURE 
+    </div> 
+    <div class="list">
+      • Perform the “AFTER REPAIR PROCEDURE”. (See 
+     <font class="extxref-label"><a href="content/">AFTER REPAIR PROCEDURE [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Are any DTCs present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the applicable DTC inspection. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC TABLE [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      DTC troubleshooting completed. 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440014"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Function Inspection Using M-MDS (With i-ELOOP)</p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">STEP</p> </th> 
+   <th id="" align="center"> <p class="thead">INSPECTION</p> </th> 
+   <th id="" align="center"> <p class="thead">RESULTS</p> </th> 
+   <th id="" align="center"> <p class="thead">ACTION</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY RELATED SERVICE INFORMATION AVAILABILITY 
+    </div> 
+    <div class="list">
+      • Verify related Service Information availability. 
+    </div> 
+    <div class="list">
+      • Is any related Service Information available? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform repair or diagnosis according to the available Service Information. 
+    </div> 
+    <div class="list">
+      • If the vehicle is not repaired, go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF POWER SUPPLY IS AFFECTED BY DTC RELATED TO DC-DC CONVERTER (i-ELOOP) 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off, then to ON (engine off or on). 
+    </div> 
+    <div class="list">
+      • Perform the DC-DC converter (i-ELOOP) DTC inspection using the M-MDS. (See 
+     <font class="extxref-label"><a href="content/">DTC INSPECTION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is the PENDING CODE/DTC U3000:49 also present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the applicable PENDING CODE or DTC inspection. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC U3000:49 [i-ELOOP]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF POWER SUPPLY IS AFFECTED BY DTC RELATED TO PCM 
+    </div> 
+    <div class="list">
+      • Perform the Pending Trouble Code Access Procedure and DTC Reading Procedure. (See 
+     <font class="extxref-label"><a href="content/">ON-BOARD DIAGNOSTIC TEST [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is the PENDING CODE/DTC P0A12:00 also present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the applicable PENDING CODE or DTC inspection. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC P0A12:00 [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      4 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: DETERMINE IF MALFUNCTION CAUSED BY DC-DC CONVERTER (i-ELOOP) 
+    </div> 
+    <div class="list">
+      • Start the engine. 
+    </div> 
+    <div class="list">
+      • Is illuminate the master warning light? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the troubleshooting procedure to perform the procedure from Step 1. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      5 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: DETERMINE IF MALFUNCTION CAUSED BY DC-DC CONVERTER (i-ELOOP) 
+    </div> 
+    <div class="list">
+      • Is the charging system warning light illuminated after the engine is restarted by i-stop, or is there an abnormality in the navigation/audio unit behavior? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the troubleshooting procedure to perform the procedure from Step 3. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the troubleshooting procedure to perform the procedure from Step 5. 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<a name="id0102h400440015"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Troubleshooting Diagnostic Procedure (With i-ELOOP)</p> 
+<div class="list-title">
+  Intention of troubleshooting procedure 
+</div> 
+<div class="list">
+  • Step 1—2 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verifying malfunction related to DC-DC converter (i-ELOOP) 1G or 1I terminal 
+  </div> 
+ </dd> 
+</dl> 
+<div class="list">
+  • Step 3—4 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verifying malfunction related to DC-DC converter (i-ELOOP) 1F terminal 
+  </div> 
+ </dd> 
+</dl> 
+<div class="list">
+  • Step 5—6 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verifying/replacing malfunctioning part 
+  </div> 
+ </dd> 
+</dl> 
+<div class="list">
+  • Step 7—8 
+</div> 
+<dl> 
+ <dd class="list"> 
+  <div class="list">
+    ― Verify that primary malfunction is resolved and there are no other malfunctions. 
+  </div> 
+ </dd> 
+</dl> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">STEP</p> </th> 
+   <th id="" align="center"> <p class="thead">INSPECTION</p> </th> 
+   <th id="" align="center"> <p class="thead">RESULTS</p> </th> 
+   <th id="" align="center"> <p class="thead">ACTION</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF SHORT TO GROUND IN EACH WIRING HARNESS AFFECTS DIAGNOSTIC RESULTS 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off. 
+    </div> 
+    <div class="list">
+      • Disconnect the service plug. (See 
+     <font class="extxref-label"><a href="content/">SERVICE PLUG DISCONNECTION/CONNECTION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Disconnect the connector of the following parts. 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Inspect for continuity between the following terminals (wiring harness-side) and body ground: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM terminal 2W 
+      </div> 
+      <div class="list">
+        ― PCM terminal 2L 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1G 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1I 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Refer to the wiring diagram and verify whether or not there is a common connector between the following terminals: 
+    </div> 
+    <div class="list">
+      • PCM terminal 2W—DC-DC converter (i-ELOOP) terminal 1G 
+    </div> 
+    <div class="list">
+      • PCM terminal 2L—DC-DC converter (i-ELOOP) terminal 1I 
+    </div> 
+    <div class="list-title">
+      If there is a common connector: 
+    </div> 
+    <div class="list">
+      • Determine the malfunctioning part by inspecting the common connector and the terminal for corrosion, damage, or pin disconnection, and the common wiring harness for a short to ground. 
+    </div> 
+    <div class="list">
+      • Repair or replace the malfunctioning part. 
+    </div> 
+    <div class="list-title">
+      If there is no common connector: 
+    </div> 
+    <div class="list">
+      • Repair or replace the wiring harness which has a short to ground. 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF OPEN CIRCUIT IN EACH WIRING HARNESS AFFECTS DIAGNOSTIC RESULTS 
+    </div> 
+    <div class="list">
+      • Verify that the generator, capacitor (i-ELOOP), and DC-DC converter (i-ELOOP) connectors are disconnected. 
+    </div> 
+    <div class="list">
+      • Inspect for continuity between the following terminals (wiring harness-side): 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM terminal 2W—DC-DC converter (i-ELOOP) terminal 1G 
+      </div> 
+      <div class="list">
+        ― PCM terminal 2L—DC-DC converter (i-ELOOP) terminal 1I 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace the DC-DC converter (i-ELOOP). 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DC-DC CONVERTER (i-ELOOP) REMOVAL/INSTALLATION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Refer to the wiring diagram and verify whether or not there is a common connector between the following terminals: 
+    </div> 
+    <div class="list">
+      • PCM terminal 2W—DC-DC converter (i-ELOOP) terminal 1G 
+    </div> 
+    <div class="list">
+      • PCM terminal 2L—DC-DC converter (i-ELOOP) terminal 1I 
+    </div> 
+    <div class="list-title">
+      If there is a common connector: 
+    </div> 
+    <div class="list">
+      • Determine the malfunctioning part by inspecting the common connector and the terminal for corrosion, damage, or pin disconnection, and the common wiring harness for an open circuit. 
+    </div> 
+    <div class="list">
+      • Repair or replace the malfunctioning part. 
+    </div> 
+    <div class="list-title">
+      If there is no common connector: 
+    </div> 
+    <div class="list">
+      • Repair or replace the wiring harness which has an open circuit. 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF SHORT TO GROUND IN EACH WIRING HARNESS AFFECTS DIAGNOSTIC RESULTS 
+    </div> 
+    <div class="list">
+      • Switch the ignition to off. 
+    </div> 
+    <div class="list">
+      • Disconnect the service plug. (See 
+     <font class="extxref-label"><a href="content/">SERVICE PLUG DISCONNECTION/CONNECTION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Disconnect the connector of the following parts. 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Inspect for continuity between the following terminals (wiring harness-side) and body ground: 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM terminal 2P 
+      </div> 
+      <div class="list">
+        ― DC-DC converter (i-ELOOP) terminal 1F 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Refer to the wiring diagram and verify whether or not there is a common connector between the following terminals: 
+    </div> 
+    <div class="list">
+      • PCM terminal 2P—DC-DC converter (i-ELOOP) terminal 1F 
+    </div> 
+    <div class="list-title">
+      If there is a common connector: 
+    </div> 
+    <div class="list">
+      • Determine the malfunctioning part by inspecting the common connector and the terminal for corrosion, damage, or pin disconnection, and the common wiring harness for a short to ground. 
+    </div> 
+    <div class="list">
+      • Repair or replace the malfunctioning part. 
+    </div> 
+    <div class="list-title">
+      If there is no common connector: 
+    </div> 
+    <div class="list">
+      • Repair or replace the wiring harness which has a short to ground. 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      4 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF OPEN CIRCUIT IN EACH WIRING HARNESS AFFECTS DIAGNOSTIC RESULTS 
+    </div> 
+    <div class="list">
+      • Verify that the generator, capacitor (i-ELOOP), and DC-DC converter (i-ELOOP) connectors are disconnected. 
+    </div> 
+    <div class="list">
+      • Inspect for continuity between the following terminals (wiring harness-side): 
+    </div> 
+    <dl> 
+     <dd class="list"> 
+      <div class="list">
+        ― PCM terminal 2P—DC-DC converter (i-ELOOP) terminal 1F 
+      </div> 
+     </dd> 
+    </dl> 
+    <div class="list">
+      • Is there continuity? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace the DC-DC converter (i-ELOOP). 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DC-DC CONVERTER (i-ELOOP) REMOVAL/INSTALLATION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Refer to the wiring diagram and verify whether or not there is a common connector between the following terminals: 
+    </div> 
+    <div class="list">
+      • PCM terminal 2P—DC-DC converter (i-ELOOP) terminal 1F 
+    </div> 
+    <div class="list-title">
+      If there is a common connector: 
+    </div> 
+    <div class="list">
+      • Determine the malfunctioning part by inspecting the common connector and the terminal for corrosion, damage, or pin disconnection, and the common wiring harness for an open circuit. 
+    </div> 
+    <div class="list">
+      • Repair or replace the malfunctioning part. 
+    </div> 
+    <div class="list-title">
+      If there is no common connector: 
+    </div> 
+    <div class="list">
+      • Repair or replace the wiring harness which has an open circuit. 
+    </div> 
+    <div class="tbody">
+      Go to Step 7. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      5 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF MALFUNCTION OCCURRING IS CAUSED BY WIRING HARNESS/CONNECTOR LOSS 
+    </div> 
+    <div class="list">
+      • Have all the wiring harnesses/connectors which can be considered the cause of DTC P0A94:00 been inspected? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Inspect all the related wiring harnesses/connectors. 
+    </div> 
+    <div class="list-title">
+      If there is a malfunction 
+    </div> 
+    <div class="list">
+      • Repair or replace the connector and/or terminals, then go to Step 7. 
+    </div> 
+    <div class="list-title">
+      If there is no malfunction 
+    </div> 
+    <div class="list">
+      • Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      6 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY DC-DC converter (i-ELOOP) REPLACEMENT RECORD 
+    </div> 
+    <div class="list">
+      • Is the DC-DC converter (i-ELOOP) being replaced within the troubleshooting diagnostic procedure this time? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace the PCM. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">PCM REMOVAL/INSTALLATION [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace the DC-DC converter (i-ELOOP). 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DC-DC CONVERTER (i-ELOOP) REMOVAL/INSTALLATION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      7 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFICATION OF VEHICLE REPAIR COMPLETION 
+    </div> 
+    <div class="list">
+      • Make sure to reconnect all disconnected connectors. 
+    </div> 
+    <div class="list">
+      • Reconnect the service plug. (See 
+     <font class="extxref-label"><a href="content/">SERVICE PLUG DISCONNECTION/CONNECTION [i-ELOOP]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Clear the DTC from the PCM memory using the M-MDS. (See 
+     <font class="extxref-label"><a href="content/">CLEARING DTC [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Implement the repeatability verification procedure. (See 
+     <font class="intxref-label"><a href="#id0102h400440008">Repeatability Verification Procedure</a></font>.) 
+    </div> 
+    <div class="list">
+      • Perform the DTC Reading Procedure. (See 
+     <font class="extxref-label"><a href="content/">ON-BOARD DIAGNOSTIC TEST [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> 
+    <div class="list">
+      • Is the same DTC present? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Repeat the inspection from Step 5. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the next step. 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center" rowspan="2"> 
+    <div class="tbody">
+      8 
+    </div> </td> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="entry-title">
+      PURPOSE: VERIFY IF THERE IS ANY OTHER MALFUNCTION 
+    </div> 
+    <div class="list">
+      • Is any other DTC or pending code stored? 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      Yes 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Go to the applicable DTC inspection. 
+    </div> 
+    <div class="tbody">
+      (See 
+     <font class="extxref-label"><a href="content/">DTC TABLE [SKYACTIV-G 2.0, SKYACTIV-G 2.5]</a></font>.) 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      No 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      DTC troubleshooting completed. 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p>]]></CONTENT></SERVICE_MANUALS>

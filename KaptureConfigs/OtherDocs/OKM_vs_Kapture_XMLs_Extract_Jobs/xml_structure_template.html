@@ -1,0 +1,108 @@
+<title>Legacy vs Kapture XML</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reference column, then a full-width aligned table per channel, with legacy on the left and Kapture on the right. */
+:root {
+  --bg: #f6f7f8; --panel: #ffffff; --fg: #1d2429; --muted: #5a6670; --line: #d7dde2;
+  --accent: #124e78; --legacy: #fbeed5; --legacy-fg: #7a4a00; --kapture: #d9f0ea; --kapture-fg: #0b5c4c; --case: #e7e4f6; --case-fg: #4a3f96;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14191d; --panel: #1b2227; --fg: #e4e9ec; --muted: #9aa7b1; --line: #313b43;
+  --accent: #7fb9e2; --legacy: #3d2f14; --legacy-fg: #f1c675; --kapture: #123a33; --kapture-fg: #80dcc6; --case: #2c2850; --case-fg: #bdb4f4; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #14191d; --panel: #1b2227; --fg: #e4e9ec; --muted: #9aa7b1; --line: #313b43;
+  --accent: #7fb9e2; --legacy: #3d2f14; --legacy-fg: #f1c675; --kapture: #123a33; --kapture-fg: #80dcc6; --case: #2c2850; --case-fg: #bdb4f4; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); }
+main { max-width: 1320px; margin: 0 auto; padding-block: 32px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 36px; }
+main > * { min-width: 0; }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; font-weight: 600; text-wrap: balance; }
+h2 { font-size: 22px; margin: 0 0 6px; font-weight: 600; text-wrap: balance; }
+h2 span { font: 500 13px var(--mono); color: var(--muted); margin-left: 6px; }
+h3 { font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+p { margin: 0 0 10px; max-width: 78ch; }
+.lead { color: var(--muted); }
+.note { color: var(--muted); font-size: 14px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
+nav a { color: var(--accent); }
+.key { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; margin-top: 10px; }
+.key span { padding: 2px 8px; border-radius: 3px; }
+.k-l { background: var(--legacy); color: var(--legacy-fg); }
+.k-k { background: var(--kapture); color: var(--kapture-fg); }
+.k-c { background: var(--case); color: var(--case-fg); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.grid > div { min-width: 0; }
+ul { margin: 0; padding-left: 18px; }
+li { margin-bottom: 6px; }
+.sum { font-size: 14px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+button { font: 500 13px var(--sans); color: var(--accent); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--panel); }
+table { border-collapse: collapse; width: 100%; min-width: 1060px; }
+th { position: sticky; top: 0; text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .03em; color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 10px; }
+td { padding: 1px 10px; vertical-align: top; white-space: pre; }
+td code { font: 12.5px/1.6 var(--mono); }
+td.s, td.m { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+td:nth-child(2) { border-left: 1px solid var(--line); }
+tr.r-legacy td:nth-child(1) { background: var(--legacy); color: var(--legacy-fg); }
+tr.r-kapture td:nth-child(2) { background: var(--kapture); color: var(--kapture-fg); }
+tr.r-case td:nth-child(-n+2) { background: var(--case); color: var(--case-fg); }
+tr.r-legacy td.m { color: var(--legacy-fg); } tr.r-kapture td.m { color: var(--kapture-fg); } tr.r-case td.m { color: var(--case-fg); }
+tr.r-root td:nth-child(-n+2) { background: var(--case); color: var(--case-fg); font-weight: 500; }
+.gap { border-left: 3px solid var(--line); padding-left: 12px; }
+</style>
+<main>
+<header>
+  <h1>Legacy vs Kapture XML structure</h1>
+  <p class="lead">One merged structure per channel for the RMI Export and MNAO Data Export tools. It holds every element and attribute found in any exported document, so a single document may carry only some of them.</p>
+  <nav><a href="#si">Service Information</a><a href="#sm">Service Manuals</a><a href="#wd">Wiring Diagrams</a><a href="#osm">Other Service Manuals</a></nav>
+  <div class="key"><span class="k-l">Legacy only</span><span class="k-k">Kapture only</span><span class="k-c">Same element, name differs</span></div>
+</header>
+
+<section class="grid">
+  <div>
+    <h3>What changed</h3>
+    <ul>
+      <li>The root element and its attribute changed: <code>CONTENT RECORDID</code> is now <code>content contentid</code>.</li>
+      <li>The header elements come from Kapture, so the legacy date, locale, version and repository elements are not in the export.</li>
+      <li>The channel elements match legacy, apart from the differences marked in each table.</li>
+      <li><code>DOCUMENTID</code> and <code>CATEGORIES</code> are unchanged.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>How to read it</h3>
+    <ul>
+      <li>"Seen in" counts the documents with that element, against all documents read for that tool. The count covers the exported XML, after each tool's filter.</li>
+      <li>Kapture often leaves out an empty element that legacy always wrote, so a lower Kapture count does not by itself mean lost data.</li>
+      <li><code>ATTACHMENT</code> appears in both forms in Kapture: a plain file name, or the five child elements shown.</li>
+      <li>Values are written in CDATA in both, so rich text reads as HTML. Kapture dates, flags and ids in the header stay plain, as they did in legacy.</li>
+    </ul>
+  </div>
+</section>
+
+<!--SECTIONS-->
+
+<section id="osm" class="gap">
+  <h2>Other Service Manuals <span>OSM</span></h2>
+  <p>No structure can be shown yet. Neither tool has exported OSM documents, in legacy or in Kapture, so there is no XML to compare. Both tools use the same filter for OSM as for Service Manuals.</p>
+</section>
+
+<footer class="note">
+  <p>Sources: RMI legacy job 830 and job 305 (en_UK, CX-5 KM); MNAO legacy jobs 261 (CX-90) and 281 (CX-5) and job 30 (en_US, CX5). RMI has no Service Information XML on either side, because job 305's two SI documents are unpublished. Service Information legacy holds Technical Service Bulletins only.</p>
+</footer>
+</main>
+<script>
+document.querySelectorAll("button[data-x]").forEach(function (b) {
+  var label = b.textContent;
+  b.addEventListener("click", function () {
+    var t = document.getElementById(b.getAttribute("data-x"));
+    var done = function (m) { b.textContent = m; setTimeout(function () { b.textContent = label; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t.value).then(function () { done("Copied"); }, function () { done("Copy not available"); });
+    } else { done("Copy not available"); }
+  });
+});
+</script>

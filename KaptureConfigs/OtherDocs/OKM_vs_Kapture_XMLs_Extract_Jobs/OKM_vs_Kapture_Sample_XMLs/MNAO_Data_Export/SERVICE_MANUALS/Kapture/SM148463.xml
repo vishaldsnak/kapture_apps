@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><content contentid="d64b6f61-1c2e-4eca-b849-c33825699a68"><displayOn>2026-10-29T14:01:50.198395217Z</displayOn><sourceFileName>content_a658bf1d564c496495c7900807c34f72.xml</sourceFileName><sourceIdentifier>sites/MAZDA/content/staging/SERVICE_MANUALS/148000/SM148463/en_US/10.0</sourceIdentifier><title><![CDATA[ANTICORROSION, SOUND INSULATION, AND VIBRATION INSULATION]]></title><type><![CDATA[SERVICE_MANUALS]]></type><categoriesESITreeLabels><![CDATA[ESI Category,General Information]]></categoriesESITreeLabels><dateAdded>10/29/2026 14:01:50</dateAdded><publishedVersion>1.0</publishedVersion><translatedLocale>en_US</translatedLocale><DOCUMENTID><![CDATA[SM148463]]></DOCUMENTID><articleId>SM148463</articleId><articleId>SM148463</articleId><dateModified>10/29/2026 14:01:50</dateModified><articleState>Published</articleState><pubFlag>true</pubFlag><createdDate>10/29/2026 14:01:50</createdDate><legacyDocumentId>SM148463</legacyDocumentId><articleVersion>1.0</articleVersion><publishedDate>2026-10-29T14:01:50.469420779Z</publishedDate><SERVICE_MANUALS><SERVICE_MANUAL_TYPE><DISPLAY><![CDATA[Bodyshop Manual]]></DISPLAY><GUID><![CDATA[0918c885ad724c6cbaa9327ca260d389]]></GUID><VALUE><![CDATA[BODYSHOP_MANUAL]]></VALUE></SERVICE_MANUAL_TYPE><TITLE><![CDATA[ANTICORROSION, SOUND INSULATION, AND VIBRATION INSULATION]]></TITLE><CONTENT><![CDATA[<hr /> 
+<p class="servinfo-title-id" align="right">id000000600600</p> 
+<br clear="all" /> 
+<a name="id00000060060001"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Body Sealing</p> 
+<div class="list">
+  • Apply body sealer where necessary. 
+</div> 
+<div class="list">
+  • For locations where application of body sealer is difficult after installation, apply it before installation. 
+</div> 
+<table class="figure-flame"> 
+ <tbody> 
+  <tr> 
+   <td width="10mm"></td> 
+   <td> 
+    <table class="figure-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/OkAssets/library/MAZDA/SERVICE_MANUALS/en_US/image/acxuub00000059.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      acxuub00000059 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<br clear="all" /> 
+<a name="id00000060060002"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Application of Undercoating</p> 
+<div class="list">
+  • Apply an undercoat to the required location of the body. 
+</div> 
+<table class="figure-flame"> 
+ <tbody> 
+  <tr> 
+   <td width="10mm"></td> 
+   <td> 
+    <table class="figure-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/OkAssets/library/MAZDA/SERVICE_MANUALS/en_US/image/acxuub00000060.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      acxuub00000060 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<br clear="all" /> 
+<a name="id00000060060003"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Application of Rust Inhibitor</p> 
+<div class="list">
+  • Apply rust inhibitor (wax, oil, etc.) to the back of the welded areas. 
+</div> 
+<table class="figure-flame"> 
+ <tbody> 
+  <tr> 
+   <td width="10mm"></td> 
+   <td> 
+    <table class="figure-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/OkAssets/library/MAZDA/SERVICE_MANUALS/en_US/image/acxuub00000061.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      acxuub00000061 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<br clear="all" /> 
+<a name="id00000060060004"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Application of Dumping Sheet</p> 
+<div class="list">
+  • Apply dumping sheet by heating with an infrared ray lamp. 
+</div> 
+<table class="figure-flame"> 
+ <tbody> 
+  <tr> 
+   <td width="10mm"></td> 
+   <td> 
+    <table class="figure-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/OkAssets/library/MAZDA/SERVICE_MANUALS/en_US/image/acxuub00000062.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      acxuub00000062 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table>]]></CONTENT></SERVICE_MANUALS><primaryLocale>en_US</primaryLocale><CATEGORIES><CATEGORY><NAME><![CDATA[JM3KE2CE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2CE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[C66M(X)-R]]></NAME><REFERENCE_KEY><![CDATA[M42]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[TRANSMISSION_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2BE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2BE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4A7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4A7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2D7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2D7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2DE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2DE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4B7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4B7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2WE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2WE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2E7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2E7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2W7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2W7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4C7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4C7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4BE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4BE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4AE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4AE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[SKYACTIV-G 2.0]]></NAME><REFERENCE_KEY><![CDATA[E54]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[ENGINE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2A7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2A7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[FW6A(X)-EL]]></NAME><REFERENCE_KEY><![CDATA[M38]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[TRANSMISSION_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2AE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2AE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2B7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2B7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[4wd]]></NAME><REFERENCE_KEY><![CDATA[D02]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[DRIVELINE_AXLE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[5wgn]]></NAME><REFERENCE_KEY><![CDATA[B02]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[BODY_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4E7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4E7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[CX5 2013]]></NAME><REFERENCE_KEY><![CDATA[CX5_2013]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[MODEL_YEAR]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[2wd]]></NAME><REFERENCE_KEY><![CDATA[D01]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[DRIVELINE_AXLE_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Bodyshop Manual]]></NAME><REFERENCE_KEY><![CDATA[BODYSHOP_MANUAL]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[SERVICE_MANUAL_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4DE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4DE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2EE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2EE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4EE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4EE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4D7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4D7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE2C7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE2C7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4W7*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4W7_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4WE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4WE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KE4CE*D#100001ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KE4CE_D_100001ZZZZZZ]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[General Information]]></NAME><REFERENCE_KEY><![CDATA[000000]]></REFERENCE_KEY><GUID/><OBJECTID/><TYPE><![CDATA[ESI]]></TYPE></CATEGORY></CATEGORIES></content>

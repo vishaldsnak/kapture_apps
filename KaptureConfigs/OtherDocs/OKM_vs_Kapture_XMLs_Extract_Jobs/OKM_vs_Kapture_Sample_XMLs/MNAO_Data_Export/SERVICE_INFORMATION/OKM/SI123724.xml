@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><CONTENT RECORDID="85c5f68b210c4a548880c7f2885f458e"><MASTERIDENTIFIER><![CDATA[09-019/25 - EXTERIOR LIGHT WARNING WITH DTC B10A3:86]]></MASTERIDENTIFIER><TYPE><![CDATA[SERVICE_INFORMATION]]></TYPE><TYPE_GUID><![CDATA[e984ea2766804a66959dc7ddaba33054]]></TYPE_GUID><REPOSITORY><![CDATA[MAZDA]]></REPOSITORY><REPOSITORY_GUID><![CDATA[92f8087d86e54f79b8535ec2c54a7f00]]></REPOSITORY_GUID><DOCUMENTID><![CDATA[SI123724]]></DOCUMENTID><LOCALECODE><![CDATA[en_US]]></LOCALECODE><LOCALEVALUE><![CDATA[1033]]></LOCALEVALUE><VERSION>57.0</VERSION><STARTTIMESTAMP>2023-06-22 05:11:00 Etc/GMT</STARTTIMESTAMP><STARTTIMESTAMP_MILLIS>1687410660000</STARTTIMESTAMP_MILLIS><STARTDATE>06/22/2023</STARTDATE><STARTTIME>02:11 PM</STARTTIME><CREATEDATE>2023-06-23 01:31:57 Etc/GMT</CREATEDATE><CREATEDATE_MILLIS>1687483917000</CREATEDATE_MILLIS><LASTMODIFIEDTIMESTAMP>2025-05-16 16:36:47 Etc/GMT</LASTMODIFIEDTIMESTAMP><LASTMODIFIEDTIMESTAMP_MILLIS>1747413407264</LASTMODIFIEDTIMESTAMP_MILLIS><LASTMODIFIEDDATE>05/17/2025</LASTMODIFIEDDATE><LASTMODIFIEDTIME>01:36 AM</LASTMODIFIEDTIME><PUBLISHEDTIMESTAMP>2025-05-16 16:36:47 Etc/GMT</PUBLISHEDTIMESTAMP><PUBLISHEDTIMESTAMP_MILLIS>1747413407154</PUBLISHEDTIMESTAMP_MILLIS><PUBLISHEDDATE>05/17/2025</PUBLISHEDDATE><PUBLISHEDTIME>01:36 AM</PUBLISHEDTIME><SERVICE_INFORMATION><TITLE><![CDATA[09-019/25 - EXTERIOR LIGHT WARNING WITH DTC B10A3:86]]></TITLE><MTIPS_NUMBER/><TSB_NUMBER><![CDATA[09-019/25]]></TSB_NUMBER><CAMPAIGN_NUMBER/><TSB_ISSUE_DATE>2025-04-14 15:00:00 Etc/GMT</TSB_ISSUE_DATE><BULLETIN_NOTES SECURITY="TECHNICIAN+AFTERMARKET"><![CDATA[<p><span style="color:Red;">This bulletin supersedes the previously issued bulletin(s) listed below. The changes are noted in Red.</span></p>
+
+<table border="1" cellpadding="4" cellspacing="0" style="width:550px;">
+	<tbody>
+		<tr>
+			<td align="center"><span style="color:Red;">Previous TSBs:</span></td>
+			<td align="center"><span style="color:Red;">Date(s) Issued:</span></td>
+		</tr>
+		<tr>
+			<td align="center"><span style="color:Red;">09-039/24</span></td>
+			<td align="center"><span style="color:Red;">08/20/24</span></td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>APPLICABLE MODEL(S)/VINS</strong><br />
+2024-2025 CX-90&nbsp;with VINS lower than JM3KK******<span style="color:Red;">241940 </span>(produced before <span style="color:Red;">April 11, 2025</span>)<br />
+2025 CX-70 with VINS lower than JM3KJ******<span style="color:Red;">129500 </span>(produced before <span style="color:Red;">April 11, 2025</span>)</p>
+]]></BULLETIN_NOTES><DESCRIPTION><![CDATA[Some vehicles equipped with the Adaptive Front lighting System (AFS) may exhibit the exterior light warning light/exterior light warning indication on while driving or when the ignition is turned on and DTC B10A3:86 (Error signal received from swivel actuator (LH)) stored in memory.
+<table border="0" cellpadding="3" cellspacing="0">
+	<tbody>
+		<tr>
+			<td style="text-align: center; vertical-align: bottom;"><img alt="" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/SI123724a.png" style="width: 85px; height: 80px;" /></td>
+			<td style="text-align: center;">&nbsp;</td>
+			<td style="text-align: center;"><img alt="" src="/OkAssets/library/MAZDA/SERVICE_INFORMATION/en_US/image/SI123724b.jpg" style="width: 167px; height: 160px;" /></td>
+		</tr>
+		<tr>
+			<td style="text-align: center;">Exterior light warning light</td>
+			<td style="text-align: center;">&nbsp; &nbsp;</td>
+			<td style="text-align: center;">Combination light with AFS<br />
+			(1): Parking light/daytime running light (DRL)</td>
+		</tr>
+	</tbody>
+</table>
+<br />
+<strong>NOTE:</strong>&nbsp;The combination light with AFS can be distinguished if it is equipped with the parking light/daytime running light (DRL) that illuminates while the ignition is turned on.<br />
+This may be caused by the AFS Control Module detecting a false headlight malfunction. This concern will likely occur when the light returns to the center position after swiveling.To eliminate this concern, the control software of the AFS control module has been <span style="color:Red;">further </span>modified. Customers having this concern should have their vehicle repaired using the following repair procedure.]]></DESCRIPTION><REPAIR_PROCEDURE><![CDATA[1. Verify the customer concern.<br />
+<strong>NOTE:</strong> Explain to the customer that, after the repair, the head lights may swivel twice at a stop that did not occur before. This action is like the one that occurs when the ignition is turned ON.<br />
+2. Reprogram the&nbsp;<strong>AFS&nbsp;</strong>with the Mazda Modular Diagnostic System (M-MDS), using Mazda Diagnostic And Repair Software (MDARS).&nbsp;Refer to&nbsp;<a href="https://na.mgss.customerservice.mazda.com/library/MAZDA/Static_Content/en_us/pdf/MDARS_ECU_REPROGRAMMING.pdf" target="_blank">MDARS ECU Reprogramming Procedure</a>.<br />
+<strong>CAUTION:&nbsp;</strong>MDARS reprogramming may require looping IG-ON 5 times.<br />
+<br />
+<img alt="" src="/library/MAZDA/GMS3/MNAO/TI/2024/cx90%20programming.png" style="height: 541px; width: 700px;" /><br />
+&nbsp;
+<div style="page-break-after: always"><span style="display: none;">&nbsp;</span></div>
+<strong>NOTE:</strong>
+
+<ul>
+	<li><strong>Be sure to submit Diagnostic Information (ODR) data as it is a required item and will be checked during warranty claim submission.</strong><strong>&nbsp;Instructions can be found under M-MDS -&gt; MDARS&nbsp;(<a href="https://na.mgss.customerservice.mazda.com/library/MAZDA/Static_Content/en_us/pdf/Uploading_Diagnostic%20Information%20(ODR)_Data.pdf">Uploading Diagnostic Information (ODR) Data</a>).</strong></li>
+	<li>Reprogramming is not necessary if the current calibration file name in the ECU FILENAME screen is the same as shown in Calibration Files Information, or with a later suffix.</li>
+</ul>
+3. Clear any other DTCs.<br />
+4. Verify the repair by starting the engine and confirming there is no CHECK ENGINE light ON or abnormal warning lights present.]]></REPAIR_PROCEDURE><CALIBRATION><![CDATA[<table border="1" cellpadding="3" cellspacing="0">
+	<tbody>
+		<tr>
+			<td style="text-align: center;">ECU</td>
+			<td style="text-align: center;">File Name (Old)</td>
+			<td style="text-align: center;">File Name (New)</td>
+		</tr>
+		<tr>
+			<td style="text-align: center;">AFS</td>
+			<td style="text-align: center;">KND2-66S16-<span style="color:Red;">B</span></td>
+			<td style="text-align: center;">KND2-66S16-<span style="color:Red;">C</span></td>
+		</tr>
+	</tbody>
+</table>
+]]></CALIBRATION><PARTS_INFORMATION/><WARRANTY_INFORMATION><![CDATA[<strong>NOTE:</strong>
+<ul>
+	<li>This warranty information applies only to verified customer complaints on vehicles eligible for warranty repair.</li>
+	<li>This repair will be covered under Mazda&rsquo;s New Vehicle Limited Warranty term.</li>
+	<li>Additional diagnostic time cannot be claimed for this repair.</li>
+</ul>
+
+<table border="1" cellpadding="4" cellspacing="0" style="width:750px;">
+	<tbody>
+		<tr>
+			<td width="50%">Warranty Type</td>
+			<td align="center" width="50%">A</td>
+		</tr>
+		<tr>
+			<td>Symptom Code</td>
+			<td align="center">6X</td>
+		</tr>
+		<tr>
+			<td>Damage Code</td>
+			<td align="center">9W</td>
+		</tr>
+		<tr>
+			<td>Part Number Main Cause</td>
+			<td align="center">5555-51-02X</td>
+		</tr>
+		<tr>
+			<td>Quantity</td>
+			<td align="center">0</td>
+		</tr>
+		<tr>
+			<td>Operation Number / Labor Hours:</td>
+			<td align="center"><span style="color:Red;">XXWSTAFX </span>/ 0.3 Hrs.</td>
+		</tr>
+	</tbody>
+</table>
+]]></WARRANTY_INFORMATION><FIRST_PUBLICATION_DATE><![CDATA[2024-08-05 15:00:00 Etc/GMT]]></FIRST_PUBLICATION_DATE><ATTACHMENTS><ATTACHMENT_TITLE/><ATTACHMENT/><PDF_ATTACHMENTS><LEGACY_PDF/><REVISION_HISTORY/><OTHER_PDF/></PDF_ATTACHMENTS></ATTACHMENTS><EXPIRATION_DATE/><CAMPAIGN_ATTACHMENTS><CAMPAIGN_ATTACHMENT_TITLE SECURITY="TECHNICIAN"/><CAMPAIGN_ATTACHMENT SECURITY="TECHNICIAN"/></CAMPAIGN_ATTACHMENTS></SERVICE_INFORMATION><CATEGORIES><CATEGORY><NAME><![CDATA[CX70 2025]]></NAME><REFERENCE_KEY><![CDATA[CX70_2025]]></REFERENCE_KEY><GUID><![CDATA[04c38d667bfe44c69bb103a9cac8d7b5]]></GUID><OBJECTID><![CDATA[00004.00046.00001]]></OBJECTID><TYPE><![CDATA[MODEL_YEAR]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Technical Service Bulletin]]></NAME><REFERENCE_KEY><![CDATA[TECHNICAL_SERVICE_BULLETIN]]></REFERENCE_KEY><GUID><![CDATA[1db12593b799498cab4bb398ea810eed]]></GUID><OBJECTID><![CDATA[00027.00005]]></OBJECTID><TYPE><![CDATA[SERVICE_INFORMATION_TYPE]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KJ****S#000000129499]]></NAME><REFERENCE_KEY><![CDATA[JM3KJ____S_000000129499]]></REFERENCE_KEY><GUID><![CDATA[247a8f3ce82740208eae5b82e0075068]]></GUID><OBJECTID><![CDATA[00031.00001.01424.00015]]></OBJECTID><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KK****S#000000241939]]></NAME><REFERENCE_KEY><![CDATA[JM3KK____S_000000241939]]></REFERENCE_KEY><GUID><![CDATA[69dfc076039b4434a97e576bd10e5b1c]]></GUID><OBJECTID><![CDATA[00031.00001.01433.00010]]></OBJECTID><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[CX90 2024]]></NAME><REFERENCE_KEY><![CDATA[CX90_2024]]></REFERENCE_KEY><GUID><![CDATA[a3b0f52981624965953aabfada838bc9]]></GUID><OBJECTID><![CDATA[00004.00045.00001]]></OBJECTID><TYPE><![CDATA[MODEL_YEAR]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[CX90 2025]]></NAME><REFERENCE_KEY><![CDATA[CX90_2025]]></REFERENCE_KEY><GUID><![CDATA[b82b69ae41df4f58839d5a36dd94187e]]></GUID><OBJECTID><![CDATA[00004.00045.00002]]></OBJECTID><TYPE><![CDATA[MODEL_YEAR]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[JM3KK****R#000000ZZZZZZ]]></NAME><REFERENCE_KEY><![CDATA[JM3KK____R_000000ZZZZZZ]]></REFERENCE_KEY><GUID><![CDATA[bd9a083368184bb983b6ddf6732ab1ff]]></GUID><OBJECTID><![CDATA[00031.00001.01408.00001]]></OBJECTID><TYPE><![CDATA[VIN]]></TYPE></CATEGORY><CATEGORY><NAME><![CDATA[Lighting Systems]]></NAME><REFERENCE_KEY><![CDATA[091800]]></REFERENCE_KEY><GUID><![CDATA[c7a31258e0b04f7ba2e7bd3caa243754]]></GUID><OBJECTID><![CDATA[00030.00003.00016]]></OBJECTID><TYPE><![CDATA[ESI]]></TYPE></CATEGORY></CATEGORIES></CONTENT>

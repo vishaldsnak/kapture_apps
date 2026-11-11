@@ -1,0 +1,1207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<SERVICE_MANUALS><DOCUMENTID><![CDATA[SM3867845]]></DOCUMENTID><LOCALE><![CDATA[en_UK]]></LOCALE><TITLE><![CDATA[SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) REPLACEMENT]]></TITLE><CONTENT><![CDATA[<hr /> 
+<p class="servinfo-title-id" align="right">id081000901100</p> 
+<dl> 
+ <dd> 
+  <div class="attention3-label">
+    Note 
+  </div> 
+ </dd> 
+ <dd> 
+  <div class="attention3"> 
+   <div class="list">
+     • For information on each icon, refer to [ 
+    <font class="extxref-label"><a href="index?page=content&amp;id=SM3867367">SYMBOL GUIDE</a></font>]. 
+   </div> 
+  </div> 
+ </dd> 
+</dl> 
+<br clear="all" /> 
+<a name="id08100090110001"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Component Procedure Overview</p> 
+<p> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">Part name</p> </th> 
+   <th id="" align="center"> <p class="thead">D-code</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Sophisticated Airbag Sensor Control Module (SAS_CM) 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      57K30 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<br clear="all" /> 
+<p> <a name="id08100090110002"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>Required part/tools</p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center" rowspan="2"> <p class="thead">Name</p> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000539.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000540.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000510.png" /> </th> 
+  </tr> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">D-code</p> </th> 
+   <th id="" align="center"> <p class="thead">Number</p> </th> 
+   <th id="" align="center"> <p class="thead">Type</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<p></p> 
+<br clear="all" /> 
+<p> <a name="id08100090110003"></a> </p> 
+<p class="topic-title"> <span class="topic-head"></span>Supplementary procedures</p> 
+<p clear="all"> </p> 
+<p>M:Use—: Do not use</p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">Replacement part or procedure</p> </th> 
+   <th id="" align="center"> <p class="thead">Procedure(s)</p> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000527.png" /> </th> 
+   <th id="" align="center"> <p class="thead">Symptom(s) if not performed</p> </th> 
+   <th id="" align="center"> <p class="thead">See</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="left" rowspan="2"> 
+    <div class="tbody">
+      Negative 12 V battery terminal disconnection 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      POWER LIFTGATE (PLG) SYSTEM INITIALIZATION PROCEDURE 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      The auto open/close operation of the power liftgate is disabled. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3867938">POWER LIFTGATE (PLG) SYSTEM INITIALIZATION PROCEDURE</a></font> 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      POWER OUTER MIRROR SYSTEM INITIALIZATION PROCEDURE 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      The power outer mirror retract/return position recognized by the door-electrical supply unit (DOOR_ESU) may differ from the power outer mirror retract/return position of the vehicle. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3867979">POWER OUTER MIRROR SYSTEM INITIALIZATION PROCEDURE</a></font> 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left" rowspan="4"> 
+    <div class="tbody">
+      Sophisticated airbag sensor control module (SAS_CM) replacement 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE BEFORE REPLACEMENT) 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • DTC and vehicle control history (RoB) may be stored. 
+    </div> 
+    <div class="list">
+      • May no longer comply with regulations. 
+    </div> 
+    <div class="list">
+      • Parts may not function normally. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869169">SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE BEFORE REPLACEMENT)</a></font> 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE AFTER REPLACEMENT) 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="list">
+      • DTC and vehicle control history (RoB) may be stored. 
+    </div> 
+    <div class="list">
+      • May no longer comply with regulations. 
+    </div> 
+    <div class="list">
+      • Parts may not function normally. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869170">SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE AFTER REPLACEMENT)</a></font> 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      CALIBRATING SEAT WEIGHT SENSOR FOR AIR BAG 
+    </div> 
+    <div class="tbody">
+      (With seat weight sensor) 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Warning in the instrument cluster and DTC are recorded. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869203">CALIBRATING SEAT WEIGHT SENSOR FOR AIR BAG</a></font> 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      CALIBRATING DSC RELATED SENSOR 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      The ABS warning light flashes. 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869240">CALIBRATING DSC RELATED SENSOR</a></font> 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<p></p> 
+<br clear="all" /> 
+<a name="id08100090110004"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Component Procedure</p> 
+<dl> 
+ <dd> 
+  <div class="attention1-label">
+    Warning 
+  </div> 
+ </dd> 
+ <dd> 
+  <div class="attention1"> 
+   <div class="list">
+     • Handling the sophisticated airbag sensor control module (SAS_CM) improperly can accidentally operate (deploy) the air bag module and pre-tensioner seat belt, which may seriously injure you. Read the air bag system service warnings and cautions before handling the sophisticated airbag sensor control module (SAS_CM). (See 
+    <font class="extxref-label"><a href="index?page=content&amp;id=SM3868811">AIR BAG SYSTEM SERVICE WARNINGS</a></font>.) (See 
+    <font class="extxref-label"><a href="index?page=content&amp;id=SM3868812">AIR BAG SYSTEM SERVICE CAUTIONS</a></font>.) 
+   </div> 
+   <div class="list">
+     • If the connector is connected and the main power is switched ON (ENG RUN/ENG OFF) with the sophisticated airbag sensor control module (SAS_CM) not secured completely using the installation nuts, the sophisticated airbag sensor control module (SAS_CM) may detect a degree of impact even when something contacts it lightly, deploying the air bag module and pre-tensioner seat belt accidentally. 
+   </div> 
+   <div class="list">
+     • If [Calibrating DSC related Sensor] is not completed, the DSC will not operate normally which could lead to an unexpected accident. Therefore, if the electronically controlled brake unit (EBU) or the sophisticated airbag sensor control module (SAS_CM) is replaced or removed/installed, be sure to perform [Calibrating DSC related Sensor] so that the DSC will operate normally. 
+   </div> 
+  </div> 
+ </dd> 
+</dl> 
+<p class="list">1.Remove using the procedure shown in the figure.</p> 
+<p class="list"></p> 
+<table class="figure-flame"> 
+ <tbody> 
+  <tr> 
+   <td width="10mm"></td> 
+   <td> 
+    <table class="figure-float" cellspacing="0" bordercolor="black"> 
+     <tbody> 
+      <tr> 
+       <td align="center"><img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/ac5wzw00020367.png" /></td> 
+      </tr> 
+     </tbody> 
+    </table> 
+    <div class="figure-caption">
+      ac5wzw00020367 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center"> <p class="thead">Step</p> </th> 
+   <th id="" align="center"> <p class="thead">Part name</p> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Connector 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Nut 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Sophisticated airbag sensor control module (SAS_CM) 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<p class="list">2.Install in the reverse order of removal.</p> 
+<p class="list"></p> 
+<br clear="all" /> 
+<a name="id08100090110005"></a> 
+<p class="servinfosub-title"> <span class="servinfosub-head"></span>Complete Procedure</p> 
+<p class="list">1.Remove it using the following procedure.</p> 
+<p class="list"> </p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Step</p> </th> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Component name/Procedure/See</p> </th> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Procedure description</p> </th> 
+   <th id="" align="center" colspan="7"> <p class="thead">Procedure points</p> </th> 
+  </tr> 
+  <tr> 
+   <th id="" align="center" colspan="7"> <p class="thead"> <font class="extxref-label"><a href="index?page=content&amp;id=SM3867367">SYMBOL GUIDE</a></font> </p> </th> 
+  </tr> 
+  <tr> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000528.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000529.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000530.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000531.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000532.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000533.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000534.png" /> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869169">SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE BEFORE REPLACEMENT)</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869019">REAR CONSOLE REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (Rear console removal preparation) (With power seat) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      T 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3868479">NEGATIVE 12 V BATTERY TERMINAL DISCONNECTION/CONNECTION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Disconnect 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      ! 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      T 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      4 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM4007525">CONSOLE PANEL REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      5 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM4007524">CONSOLE LID REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      6 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869014">SIDE WALL REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (Driver-side) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      7 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869014">SIDE WALL REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (Passenger-side) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      8 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3868722">SHIFT SELECTOR KNOB REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      9 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869016">SHIFT PANEL REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (Shift panel component) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      10 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869017">FRONT CONSOLE REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      11 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869021">CUP HOLDER REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      12 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3868788">REAR VENT DUCT No.2 REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (With rear vent) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      13 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869019">REAR CONSOLE REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      i 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      T 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      14 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3868787">REAR VENT DUCT No.1 REMOVAL/INSTALLATION</a></font> 
+    </div> 
+    <div class="tbody">
+      (With rear vent) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Remove 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      15 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3868819">SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) REMOVAL/INSTALLATION</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Replace 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      ! 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      T 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<p></p> 
+<p class="list">2.Install in the reverse order of removal.</p> 
+<p class="list"></p> 
+<p class="list">3.After installing, perform the following procedure.</p> 
+<p class="list"> </p> 
+<p clear="all"> </p> 
+<table class="table-flame" border="1"> 
+ <thead> 
+  <tr> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Step</p> </th> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Supplementary procedures/Operation after installing/See</p> </th> 
+   <th id="" align="center" rowspan="3"> <p class="thead">Procedure description</p> </th> 
+   <th id="" align="center" colspan="5"> <p class="thead">Procedure points</p> </th> 
+  </tr> 
+  <tr> 
+   <th id="" align="center" colspan="5"> <p class="thead"> <font class="extxref-label"><a href="index?page=content&amp;id=SM3867367">SYMBOL GUIDE</a></font> </p> </th> 
+  </tr> 
+  <tr> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000535.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000536.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/ac5wzw00018962.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000537.png" /> </th> 
+   <th id="" align="center"> <img src="/library/MAZDA/SERVICE_MANUALS/en_uk/image/atsuzw00000538.png" /> </th> 
+  </tr> 
+ </thead> 
+ <tbody> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      1 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869170">SOPHISTICATED AIRBAG SENSOR CONTROL MODULE (SAS_CM) CONFIGURATION (PROCEDURE AFTER REPLACEMENT)</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      ! 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      2 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869203">CALIBRATING SEAT WEIGHT SENSOR FOR AIR BAG</a></font> 
+    </div> 
+    <div class="tbody">
+      (With seat weight sensor) 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      ! 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      3 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869240">CALIBRATING DSC RELATED SENSOR</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Perform 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      ! 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      M 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      4 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869158">POWER LIFTGATE (PLG) SYSTEM INITIALIZATION PROCEDURE</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Initialize 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+  <tr> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      5 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody"> 
+     <font class="extxref-label"><a href="index?page=content&amp;id=SM3869160">POWER OUTER MIRROR SYSTEM INITIALIZATION PROCEDURE</a></font> 
+    </div> </td> 
+   <td id="" align="left"> 
+    <div class="tbody">
+      Initialize 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+   <td id="" align="center"> 
+    <div class="tbody">
+      — 
+    </div> </td> 
+  </tr> 
+ </tbody> 
+</table> 
+<p></p> 
+<p></p> 
+<link href="/library/MAZDA/GMS3_CUSTOM/mazda-css-mme.css" type="text/css" rel="stylesheet" />]]></CONTENT></SERVICE_MANUALS>
