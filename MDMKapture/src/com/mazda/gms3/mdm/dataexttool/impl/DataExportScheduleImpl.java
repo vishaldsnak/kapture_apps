@@ -1016,6 +1016,15 @@ public class DataExportScheduleImpl {
 									xmlFilteredData = com.mazda.gms3.mdm.utils.KaptureLibraryPath.xmlLibraryPathsWithoutKaptureContext(xmlFilteredData);
 									// values in CDATA as in the legacy export - last, every replace above works on the escaped text; see ExportXmlCData
 									xmlFilteredData = com.mazda.gms3.mdm.utils.ExportXmlCData.withCData(xmlFilteredData, newItemDetails.getChannelName());
+									// OKM (InfoManager) shape: header, attachments, dates, node order - LAST, after the CDATA step; see ExportOkmShape
+									String okmAttachmentPrefix = newItemDetails.getLocale()+"/"+newItemDetails.getModel()+"/"+newItemDetails.getChannelName()+"/";
+									if(null!=newItemDetails.getDocumentType() && !"".equals(newItemDetails.getDocumentType()))
+									{
+										okmAttachmentPrefix += newItemDetails.getDocumentType()+"/";
+									}
+									okmAttachmentPrefix += newItemDetails.getDocumentId()+"/";
+									xmlFilteredData = com.mazda.gms3.mdm.utils.ExportOkmShape.forExport(ApplicationProperties::requireProperty,
+											xmlFilteredData, newItemDetails.getChannelName(), newItemDetails.getLocale(), okmAttachmentPrefix, documentXMLFile.getParentFile());
 									long xmlWriteStarted = System.currentTimeMillis();
 									writeFlag = null!=xmlFilteredData && FileReadWriteUtil.writeFile(xmlFilteredData.getBytes(), actualWriteFolderPath);
 									CDRomJobTimings.op("File write - document XML (one file)", CDRomJobTimings.FILE, System.currentTimeMillis()-xmlWriteStarted, null==xmlFilteredData ? 0L : xmlFilteredData.length());

@@ -479,6 +479,8 @@ public class RMIExportToolUtils {
 						if(document.getElementsByTagName(channelName).getLength()>0)
 						{
 							com.mazda.gms3.mdm.utils.ExportXmlCData.decodeDoubleEscaped(document.getElementsByTagName(channelName).item(0));
+							// FILE_SOURCE_LOCATION -> DJVU_FILE_LOCATION (WD, when absent) before the document is read; BIJLAGEN passed as is; see ExportOkmShape
+							com.mazda.gms3.mdm.utils.ExportOkmShape.renameForExport(com.mazda.gms3.mdm.utils.ApplicationProperties::requireProperty, (org.w3c.dom.Element)document.getElementsByTagName(channelName).item(0));
 						}
 						xmlData= Utilities.transformString(document);
 
@@ -963,13 +965,21 @@ public class RMIExportToolUtils {
 					NodeList itemsTobeDeletedNodesList = document.getElementsByTagName(nodeName);
 					if(null!=itemsTobeDeletedNodesList && itemsTobeDeletedNodesList.getLength()>0)
 					{
-						Node itemTobeDeletedNode = (Node)itemsTobeDeletedNodesList.item(0);
-						// remove from channelNode
-						if(null!=channelNode && null!=itemTobeDeletedNode)
+						// EVERY occurrence under the channel node (user 2026-11-12): these fields are not exported at all. InfoManager
+						// held each once, so item(0) was enough; Kapture writes one element per value / file (RECALL_NUMBERS can be
+						// added several times, MD_LETTER_ATTACHMENT is one per letter), and item(0) left the others in the export.
+						java.util.List<Node> itemsTobeDeleted = new java.util.ArrayList<Node>();
+						for(int d=0;d<itemsTobeDeletedNodesList.getLength();d++)
+						{
+							if(null!=channelNode && itemsTobeDeletedNodesList.item(d).getParentNode()==channelNode)
+							{
+								itemsTobeDeleted.add(itemsTobeDeletedNodesList.item(d));
+							}
+						}
+						for(Node itemTobeDeletedNode : itemsTobeDeleted)
 						{
 							channelNode.removeChild(itemTobeDeletedNode);
 						}
-						itemTobeDeletedNode  = null;
 					}
 					itemsTobeDeletedNodesList = null;
 					channelNode = null;
@@ -1139,7 +1149,8 @@ public class RMIExportToolUtils {
 				/*
 				 * NOW CAMPAIGN_ATTACHMENTS
 				 */
-				NodeList campaignAttachmentsNodesList = doc.getElementsByTagName("CAMPAIGN_ATTACHMENTS");
+				// the CAMPAIGN_ATTACHMENT elements themselves: the legacy loop took the CAMPAIGN_ATTACHMENTS containers and never matched (fix approved by the user 2026-11-12)
+				NodeList campaignAttachmentsNodesList = doc.getElementsByTagName("CAMPAIGN_ATTACHMENT");
 				if(null!=campaignAttachmentsNodesList && campaignAttachmentsNodesList.getLength()>0)
 				{
 					Node campaignNode = null;
@@ -1198,6 +1209,11 @@ public class RMIExportToolUtils {
 			String name = null;
 			if(null!=doc)
 			{
+				// BIJLAGEN (Kapture SM / OSM) is passed as is in the XML, but its files are exported too; see ExportOkmShape
+				for(String asIsName : com.mazda.gms3.mdm.utils.ExportOkmShape.asIsAttachmentFiles(com.mazda.gms3.mdm.utils.ApplicationProperties::requireProperty, doc))
+				{
+					attachmentsList = addAttachmentDetails(attachmentsList, asIsName, itemDetails, sourceDirPath);
+				}
 				NodeList attachmentNodesList = doc.getElementsByTagName("ATTACHMENTS");
 				if(null!=attachmentNodesList && attachmentNodesList.getLength()>0)
 				{
