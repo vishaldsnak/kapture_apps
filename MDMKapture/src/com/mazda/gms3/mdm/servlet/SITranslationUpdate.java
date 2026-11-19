@@ -2742,12 +2742,19 @@ public class SITranslationUpdate extends HttpServlet {
 		return returnData;
 	}
 	
+	/*
+	 * THE VALUE OF AN ELEMENT, WITH OR WITHOUT CDATA. Every text and CDATA child is read and joined,
+	 * then trimmed - so <X>v</X>, <X><![CDATA[v]]></X> and a CDATA section with line breaks or
+	 * spaces around it (an editor's re-formatting) all give the same value. Reading only the first
+	 * child returned the white space in front of the CDATA section instead of the value.
+	 */
 	private String getCharacterDataFromElement(Element e) {
-		Node child = e.getFirstChild();
-		if (child instanceof CharacterData) {
-			CharacterData cd = (CharacterData) child;
-			return cd.getData();
+		StringBuilder value = new StringBuilder();
+		for (Node child = e.getFirstChild(); null != child; child = child.getNextSibling()) {
+			if (child instanceof CharacterData && child.getNodeType() != Node.COMMENT_NODE) {
+				value.append(((CharacterData) child).getData());
+			}
 		}
-		return "";
+		return value.toString().trim();
 	}
 }

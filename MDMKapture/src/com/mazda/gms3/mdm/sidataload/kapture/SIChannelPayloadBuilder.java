@@ -20,9 +20,9 @@ import com.mazda.gms3.mdm.vo.KaptureArticleIdentity;
  * ("SERVICE_INFORMATION":{"TITLE":...}), with the tag names carried across unchanged. Verified
  * against the live API: the SERVICE_INFORMATION node on SI1123 uses exactly these names.
  *
- * ONE NAME DIFFERS, AND ONLY IN THE PAYLOAD. The Word file's token is [||TSB_ISSUE_DATE||] and
- * stays that way; Kapture's schema field is "Issue Date", so the value is emitted as ISSUE_DATE.
- * There is no TSB_ISSUE_DATE field in the SI channel - sending it would silently drop the date.
+ * THE ISSUE DATE IS TSB_ISSUE_DATE EVERYWHERE. The Word file's token is [||TSB_ISSUE_DATE||], the
+ * payload key is TSB_ISSUE_DATE and the content XML element is TSB_ISSUE_DATE - one name in the
+ * document, the payload, the XML and the exports, so they stay in sync.
  *
  * THREE PAYLOADS, BECAUSE THERE ARE THREE ENDPOINTS:
  *   buildCreate            -> add-article-tab           a document that does not exist yet
@@ -96,11 +96,8 @@ public class SIChannelPayloadBuilder {
 
 		// WRITTEN ALWAYS - blank when the document did not carry them, again as the XML builder did
 		node.addProperty("LEGACY_ID", nz(contentDetails.getLegacyId()));
-		/*
-		 * THE ONE RENAME. Read from [||TSB_ISSUE_DATE||] in the Word file, sent as Kapture's
-		 * ISSUE_DATE - see the class comment.
-		 */
-		node.addProperty("ISSUE_DATE", nz(contentDetails.getTsbIssueDate()));
+		// Read from [||TSB_ISSUE_DATE||] in the Word file, sent under the same name - see the class comment
+		node.addProperty("TSB_ISSUE_DATE", nz(contentDetails.getTsbIssueDate()));
 		node.addProperty("FIRST_PUBLICATION_DATE", nz(contentDetails.getFirstPublicationDate()));
 		node.addProperty("DESCRIPTION", nz(contentDetails.getDescription()));
 		node.addProperty("REPAIR_PROCEDURE", nz(contentDetails.getRepairProcedure()));

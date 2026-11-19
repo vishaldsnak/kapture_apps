@@ -24,6 +24,15 @@ public class SchMaintenanceVINMappingBean {
 	private List<SchVINMappingDetails> schVinMappingListToImport=null;
 	
 	private String reportViewPath = null;
+	// row count of gms3_dmt_schm_mapping; the rows themselves are paged from the server
+	private long totalRecords = 0;
+	
+	public long getTotalRecords() {
+		return totalRecords;
+	}
+	public void setTotalRecords(long totalRecords) {
+		this.totalRecords = totalRecords;
+	}
 	
 	
 	public String getReportViewPath() {

@@ -53,11 +53,9 @@ public class ReadContentUtils {
 	 * COMMENT IS A TERMINATOR BUT NOT A FIELD - per Yoshioka San's confirmation of 18 May 2021,
 	 * content under [||COMMENT||] is deliberately NOT loaded.
 	 *
-	 * THE WORD TOKEN STAYS TSB_ISSUE_DATE, DELIBERATELY. Kapture's SERVICE_INFORMATION schema has
-	 * no field of that name - it calls this one "Issue Date" - but that rename belongs to the
-	 * PAYLOAD, not to the document business authors. The JSON builder emits the value under the key
-	 * ISSUE_DATE; nothing changes here, so no Word file and no line of SI_Import_Guidelines.pdf has
-	 * to be reissued.
+	 * THE WORD TOKEN IS TSB_ISSUE_DATE, AND SO IS THE PAYLOAD KEY. The JSON builder emits the value
+	 * under the same name the document uses and the content XML carries, so no Word file and no
+	 * line of SI_Import_Guidelines.pdf has to be reissued.
 	 */
 	private static final String[] SCHEMA_MARKERS = {
 		"TITLE", "TSB_NUMBER", "DESCRIPTION", "CALIBRATION", "REPAIR_PROCEDURE",
@@ -176,10 +174,7 @@ public class ReadContentUtils {
 						contentDetails.setTiNumber(getFieldValues("TI_NUMBER", FILED_TYPE_TEXT, htmlFile));
 						contentDetails.setMtipsNumber(getFieldValues("MTIPS_NUMBER", FILED_TYPE_TEXT, htmlFile));
 						contentDetails.setLegacyId(getFieldValues("LEGACY_ID", FILED_TYPE_TEXT, htmlFile));
-						/*
-						 * READ UNDER THE WORD TOKEN, EMIT UNDER KAPTURE'S NAME. The document says
-						 * TSB_ISSUE_DATE and always will; the JSON builder writes ISSUE_DATE.
-						 */
+						// The document says TSB_ISSUE_DATE; the JSON builder writes the same name
 						contentDetails.setTsbIssueDate(getFieldValues("TSB_ISSUE_DATE", FILED_TYPE_TEXT, htmlFile));
 						contentDetails.setFirstPublicationDate(getFieldValues("FIRST_PUBLICATION_DATE", FILED_TYPE_TEXT, htmlFile));
 						contentDetails.setInternalDocRefNumber(getFieldValues("INTERNAL_DOCUMENT_REFERENCE_NUMBER", FILED_TYPE_TEXT, htmlFile));

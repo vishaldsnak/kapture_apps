@@ -1,0 +1,652 @@
+# ENVIRONMENT: DEV (MC Dev). build.bat DEV packages this file as WEB-INF/classes/application.properties.
+# Values: Environment_Config/Kapture_Environment_Config.xlsx (column MC Dev).
+#
+###################################
+#### DATABASE PROPERTIES ##########
+###################################
+#jdbc.databaseurl=jdbc:oracle:thin:@X4OKDB01:1525:okmdev
+#jdbc.databaseUserName=ok_dc
+#jdbc.databasePassword=GMsokcv!32
+
+# --- Oracle (legacy source; kept for reference) ---
+#jdbc.databaseurl=jdbc:oracle:thin:@X4OKDB01:1526:okmtest
+#jdbc.databaseUserName=ok_dc_dl
+#jdbc.databasePassword=DLdc12##t
+
+# --- MySQL (migrated target) ---
+# The connection comes from an application-SCOPED DataSource declared in this
+# application's own META-INF/context.xml (WebContent/META-INF/context.xml), NOT from a
+# server-wide resource - so the server config is untouched and no other application
+# deployed on it is affected. The url / username / password and the JDBC driver class
+# live in that context.xml; only the RESOURCE NAMES are configured here.
+# Per environment (local / VDI / production) only context.xml changes.
+jdbc.datasource=jdbc/conv_datasource
+jdbc.im.datasource=jdbc/im_datasource
+
+# --- KAPTURE CMS database (kapture_cms_db) - replaces the Oracle OK_IM schema ---
+# A SEPARATE resource is required, not a cross-database reference on jdbc.datasource:
+# on VDI kapture_dc and kapture_cms_db sit on the same MySQL server, but on a developer
+# workstation kapture_dc is local while kapture_cms_db is the shared AWS server. Where
+# they are co-located both resources simply point at the same server.
+# All CMS tables are written fully qualified (kapture_cms_db.<table>).
+jdbc.cms.datasource=jdbc/cms_datasource
+
+# Values of kapture_cms_db.k_user.user_status that mean the user is ACTIVE.
+# Comma separated. Matching is CASE INSENSITIVE and trims surrounding spaces, so listing
+# "Active" already accepts "ACTIVE" and "active" - the short form "A" is a genuinely different
+# value and does need its own entry. Kapture is not consistent about this: the same environment
+# holds "Active" for one user and "ACTIVE" for the next, so an exact match silently treats live
+# users as inactive (no notification e-mail, or no profile at login). Blank or missing falls back
+# to ACTIVE,A rather than matching nothing, so a typo here cannot lock everyone out.
+# Used through Utilities.activeUserStatusPredicate().
+kapture.user.active.status=Active,A
+
+# ---------------------------------------------------------------------------
+# LOCAL TESTING SWITCH - MUST BE BLANK ON VDI AND MC DEV
+# ---------------------------------------------------------------------------
+# Reference keys appended to the roles Kapture returns for the logged-in user.
+# Comma separated. Kapture has no DEFAULT_ADMINISTRATION_ROLE_KEY yet, so without this
+# NO user resolves to MDM Super Admin and the Administration screens cannot be reached.
+# This grants nothing on its own: the keys are still intersected with gms3_mdm_roles and
+# super-admin is still derived from mdm_role_priority = 1, so a key that is not a real MDM
+# role is ignored exactly like a KAuthor one. Every use is logged loudly.
+# Blank this the moment Kapture creates and assigns the real super-admin role.
+kapture.user.additional.roles=DEFAULT_ADMINISTRATION_ROLE_KEY
+
+# --- Kapture generated document XML ---
+# Kapture writes an XML per document version. Layout below the root is
+#   <live|staging>/<CHANNEL>/<bucket>/<articleId>/<locale>/<version>/content_<contentid>.xml
+# where bucket is a numbered folder FOUND BY SEARCHING for the document, never calculated -
+# see KaptureContentXmlReader.bucketFor(). A PUBLISHED document is read from live at its published_version,
+# an UNPUBLISHED one from staging at its article_version.
+# NOTE the filename is per-CHANNEL, not per-document (all SI docs share one contentid),
+# so the FOLDER PATH is what identifies the document - the reader globs content_*.xml.
+kapture.content.xml.root=/s3kapture/ROOT/resources/sites/KAPTURE/content
+
+# --- Category label fallback locale, per market ---
+# A category row may exist for a reference key but carry no name for the wanted locale.
+# MNAO then falls back to en_US, MC uses the selected locale, MME falls back to en_UK.
+# en_UK is deliberate and is NOT a typo for en_GB - k_categories carries BOTH as separate
+# locales, so "correcting" this to en_GB would silently read the wrong tree.
+# The same locale is used as the SOURCE to copy a category hierarchy from when the wanted
+# locale has no row at all - see KaptureCategoryServiceImpl.ensureCategoriesForLocale.
+# MC has no entry on purpose: it uses the selected locale for both, so there is nothing
+# to configure.
+kapture.category.label.fallback.mnao=en_US
+kapture.category.label.fallback.mme=en_UK
+###################################
+#########---   STATUS VALUES ---###
+###################################
+flag.value.active=1
+flag.value.sleep=2
+flag.value.delete=3
+flag.value.publish=4
+flag.value.draft=5
+flag.value.deprecated=6
+
+###################################
+#########---RULE LANGUAGE TYPE -###
+###################################
+rule.language.ref.type.common=C
+rule.language.ref.type.wiringdiagram=W
+
+
+###################################
+#########---SUPPORED LOCALES ---###
+###################################
+locales.labels=English,\u65E5\u672C\u8A9E
+locales.values=en,jp
+
+locales.values.english=en
+locales.values.japanese=jp
+
+###################################
+###### -MASTER CATEGORY TYPE ---###
+###################################
+master.category.type.value.category=C
+master.category.type.value.vinattribute=V
+
+
+###################################
+###### -WSL CHECK FLAG ---###
+###################################
+wsl.check=TRUE
+# When the container does not supply the "iv-user" request header (no WebSEAL in front of the
+# app), set a user id here. AccessManagementFilter then injects that value as the iv-user header
+# for every request, so the whole application sees a logged-in user with no other change.
+# The injected user is given a hardcoded PROFILE (display name, locales, mapped roles) instead
+# of an InfoManager profile lookup - see
+# AccessManagementFilter.addDefaultUserProfileDetailsToSessionBean. Leave BLANK to disable
+# injection and use the real iv-user header.
+wsl.default.user=
+
+# LOCAL TESTING SWITCH - MUST BE BLANK ON VDI AND MC DEV.
+# Injecting the iv-user header and building the profile are two SEPARATE decisions.
+# wsl.default.user above only supplies the header. Set this to TRUE to inject that header
+# but still read the PROFILE (display name, default locale, content locales, mapped roles)
+# from Kapture through UserProfileDAO - which is the only way to exercise the real profile
+# lookup on a workstation, since the hardcoded block below never touches it.
+# Blank or anything other than TRUE keeps the old behaviour: injected header AND hardcoded
+# profile from wsl.default.user.roles.
+wsl.default.user.kapture.profile=TRUE
+
+# Role reference key(s) mapped to that injected user, comma separated for more than one.
+# Whether the user ends up a super admin is NOT decided here - the refkey is looked up in
+# gms3_mdm_roles and its priority compared with SUPER_ADMIN_ROLE_PRIORITY (1), exactly as in
+# production. So changing this value is how a NON super admin role is smoke tested.
+# Values present in gms3_mdm_roles. The trailing _KEY is not decoration - these reference keys
+# are spelled exactly as Kapture spells them in k_add_user_cmsrole.role_ref, so the real profile
+# lookup is a plain equality match with no translation table. See
+# db/align_mdm_role_refkeys_with_kapture.sql.
+#   DEFAULT_ADMINISTRATION_ROLE_KEY (priority 1 - super admin, sees every module)
+#   MDM_MAZDA_ACE_ADMIN_KEY         (priority 2)
+#   MDM_DISTRIBUTOR_ADMIN_KEY       (priority 3)
+#   MDM_DISTRIBUTOR_AUTHOR_KEY      (priority 4)
+#   MDM_MC_CDROM_USER_KEY           (priority 5)
+# A non super admin role only sees the modules configured for it in gms3_mdm_roles_access.
+# Blank or unknown falls back to DEFAULT_ADMINISTRATION_ROLE_KEY.
+wsl.default.user.roles=
+
+
+###################################
+####-NOTIFICATION EMAIL DETAILS-###
+###################################
+NOTIF_EMAIL_TO_ID=vishald@softclouds.com,gauravb@softclouds.com
+NOTIF_EMAIL_FROM_ID=TSSOKIMRCA@mazda.ca
+SMTP_HOST_NAME=smtp.mazdausa.com
+SMTP_PORT=587
+SMTP_AUTH_REQ=Y
+SMTP_USER_ID=TSSOKIMRCA@mazda.ca
+SMTP_USER_PASSWORD=MazdaUSA123
+
+
+###################################
+####-EXPORT DATA PATHS-###
+###################################
+EXPORT_DATA_PHYSICAL_PATH=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/EXPORT_DATA/
+EXPORT_DATA_WB_PATH=/content/library/MAZDA/GMS3_CUSTOM/ExportData/
+
+EXPORT_DATA_EXTENSION_ZIP=.zip
+EXPORT_DATA_EXTENSION=.xlsx
+EXPORT_DATA_CAR_NAME=CARLINE
+EXPORT_DATA_VIN_NAME=VIN
+EXPORT_DATA_CAT_NAME=CAT
+EXPORT_DATA_CVC_NAME=CVC
+EXPORT_DATA_ENGINE_BOOK_NAME=ENGINE_BOOK
+EXPORT_DATA_ENGINE_TYPE_NAME=ENGINE_TYPE
+EXPORT_DATA_MISSION_BOOK_NAME=TRANSMISSION_BOOK
+EXPORT_DATA_MISSION_TYPE_NAME=TRANSMISSION_TYPE
+EXPORT_DATA_DRIVE_AXLE_NAME=DRIVE_AXLE
+EXPORT_DATA_BODY_TYPE_NAME=BODY_TYPE
+EXPORT_DATA_VIN_XREF_NAME=VIN_XREF
+EXPORT_DATA_MANUALTYPE_NAME=MANUAL_TYPE
+EXPORT_DATA_MNAOSIVIN_NAME=MNAO_SIVIN
+EXPORT_DATA_MC_SIVIN_NAME=MC_SIVIN
+EXPORT_DATA_MME_SIVIN_NAME=MME_SIVIN
+EXPORT_DATA_ABBREVIATION_NAME=ABBREVIATION
+EXPORT_DATA_DIVISION_NAME=DIVISION
+EXPORT_DATA_SECTION_NAME=SECTION
+EXPORT_DATA_SSTIMAGE_NAME=SSTIMAGE
+EXPORT_DATA_USEIMAGE_NAME=USEIMAGE
+EXPORT_DATA_SST_NAME=SST
+EXPORT_DATA_OEMMAPPING_NAME=SST_OEMMAPPING
+EXPORT_DATA_SSTSECPARENTMAP_NAME=SST_SECTIONPARENTMAPPING
+EXPORT_DATA_DIVISIONMODELMAP_NAME=DIVISION_MODELMAPPING
+EXPORT_DATA_DISPLAYORDER_NAME=DISPLAY_ORDER
+EXPORT_DATA_MODELVINMAP_NAME=SST_MODELVINMAPPING
+EXPORT_DATA_SECTIONMODELMAP_NAME=SECTION_MODELMAPPING
+EXPORT_DATA_SSTMDMVINMAPPING_NAME=SST_MDM_VIN_MAPPING
+EXPORT_DATA_SST_IMAGES_UPLOAD_NAME=SST_IMAGES_UPLOAD
+
+EXPORT_DATA_MASTERDATALOCALEMAPPING_NAME=MASTERDATA_LOCALEMAPPING
+EXPORT_DATA_SITRANSLATION_UPDATE=SITRANSLATION_UPDATE
+
+EXPORT_ERROR_PHYSICAL_PATH=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/MDM_IMPORTS/ERROR/
+EXPORT_ERROR_WB_PATH=/content/library/MAZDA/GMS3_CUSTOM/MDM_IMPORTS/ERROR/
+EXPORT_ERROR_EXTENSION=.txt
+
+SST_FOLDER_PATH=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/SPECIAL_SERVICE_TOOL
+SST_FOLDER_WB_PATH=/content/library/MAZDA/GMS3_CUSTOM/SPECIAL_SERVICE_TOOL/
+SST_IMAGES_WB_PATH=/SSTImages/
+USE_IMAGES_WB_PATH=/USEImages/
+
+###################################
+####-CARLINE DEPENDENT COUNTRIES ##
+###################################
+carline.dependent.countries=US,CA,FR
+
+###################################
+####-DEFAULT RULE NAME ##
+###################################
+aml.default.rule=\u30C7\u30D5\u30A9\u30EB\u30C8\u30EB\u30FC\u30EB
+
+
+
+###################################
+####-IM CONNECTION DETAILS #######
+###################################
+USERNAME=okadmin
+PASSWORD=Okadmin1
+DOMAIN=MAZDA
+REPOSITORY=MAZDA
+IM_CLIENT_LIBRARY_ENDPOINT=http://m3okia10:8226/imws/WebObjects/imws.woa/ws/RequestProcessor
+SEARCH_CLIENT_LIBRARY_ENDPOINT=http://m3okia10:8226/imws/inquiragw/services/RequestProcessor
+
+en_us=en_US
+en_ca=en_CA
+es_mx=es_MX
+fr_ca=fr_CA
+ja_jp=ja_JP
+en_jp=en_JP
+
+en_uk=en_UK
+en_eu=en_EU
+###################################
+####-MME COUNTRIES WRITE NOT ALLOWED -###
+# DO NOT AD EN_UK IN THIS LIST
+###################################
+mme.not.writable.countries=EU,AT,BE,BE,HR,CZ,DK,EE,FI,FR,DE,GB,GR,HU,IT,LV,LT,NL,NO,PL,PT,RO,RU,SK,SL,ES,SE,CH,TR,UA,BA,BG,GE,IE,CS
+mme.not.writable.locales=en_EU,de_AT,fr_BE,nl_BE,hr_HR,cs_CZ,da_DK,et_EE,fi_FI,fr_FR,de_DE,en_GB,el_GR,hu_HU,it_IT,lv_LV,lt_LT,nl_NL,no_NO,pl_PL,pt_PT,ro_RO,ru_RU,sk_SK,sl_SL,es_ES,sv_SE,fr_CH,de_CH,tr_TR,uk_UA,bs_BA,bg_BG,ka_GE,en_IE,sr_CS,en_SE,en_FI
+
+###################################
+####-COUNTRIES WRITE ALLOWED FOR CVC-###
+###################################
+writable.cvc.countries=US,CA,MX,JP
+writable.cvc.locales=en_US,en_CA,es_MX,fr_CA,ja_JP
+
+###################################
+####-COUNTRIES WRITE ALLOWED FOR ESI -###
+###################################
+writable.esi.countries=US,CA,MX,JP,UK,CZ,PL,PT,SE,DE,FI,TR,FR,GR,RU,NL,IT,ES
+writable.esi.locales=en_US,en_CA,es_MX,fr_CA,ja_JP,en_UK,cs_CZ,pl_PL,pt_PT,sv_SE,de_DE,fi_FI,tr_TR,fr_FR,el_GR,ru_RU,nl_NL,it_IT,es_ES
+
+###################################
+#########---CHECK KEYS -------- ###
+###################################
+check.all.label=All
+
+###################################
+####- 	INTENRAL TEAM USER IDS -###
+###################################
+GMS3_INTERNAL_TEAM_USERS=gbansal1,vdabkara,dsinghga,skoguru,achoragu
+
+###################################
+####- CATEGORIES TO BE SKIPPED ####
+###################################
+SKIP_CATEGORIES=CAMPAIGN,KAIZEN_TAISAKU,M_TIPS,RECALL,SERVICE_ALERT,TECHNICAL_INFORMATION,TECHNICAL_SERVICE_BULLETIN,CAMPAIGN_KAIZEN_TAISAKU,DEALER_REWORK,MAZDA_SERVICE_PROGRAMS,OTHER_CAMPAIGNS,RECALLS,SPECIAL_SERVICE_PROGRAMS,ACCESSORIES,CUSTOMIZATIONS,OTHERS,OWNERS_MANUAL,PARTS,PRODUCT_CHARACTERISTICS,REPAIR,WARRANTY_SI,WORKSHOP_MANUAL_SI
+
+###################################
+####-ESI CATEGORY FLAGS-###
+###################################
+value.esicategory.flag.yes=Y
+value.esicategory.flag.no=N
+
+###################################
+####-MNAO LOCALES -###
+###################################
+mnao.countries.locales.codes=en_US,fr_CA,es_MX,en_CA
+mnao.countries.codes=US,CA,MX
+
+mc.countries.codes=JP
+mc.countries.locales.codes=ja_JP
+###################################
+####-APPLICATION ENVIRONMENT CONTEXT -###
+###################################
+application.environment.context=
+application.hostname=https://portaltest.mazdausa.com
+application.infocenter.context=/dokinfoctr/mazdagms3
+application.infocenter.web.context=
+application.mc.hostname=https://gtstest.mazdausa.com
+application.mc.redirecturl=https://gtstest.mazdausa.com/dokinfoctr/mazdagms3/index?page=home
+###################################
+#### -FEDERATION URL FOR LOGOUT-###
+###################################
+FEDERATION_URL=https://auth.mazda.co.jp/fed/idp/initiatesso?providerid=https://gtstest.mazdausa.com/MazdaCorp&returnurl=
+FEDERATION_URL_MME=https://moa.mazdaeur.com/oamfed/idp/initiatesso?providerid=https://gtstest.mazdausa.com/MazdaEurope&returnurl=https://gtstest.mazdausa.com/dmdcapps/okmdmgt/mypage
+
+###################################
+####-MAX DATA CHUNK SIZE -###
+###################################
+MAX_ENTRIES_SIZE=500
+
+###################################
+##-VIN PARENT CATEGORIES REFKEY -##
+###################################
+MNAO.VIN.HIERARCHY.REFKEY=VIN
+MC.VIN.HIERARCHY.REFKEY=CARLINE
+
+
+####################################
+## CATEGORY LOAD LIMIT #############
+####################################
+mnao.cat.create.limit=5
+mc.cat.create.limit=5
+mme.cat.create.limit=5
+
+####################################
+## CATEGORY SCHEDULE NAME KEYS #####
+####################################
+mme.schedule.name.key=MGSS_SIVIN_MME_
+mc.schedule.name.key=MGSS_SIVIN_MC_
+mnao.schedule.name.key=MGSS_SIVIN_MNAO_
+
+SIVIN_BATCH_REPORTS_DIRECTORY=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/SIVIN_BATCH_REPORTS
+SIVIN_BATCH_REPORTS_DIRECTORY_WEB=/content/library/MAZDA/GMS3_CUSTOM/SIVIN_BATCH_REPORTS/
+REPORTS_ZIP_SUFFIX=REPORTS.zip
+
+
+category.email.ids.for.internalusers=vishald@softclouds.com,gauravb@softclouds.com
+
+###################################
+#########-- MARKETS LIST  -- ###
+###################################
+market.mnao=MNAO
+market.mc=MC
+market.mme=MME
+
+###################################
+#########-- CDROM STARTS  -- ###
+###################################
+
+
+###################################
+#########-- SCHEDULE STATUS  -- ###
+###################################
+schedule.status.pending.value=1
+schedule.status.processing.value=2
+schedule.status.success.value=3
+schedule.status.failure.value=4
+schedule.status.aborted.value=5
+schedule.status.no.record.value=6
+
+
+schedule.current.status.document.value=Document Processing
+schedule.current.status.folder.copy.value=Folder Copy
+schedule.current.status.okasset.value=OK Asset Processing
+schedule.current.status.innerlink.value=Inner link Processing
+schedule.current.status.complete.value=Completed
+schedule.current.status.zip.processing=CD Zip File Processing
+schedule.current.status.report.processing=Reports Processing
+schedule.current.status.applicable.vin.processing=Applicable VIN Processing
+
+
+
+schedule.name.key=MDM_CDROM_
+default.user=CDROM_MDM_USER
+
+###################################
+#########---   MANUALS TYPE REFERENCE KEYS ---###
+###################################
+
+GMS3_SM_TYPE_WM_REF_KEY=WORKSHOP_MANUAL
+GMS3_SM_TYPE_BSM_REF_KEY=BODYSHOP_MANUAL
+GMS3_SM_TYPE_SH_REF_KEY=SERVICE_HIGHLIGHTS
+GMS3_SM_TYPE_TG_REF_KEY=SERVICE_HIGHLIGHTS
+GMS3_SM_TYPE_ENGINE_REF_KEY=ENGINE_WORKSHOP_MANUAL
+GMS3_SM_TYPE_AT_REF_KEY=AT_WORKSHOP_MANUAL
+GMS3_SM_TYPE_MT_REF_KEY=MT_WORKSHOP_MANUAL
+GMS3_SM_TYPE_IM_REF_KEY=ONBAORD_DIAGNOSTICS_INSPECTION_AND_MAINTENANCE
+GMS3_SM_TYPE_WM&SH_REF_KEY=WORKSHOP_AND_NEW_MODEL_GUIDE
+GMS3_SM_TYPE_MC_REF_KEY=MAINTENANCE_AND_CARE
+GMS3_SM_TYPE_TQG_REF_KEY=TECHNICAL_QUICK_GUIDE
+GMS3_SM_TYPE_WD_REF_KEY=WIRING_DIAGRAMS
+GMS3_SM_TYPE_E-WD_REF_KEY=WIRING_DIAGRAMS
+
+GMS3_SM_TYPE_RQ_REF_KEY=RESCUE_MANUAL
+# Same value as the IM Prod MDM (user 2026-11-15): Diag documents are stored as TROUBLESHOOTING_MANUAL, so with this value
+# CD Creation does not offer Diag under Engine Workshop, exactly as IM Prod.
+GMS3_SM_TYPE_DM_REF_KEY=DIAGNOSIS_MANUAL
+GMS3_SM_TYPE_MCM_REF_KEY=MAZDA_CONNECT_MANUAL
+
+manual.prefix=GMS3_SM_TYPE_
+manual.suffix=_REF_KEY
+
+cdrom.image.server.path = /s3kapture/ROOT/resources/sites/KAPTURE/content
+# Context Job 10 / DMT put in front of every library path sent to Kapture (/content/library/...).
+# CD Creation, RMI Export and MNAO Data Export drop it before joining a content path to the
+# okassets roots above (they already end in the content folder). Same key + value as DMT.
+kapture.library.path.context=/content
+# CD Creation - Kapture link forms in document content (Job 10 / DMT), handled BESIDES the InfoManager ones
+# (any ...id=<id> link, rimtool.othermanualink.mc / .mme, WD JS index?page=detail_mc|detail_mme&id=) - same
+# shapes as the Bulk Extract job. REQUIRED.
+# Document link, regular expression, group 1 = document id: content/<id>[#anchor] -> <id>.html[#anchor].
+# Anchored on a letters+digits id so /content/library/... asset paths are not taken for links.
+cdrom.innerlink.kapture.pattern=(?:^|/)content/([A-Za-z]+[0-9]+)(?:[/?#&]|$)
+# Other manual (search) links -> their text in the CD.
+cdrom.othermanualink.kapture.mc.url.pattern=result_mc?question_box=
+cdrom.othermanualink.kapture.mme.url.pattern=result_mme?question_box=
+# WD window.js / voltageMAP.js / voltagelinkMAP.js document links (DMT: GMS3_INFOCENTER_APPLICATION_CONTENT +
+# LINK_URL_MC_WINDOW_JS / LINK_URL_MME_WINDOW_JS), with or without a leading "/" -> ../sm_doc/<id>.html
+cdrom.wd.reflinks.kapture.pattern=mazdagms3/content/
+cdrom.pdf.server.path = /s3kapture/ROOT/resources/sites/KAPTURE/content
+cdrom.server.path.name = /s3kapture/ROOT/resources/sites/KAPTURE/content
+cdrom.schedule.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/CDROM
+# CD Creation - at most this many CD jobs (data extract, not the selection-criteria job) Pending / Processing
+# at the same time; Schedule is refused beyond it. REQUIRED. See CDRomScheduleServlet.
+cdrom.max.parallel.jobs=5
+# CD Creation - files copied at the same time PER JOB (WD / e-WD folders, images). Each file on the
+# /s3kapture NFS mount costs ~0.7 s whatever its size, so they are copied side by side. Worst case on the
+# mount = cdrom.max.parallel.jobs x this. REQUIRED.
+cdrom.copy.parallel.threads=5
+# RMI Export - at most this many jobs Pending / Processing at the same time; Schedule is refused beyond it. REQUIRED.
+rmitool.max.parallel.jobs=5
+# MNAO Data Export - at most this many jobs Pending / Processing at the same time; Schedule is refused beyond it. REQUIRED.
+dataexttool.max.parallel.jobs=5
+# RMI Export + MNAO Data Export reports (document, files, inner links and view content) - data rows written in ONE Excel.
+# A report with more rows continues in reportName_1.xlsx, reportName_2.xlsx ... (same header in each).
+# 1 or more, not above 1048575 (rows one Excel sheet holds besides the header). REQUIRED.
+rmitool.report.max.rows.per.excel=500000
+dataexttool.report.max.rows.per.excel=500000
+cdrom.japan.html.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/CDROM_Template/JAPAN
+cdrom.mme.html.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/CDROM_Template/MME
+cdrom.extracted.webserver.path=/content/library/MAZDA/GMS3_CUSTOM/CDROM/
+# CD ROM DOCUMENT CONTENT ROOT - see kapture.content.xml.root at the top of this file.
+# Deliberately NOT a second property. CD Creation reads the same generated document XML the SI
+# screens read, so it uses the same root and the same <live|staging> convention; two roots would
+# drift apart the first time one of them was updated on VDI and the other was not.
+# CD Creation reads PUBLISHED documents, which live under live/ - never staging/, which holds the
+# working drafts between publishes.
+
+cdrom.model.type.folder.key.newm=newm
+cdrom.model.type.folder.key.oldm=oldm
+
+GMS3_MC_CUSTOM_CONTENT_CSS=mazda-css-jp.css
+###################################
+#########-- CDROM ENDS  -- ###
+###################################
+
+###################################
+########-- TRANSLATION KEYS  -- ###
+###################################
+translation.update.job.key=MGSS_TU_
+translation.update.export.physical.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/TRANSLATION_UPDATE/EXPORT/
+translation.update.import.physical.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/TRANSLATION_UPDATE/IMPORT/
+translation.update.export.webserver.path=/content/library/MAZDA/GMS3_CUSTOM/TRANSLATION_UPDATE/EXPORT/
+ZIP_SUFFIX=.zip
+translation.update.import.temp.directory=temp/
+
+SI_ROOT_NODE=SERVICE_INFORMATION
+SI_NODES_LIST=TITLE,SI_HISTORY,TI_SUMMARY,BULLETIN_NOTES,DESCRIPTION,REPAIR_PROCEDURE,CALIBRATION,PARTS_INFORMATION,WARRANTY_INFORMATION
+SM_ROOT_NODE=SERVICE_MANUALS
+SM_NODES_LIST=TITLE,CONTENT
+
+###################################
+########-- RMI TOOL KEYS  -- ###
+###################################
+# SUPERSEDED - the document XML is located through kapture.content.xml.root (see the top of this
+# file), because Kapture adds a VERSION level below the locale that has to be resolved from
+# k_article first. Kept only so the schedule detail screens still render a source path; nothing
+# reads a document from it any more.
+rmitool.live.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/live/
+rmitool.working.dir.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/
+rmitool.reports.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/REPORTS/
+rmitool.reports.web.path=/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/REPORTS/
+rmitool.working.dir.web.path=/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/
+rmitool.okassets.source.dir.path=/s3kapture/ROOT/resources/sites/KAPTURE/content
+rmitool.okassets.dir.sub.path=/OkAssets/library/MAZDA
+rmitool.library.dir.name=library
+rmitool.mazda.dir.name=MAZDA
+rmitool.image.dir.name=image
+rmitool.pdf.dir.name=pdf
+extension.pdf=.pdf
+rmitool.innerlink.url=index?page=content&id=
+# RMI Export - Kapture document link (Job 10 / DMT content/<id>), regular expression, group 1 = document id; handled
+# besides rmitool.innerlink.url (InfoManager form). Same shape as the Bulk Extract job + CD Creation. REQUIRED.
+rmitool.innerlink.kapture.pattern=(?:^|/)content/([A-Za-z]+[0-9]+)(?:[/?#&]|$)
+# Exported XML (RMI Export + MNAO Data Export): header nodes written in CDATA as in the legacy export; every value inside the channel node always is
+kapture.export.xml.cdata.header.nodes=DOCUMENTID,type,title,categoriesESITreeLabels
+# ---- OKM (InfoManager) shape of the exported XML (user 2026-11-12; mapping Environment_Config/OKM_vs_Kapture_Export_Mapping.xlsx; see ExportOkmShape). ALL REQUIRED.
+# DATES ARE NEVER CONVERTED (user 2026-11-12): every Kapture date value is passed exactly as it is
+# channels whose channel node is converted (renames, attachments, SECURITY, dates, order); other channels pass as they are
+okm.export.channels=SERVICE_INFORMATION,SERVICE_MANUALS,OTHER_SERVICE_MANUALS,WIRING_DIAGRAMS
+# file elements in the OKM form (file name as text): get the exported text + SIZE (bytes of the file, blank when not found). Kapture's fileName/filePath form is found on any element
+okm.export.attachment.nodes=ATTACHMENT,LEGACY_PDF,REVISION_HISTORY,OTHER_PDF,CAMPAIGN_ATTACHMENT,MD_LETTER_ATTACHMENT,OTHER_REFERENCE_FILE_ATTACHMENT
+# SECURITY="" on these when they have a value (CHANNEL/NAME anywhere under the channel, CHANNEL/PARENT/NAME with that parent)
+okm.export.security.nodes=SERVICE_INFORMATION/BULLETIN_NOTES,SERVICE_INFORMATION/ATTACHMENTS/ATTACHMENT_TITLE,SERVICE_INFORMATION/LEGACY_PDF,SERVICE_INFORMATION/OTHER_PDF,SERVICE_INFORMATION/CAMPAIGN_ATTACHMENT_TITLE,SERVICE_INFORMATION/CAMPAIGN_ATTACHMENT,SERVICE_INFORMATION/MD_LETTER_ATTACHMENT,SERVICE_INFORMATION/OTHER_REFERENCE_FILE_ATTACHMENT
+# passed as is: CHANNEL/NODE written as Kapture wrote it, only filePath gets the exported value; its files are exported (SM / OSM BIJLAGEN, user 2026-11-12)
+okm.export.as.is.nodes=SERVICE_MANUALS/BIJLAGEN,OTHER_SERVICE_MANUALS/BIJLAGEN
+okm.export.rename.if.absent=WIRING_DIAGRAMS/FILE_SOURCE_LOCATION>DJVU_FILE_LOCATION
+# child order (from the legacy OKM export files): first element of each name in this order, then repeats and unlisted names as they are
+okm.export.child.order.nodes=SERVICE_INFORMATION,SERVICE_MANUALS,OTHER_SERVICE_MANUALS,WIRING_DIAGRAMS,ATTACHMENTS,PDF_ATTACHMENTS,CAMPAIGN_ATTACHMENTS
+okm.export.child.order.SERVICE_INFORMATION=TITLE,SA_NUMBER,MTIPS_NUMBER,TSB_NUMBER,CAMPAIGN_NUMBER,TSB_ISSUE_DATE,RECALL_NUMBERS,BULLETIN_NOTES,DESCRIPTION,REPAIR_PROCEDURE,CALIBRATION,PARTS_INFORMATION,WARRANTY_INFORMATION,SERVICE_INFORMATION_TYPE,CAMPAIGN_TYPE,FIRST_PUBLICATION_DATE,LEGACY_ID,INTERNAL_DOCUMENT_REFERENCE_NUMBER,ATTACHMENTS,SHOW_AS_NEWS_FOR_WEEKS,EXPIRATION_DATE,OTHER_REFERENCE_FILE_ATTACHMENT,MC_AUTHORIZATION_NUMBER,CAMPAIGN_ATTACHMENTS,SIGNATURE,MD_LETTER_ATTACHMENT
+okm.export.child.order.SERVICE_MANUALS=TITLE,SERVICE_MANUAL_TYPE,CONTENT,VTOC_FILENAME,SIE_ID,DJVU_FILE_LOCATION,OASIS_FILE_LOCATION,ATTACHMENTS
+okm.export.child.order.OTHER_SERVICE_MANUALS=TITLE,CONTENT,ATTACHMENTS,DJVU_FILE_LOCATION,OASIS_FILE_LOCATION
+okm.export.child.order.WIRING_DIAGRAMS=TITLE,HTML_CONTENT,FLASH_CONTENT,NAVIGATION,HTML5_FILE_NAME,HTML5_UPLOAD_DIRECTORY,HTML5_FONT_SELECTION,DJVU_FILE_LOCATION,ATTACHMENT_TITLE,ATTACHMENT
+okm.export.child.order.ATTACHMENTS=ATTACHMENT_TITLE,ATTACHMENT,PDF_ATTACHMENTS
+okm.export.child.order.PDF_ATTACHMENTS=LEGACY_PDF,REVISION_HISTORY,OTHER_PDF
+okm.export.child.order.CAMPAIGN_ATTACHMENTS=CAMPAIGN_ATTACHMENT_TITLE,CAMPAIGN_ATTACHMENT
+# header (RMI Export + MNAO Data Export): CONTENT RECORDID="" + MASTERIDENTIFIER .. PUBLISHEDTIME rebuilt from the Kapture header
+okm.export.xml.declaration=<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+okm.export.header.cdata.nodes=MASTERIDENTIFIER,TYPE,TYPE_GUID,REPOSITORY,REPOSITORY_GUID,DOCUMENTID,LOCALECODE,LOCALEVALUE
+# CHANNEL:GUID; SERVICE_MANUALS blank (user 2026-11-12); a channel not listed = blank
+okm.export.header.type.guids=SERVICE_INFORMATION:e984ea2766804a66959dc7ddaba33054,WIRING_DIAGRAMS:4ddf567dffa242a8ad717dca5830a8d5,OTHER_SERVICE_MANUALS:517194d5e6ba451280b8e86a107ed67c,SERVICE_MANUALS:
+okm.export.header.repository=MAZDA
+okm.export.header.repository.guid=92f8087d86e54f79b8535ec2c54a7f00
+# CHANNEL:prefix - METARESOURCEPATH = prefix + (document number / 1000 * 1000) + / + DOCUMENTID + /
+okm.export.header.metaresourcepath=WIRING_DIAGRAMS:/sites/MAZDA/content/meta/WIRING_DIAGRAMS/
+# CHANNEL:empty nodes written after the channel node (A+B for several)
+okm.export.header.after.channel=WIRING_DIAGRAMS:META
+rmitool.master.category.refkeys=APPROVAL_PROCESS,ESI,CVC,VIN,MODEL_YEAR,TRANSMISSION_TYPE,ENGINE_TYPE,BODY_TYPE,DRIVELINE_AXLE_TYPE,FAQ_TYPE,PROCEDURE_TYPE,REFERENCE_TYPE,SOLUTION_TYPE,VEHICLE_LITERATURE_TYPE,STEERING_TYPE,CARLINE,CONTENT_PROCESS,SERVICE_INFORMATION_TYPE,SERVICE_MANUAL_TYPE,OTHER_MANUAL_TYPE,TRAINING_TYPE,POD_TEAMS
+rmitool.master.category.objectids=00019,00001,00002,00003,00004,00005,00006,00007,00008,00020,00021,00022,00023,00024,00025,00034,00026,00027,00028,00035,00037,00041
+rmitool.thumbs.db.file=thumbs.db
+rmitool.MDM_DISTRIBUTOR_AUTHOR.refkey=MDM_DISTRIBUTOR_AUTHOR_KEY
+rmitool.to.email.id=vishald@softclouds.com,gauravb@softclouds.com
+
+
+#rimtool.othermanualink.mnao.url.pattern=index?page=result&startover=y&qstr=qstr&question_box
+#rimtool.othermanualink.mc.url.pattern=index?page=result_mc&startover=y&qstr=qstr&question_box
+#rimtool.othermanualink.mme.url.pattern=index?page=result_mme&startover=y&qstr=qstr&question_box
+
+rimtool.othermanualink.mnao.url.pattern=index?page=result&startover=y&qstr=qstr
+rimtool.othermanualink.mc.url.pattern=index?page=result_mc&startover=y&qstr=qstr
+rimtool.othermanualink.mme.url.pattern=index?page=result_mme&startover=y&qstr=qstr
+# RMI Export + MNAO Data Export - Kapture other manual (search) links (Job 10 / DMT), handled besides the
+# InfoManager patterns above: the link is replaced by its text. REQUIRED.
+rimtool.othermanualink.kapture.mnao.url.pattern=result?question_box=
+rimtool.othermanualink.kapture.mc.url.pattern=result_mc?question_box=
+rimtool.othermanualink.kapture.mme.url.pattern=result_mme?question_box=
+
+
+###################################
+## MNAO DATA EXPORT TOOL KEYS  -- #
+###################################
+# SUPERSEDED - the document XML is located through kapture.content.xml.root (see the top of this
+# file), because Kapture adds a VERSION level below the locale that has to be resolved from
+# k_article first. Kept only so the schedule detail screens still render a source path; nothing
+# reads a document from it any more.
+dataexttool.live.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/live/
+dataexttool.working.dir.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/
+dataexttool.reports.folder.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/REPORTS/
+dataexttool.reports.web.path=/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/REPORTS/
+dataexttool.working.dir.web.path=/content/library/MAZDA/GMS3_CUSTOM/RMI_EXPORT_DIR/
+dataexttool.okassets.source.dir.path=/s3kapture/ROOT/resources/sites/KAPTURE/content
+dataexttool.okassets.dir.sub.path=/OkAssets/library/MAZDA
+dataexttool.library.dir.name=library
+dataexttool.mazda.dir.name=MAZDA
+dataexttool.image.dir.name=image
+dataexttool.pdf.dir.name=pdf
+dataexttool.innerlink.url=index?page=content&id=
+# MNAO Data Export - Kapture document link (Job 10 / DMT content/<id>), regular expression, group 1 = document id;
+# handled besides dataexttool.innerlink.url (InfoManager form). Same shape as the Bulk Extract job + CD Creation. REQUIRED.
+dataexttool.innerlink.kapture.pattern=(?:^|/)content/([A-Za-z]+[0-9]+)(?:[/?#&]|$)
+dataexttool.master.category.refkeys=APPROVAL_PROCESS,ESI,CVC,VIN,MODEL_YEAR,TRANSMISSION_TYPE,ENGINE_TYPE,BODY_TYPE,DRIVELINE_AXLE_TYPE,FAQ_TYPE,PROCEDURE_TYPE,REFERENCE_TYPE,SOLUTION_TYPE,VEHICLE_LITERATURE_TYPE,STEERING_TYPE,CARLINE,CONTENT_PROCESS,SERVICE_INFORMATION_TYPE,SERVICE_MANUAL_TYPE,OTHER_MANUAL_TYPE,TRAINING_TYPE,POD_TEAMS
+dataexttool.master.category.objectids=00019,00001,00002,00003,00004,00005,00006,00007,00008,00020,00021,00022,00023,00024,00025,00034,00026,00027,00028,00035,00037,00041
+dataexttool.thumbs.db.file=thumbs.db
+dataexttool.MDM_DISTRIBUTOR_AUTHOR.refkey=MDM_DISTRIBUTOR_AUTHOR_KEY
+dataexttool.to.email.id=vishald@softclouds.com,gauravb@softclouds.com
+
+
+#dataexttool.othermanualink.mnao.url.pattern=index?page=result&startover=y&qstr=qstr&question_box
+#dataexttool.othermanualink.mc.url.pattern=index?page=result_mc&startover=y&qstr=qstr&question_box
+#dataexttool.othermanualink.mme.url.pattern=index?page=result_mme&startover=y&qstr=qstr&question_box
+
+dataexttool.othermanualink.mnao.url.pattern=index?page=result&startover=y&qstr=qstr
+dataexttool.othermanualink.mc.url.pattern=index?page=result_mc&startover=y&qstr=qstr
+dataexttool.othermanualink.mme.url.pattern=index?page=result_mme&startover=y&qstr=qstr
+
+dataexttool.operation.type.fullextract.value=FC
+dataexttool.operation.type.specificextract.value=SC
+
+###########################################
+########-- SI CHANNEL DATA LOAD KEYS  -- ##
+###########################################
+sichannel.data.load.zip.file.directory.physical.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/GMS3_CUSTOM/MDM_SI_DL/
+sichannel.data.load.zip.file.directory.web.path=/content/library/MAZDA/GMS3_CUSTOM/MDM_SI_DL/
+sichannel.data.load.content.file.html.ext=.html
+sichannel.data.load.content.file.htm.ext=.htm
+SERVER_LIBRARY_DIRECTORY=content/library/
+# KAPTURE root, NOT .../content/: SERVER_LIBRARY_DIRECTORY (content/library/) is appended to it
+SERVER_OKASSETS_PHYSICAL_PATH=/s3kapture/ROOT/resources/sites/KAPTURE/
+SI_CHANNEL_NAME=SERVICE_INFORMATION
+view.mnao=MNAO
+view.mc=MC
+view.mme=MME
+sichannel.data.load.reports.dir=Reports/
+sichannel.data.load.email.id=vishald@softclouds.com,gauravb@softclouds.com
+sichannel.data.load.gms3.diretory=GMS3
+sichannel.data.load.si.diretory=SI
+
+###########################################
+########-- SCH MAIN VIN MAPPING KEYS  -- ##
+###########################################
+EXPORT_DATA_SCH_MAIN_VIN_MAPPING_NAME=SCH_MAIN_VIN_MAPPING
+
+###########################################
+#######-- NEW MGSS EXTRACT TOOL KEYS  -- ##
+###########################################
+mgssexttool.reports.zip.physical.path=/s3kapture/ROOT/resources/sites/KAPTURE/content/library/MAZDA/MGSS_DATA_EXTRACT/ZIP_REPORTS/
+mgssexttool.reports.zip.relative.path=/content/library/MAZDA/MGSS_DATA_EXTRACT/ZIP_REPORTS/
+mgssexttool.delta.dir=DELTA_DATA_DEV
+mgssexttool.full.dir=FULL_DATA_DEV
+
+# --- Kapture REST API (replaces the InQuira IQ client library) ---
+# Used by com.mazda.gms3.mdm.kapture.KaptureApiClient for the SI VIN modify/delete content
+# operations. Same endpoints and credentials as the ContentImportJob (Job 9).
+kapture.api.base         = http://oclut0124:8883
+kapture.api.login.path   = /kauthor-api/cms-check
+kapture.api.display.path = /kauthor-api/display-Article
+# READS GO THROUGH latest-article - IT RESOLVES THE VERSION AND STATE ITSELF AND RETURNS
+# BYTE-IDENTICAL CONTENT TO display-Article (verified over master/translation x pub/unpub).
+kapture.api.latest.path  = /kauthor-api/latest-article
+# TRANSLATIONS ARE WRITTEN HERE, NOT THROUGH update-article-tab, WHICH IS MASTER ONLY.
+kapture.api.translate.path = /kauthor-api/save-translate-article
+kapture.api.update.path  = /kauthor-api/update-article-tab
+# CREATE - the only endpoint that mints a document; used by the SI Data Load screen
+kapture.api.create.path  = /kauthor-api/add-article-tab
+# Re-publish after updating a PUBLISHED document. Updating a published article writes the change
+# into a NEW UNPUBLISHED version, so this promotes that version back to Published. Called ONLY
+# when the version being updated was itself Published - an unpublished document stays unpublished.
+kapture.api.publish.path = /kauthor-api/publish-article
+# Category create / update. kapture_cms_db is READ ONLY to this application, so k_categories is
+# never written to directly. Same endpoint names IMCategoryImportJob (Job 4) used to load all 51
+# locales, but under /kauthor-api - Job 4's /Kapture-Author context now answers 404 for every
+# path. Both were re-confirmed against the live API.
+kapture.api.category.create.path = /kauthor-api/add-categoryMgt
+kapture.api.category.update.path = /kauthor-api/updateCategoryByCatRef
+kapture.api.email        = gauravb@softclouds.com
+kapture.api.password     = nNrjnrYwBp
+kapture.api.appType      = kauthor
+kapture.api.publicIp     = oclut0124
+kapture.api.userAgent    = chrome
+kapture.api.connect.timeout.ms = 30000
+kapture.api.read.timeout.ms    = 120000

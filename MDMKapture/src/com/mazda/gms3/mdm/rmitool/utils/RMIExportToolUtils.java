@@ -1762,7 +1762,10 @@ public class RMIExportToolUtils {
 											if (null != srcValue && !"".equals(srcValue)
 													&& !"".equals(srcValue.trim()) && !srcValue.startsWith("#")  
 													&& !srcValue.trim().toLowerCase().startsWith("http://")  
-													&& !srcValue.trim().toLowerCase().startsWith("https://")) 
+													&& !srcValue.trim().toLowerCase().startsWith("https://")
+													// an image embedded in the page itself (src="data:image/png;base64,...") is not a file -
+													// nothing to copy or trace: it stays in the XML as is
+													&& !srcValue.trim().toLowerCase().startsWith("data:")) 
 											{
 												imagesDetails  = new RMIExportToolAttachmentDetails();
 												/*

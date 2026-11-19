@@ -325,7 +325,7 @@ public class TranslationKaptureService {
 	 *
 	 * ONLY THE CONFIGURED NODES CHANGE - EVERYTHING ELSE PASSES THROUGH AS IS. That is the screen's
 	 * rule, and it cannot be left to the merge to honour: on live data the merge returned a node
-	 * missing six fields the document had (LEGACY_ID, FIRST_PUBLICATION_DATE, ISSUE_DATE,
+	 * missing six fields the document had (LEGACY_ID, FIRST_PUBLICATION_DATE, TSB_ISSUE_DATE,
 	 * INTERNAL_DOCUMENT_REFERENCE_NUMBER, MC_AUTHORIZATION_NUMBER, SHOW_AS_NEWS_FOR_WEEKS). Since
 	 * the write endpoints rewrite the whole row, sending that would have stored all six as NULL.
 	 *

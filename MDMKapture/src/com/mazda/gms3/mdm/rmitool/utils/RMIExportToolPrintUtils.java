@@ -23,6 +23,7 @@ import com.mazda.gms3.mdm.rmitool.vo.RMIExportToolInnerLinkDetails;
 import com.mazda.gms3.mdm.rmitool.vo.RMIExportToolItemDetails;
 import com.mazda.gms3.mdm.rmitool.vo.RMIExportToolReportSummaryDetails;
 import com.mazda.gms3.mdm.utils.ApplicationProperties;
+import com.mazda.gms3.mdm.utils.ExportReportSplit;
 import com.mazda.gms3.mdm.utils.Utilities;
 import com.mazda.gms3.mdm.vo.MMEViewContentDetails;
 import com.mazda.gms3.mdm.vo.ScheduleConstants;
@@ -304,6 +305,7 @@ public class RMIExportToolPrintUtils {
 				String headers="";
 				headers="SCHEDULE_ID,LOCALE,MODEL,CARLINE CODE,CHANNEL,DOCUMENT TYPE,DOCUMENT ID,CHANNEL SOURCE DIR,DESTINATION DOCUMENT DIR,PROCESSING STATUS,ERROR MESSAGE";
 
+				String[] headerLabels = headers.split(",");
 				String[] tokens=headers.split(",");
 				if(null!=tokens && tokens.length>0)
 				{
@@ -320,6 +322,9 @@ public class RMIExportToolPrintUtils {
 				headers=null;
 
 				int rowCount = 0;
+				// one Excel holds at most this many data rows - a bigger report continues in fName_1.xlsx, fName_2.xlsx ...
+				int maxRowsPerExcel = ExportReportSplit.maxRowsPerExcel("rmitool.report.max.rows.per.excel");
+				int partNo = 1;
 				/*
 				 * GENERATE MULTIPLE ROWS SUCH THAT
 				 * item data + Document Id + multiple Rows for Applicable VIN List
@@ -347,6 +352,10 @@ public class RMIExportToolPrintUtils {
 					dataRow+="<TOK_SEPARATOR>"+details.getCarlineCode()+"<TOK_SEPARATOR>"+details.getChannelName()+"<TOK_SEPARATOR>"+details.getDocumentType()+
 							"<TOK_SEPARATOR>"+details.getDocumentId()+"<TOK_SEPARATOR>"+details.getChannelFolderPath()+"<TOK_SEPARATOR>"+details.getDocumentDirPath()+"<TOK_SEPARATOR>"+details.getProcessingStatus()+"<TOK_SEPARATOR>"+details.getErrorMessage();
 
+					// counts as they stand BEFORE this row - the summary of an Excel that gets full covers only its own rows
+					long successBeforeRow = successCount;
+					long failureBeforeRow = failureCount;
+					String statusBeforeRow = reportStatus;
 					if(null!=details.getProcessingStatus() && details.getProcessingStatus().equals(ScheduleConstants.STATUS_SUCCESS))
 					{
 						// increment successCount
@@ -360,6 +369,32 @@ public class RMIExportToolPrintUtils {
 						reportStatus  = ScheduleConstants.STATUS_FAILURE;
 					}
 					// increment rowCount by 1
+					if(rowCount >= maxRowsPerExcel)
+					{
+						// this Excel is full - write it and continue the report in the next Excel
+						ExportReportSplit.closeFullPart(myWorkBook, myFile);
+						logger.info("Writing on "+myFile.getName()+" REPORT XLSX file Finished ...");
+						// summary row of the Excel just written - its own rows only
+						RMIExportToolReportSummaryDetails partSummaryDetails = new RMIExportToolReportSummaryDetails();
+						partSummaryDetails.setScheduleId(scheduleCode);
+						partSummaryDetails.setReportName(ExportReportSplit.partReportName("DOCUMENT EXTRACTION REPORT", partNo));
+						partSummaryDetails.setTotalCount(successBeforeRow+failureBeforeRow);
+						partSummaryDetails.setSuccessCount(successBeforeRow);
+						partSummaryDetails.setFailureCount(failureBeforeRow);
+						partSummaryDetails.setReportStatus(statusBeforeRow);
+						transactionDAO.createReportSummary(partSummaryDetails);
+						partSummaryDetails = null;
+						// the next Excel starts its own counts with this row
+						successCount = successCount-successBeforeRow;
+						failureCount = failureCount-failureBeforeRow;
+						reportStatus = (failureCount>0) ? ScheduleConstants.STATUS_FAILURE : ScheduleConstants.STATUS_SUCCESS;
+						partNo++;
+						myFile = new File(path + ExportReportSplit.partFileName(fName, partNo));
+						myWorkBook = new SXSSFWorkbook(100);
+						mySheet = myWorkBook.createSheet("Details");
+						ExportReportSplit.writeHeader(mySheet, headerLabels);
+						rowCount = 0;
+					}
 					rowCount++;
 					// Create a new Row
 					row = mySheet.createRow(rowCount);
@@ -397,8 +432,9 @@ public class RMIExportToolPrintUtils {
 				 */
 				RMIExportToolReportSummaryDetails summaryDetails = new RMIExportToolReportSummaryDetails();
 				summaryDetails.setScheduleId(scheduleCode);
-				summaryDetails.setReportName("DOCUMENT EXTRACTION REPORT");
-				summaryDetails.setTotalCount(totalCount);
+				summaryDetails.setReportName(ExportReportSplit.partReportName("DOCUMENT EXTRACTION REPORT", partNo));
+				// more than one Excel: this summary row is for the last Excel only
+				summaryDetails.setTotalCount((partNo>1) ? (successCount+failureCount) : totalCount);
 				summaryDetails.setSuccessCount(successCount);
 				summaryDetails.setFailureCount(failureCount);
 				summaryDetails.setReportStatus(reportStatus);
@@ -489,6 +525,7 @@ public class RMIExportToolPrintUtils {
 				String headers="";
 				headers="SCHEDULE_ID,LOCALE,MODEL,CARLINE CODE,CHANNEL,DOCUMENT TYPE,DOCUMENT ID,FILE NAME,FILE TYPE,SOURCE PATH,DESTINATION DIRECTORY,PROCESSING STATUS,ERROR MESSAGE";
 
+				String[] headerLabels = headers.split(",");
 				String[] tokens=headers.split(",");
 				if(null!=tokens && tokens.length>0)
 				{
@@ -505,6 +542,9 @@ public class RMIExportToolPrintUtils {
 				headers=null;
 
 				int rowCount = 0;
+				// one Excel holds at most this many data rows - a bigger report continues in fName_1.xlsx, fName_2.xlsx ...
+				int maxRowsPerExcel = ExportReportSplit.maxRowsPerExcel("rmitool.report.max.rows.per.excel");
+				int partNo = 1;
 				/*
 				 * GENERATE MULTIPLE ROWS SUCH THAT
 				 * item data + Document Id + multiple Rows for Applicable VIN List
@@ -539,6 +579,10 @@ public class RMIExportToolPrintUtils {
 					dataRow+="<TOK_SEPARATOR>"+details.getCarlineCode()+"<TOK_SEPARATOR>"+details.getChannelName()+"<TOK_SEPARATOR>"+details.getDocumentType()+
 							"<TOK_SEPARATOR>"+details.getDocumentId()+"<TOK_SEPARATOR>"+attachmentDetails.getName()+"<TOK_SEPARATOR>"+attachmentDetails.getAttachmentType()+"<TOK_SEPARATOR>"+attachmentDetails.getSourcePath()+"<TOK_SEPARATOR>"+attachmentDetails.getDestinationPath()+"<TOK_SEPARATOR>"+attachmentDetails.getProcessingStatus()+"<TOK_SEPARATOR>"+attachmentDetails.getErrorMessage();
 
+					// counts as they stand BEFORE this row - the summary of an Excel that gets full covers only its own rows
+					long successBeforeRow = successCount;
+					long failureBeforeRow = failureCount;
+					String statusBeforeRow = reportStatus;
 					if(null!=attachmentDetails.getProcessingStatus() && attachmentDetails.getProcessingStatus().equals(ScheduleConstants.STATUS_SUCCESS))
 					{
 						// increment successCount
@@ -553,6 +597,32 @@ public class RMIExportToolPrintUtils {
 					}
 
 					// increment rowCount by 1
+					if(rowCount >= maxRowsPerExcel)
+					{
+						// this Excel is full - write it and continue the report in the next Excel
+						ExportReportSplit.closeFullPart(myWorkBook, myFile);
+						logger.info("Writing on "+myFile.getName()+" REPORT XLSX file Finished ...");
+						// summary row of the Excel just written - its own rows only
+						RMIExportToolReportSummaryDetails partSummaryDetails = new RMIExportToolReportSummaryDetails();
+						partSummaryDetails.setScheduleId(scheduleCode);
+						partSummaryDetails.setReportName(ExportReportSplit.partReportName("FILES TRANSACTION REPORT", partNo));
+						partSummaryDetails.setTotalCount(successBeforeRow+failureBeforeRow);
+						partSummaryDetails.setSuccessCount(successBeforeRow);
+						partSummaryDetails.setFailureCount(failureBeforeRow);
+						partSummaryDetails.setReportStatus(statusBeforeRow);
+						transactionDAO.createReportSummary(partSummaryDetails);
+						partSummaryDetails = null;
+						// the next Excel starts its own counts with this row
+						successCount = successCount-successBeforeRow;
+						failureCount = failureCount-failureBeforeRow;
+						reportStatus = (failureCount>0) ? ScheduleConstants.STATUS_FAILURE : ScheduleConstants.STATUS_SUCCESS;
+						partNo++;
+						myFile = new File(path + ExportReportSplit.partFileName(fName, partNo));
+						myWorkBook = new SXSSFWorkbook(100);
+						mySheet = myWorkBook.createSheet("Details");
+						ExportReportSplit.writeHeader(mySheet, headerLabels);
+						rowCount = 0;
+					}
 					rowCount++;
 					// Create a new Row
 					row = mySheet.createRow(rowCount);
@@ -590,8 +660,9 @@ public class RMIExportToolPrintUtils {
 				 */
 				RMIExportToolReportSummaryDetails summaryDetails = new RMIExportToolReportSummaryDetails();
 				summaryDetails.setScheduleId(scheduleCode);
-				summaryDetails.setReportName("FILES TRANSACTION REPORT");
-				summaryDetails.setTotalCount(totalCount);
+				summaryDetails.setReportName(ExportReportSplit.partReportName("FILES TRANSACTION REPORT", partNo));
+				// more than one Excel: this summary row is for the last Excel only
+				summaryDetails.setTotalCount((partNo>1) ? (successCount+failureCount) : totalCount);
 				summaryDetails.setSuccessCount(successCount);
 				summaryDetails.setFailureCount(failureCount);
 				summaryDetails.setReportStatus(reportStatus);
@@ -684,6 +755,7 @@ public class RMIExportToolPrintUtils {
 				String headers="";
 				headers="SCHEDULE_ID,LOCALE,MODEL,CARLINE CODE,CHANNEL,DOCUMENT TYPE,DOCUMENT id,DOCUMENT PATH IN EXPORTED DIR,INNERLINK DOCUMENT id,INNERLINK SOURCE PATH,INNERLINK DESTINATION PATH,PROCESSING STATUS,ERROR MESSAGE";
 
+				String[] headerLabels = headers.split(",");
 				String[] tokens=headers.split(",");
 				if(null!=tokens && tokens.length>0)
 				{
@@ -700,6 +772,9 @@ public class RMIExportToolPrintUtils {
 				headers=null;
 
 				int rowCount = 0;
+				// one Excel holds at most this many data rows - a bigger report continues in fName_1.xlsx, fName_2.xlsx ...
+				int maxRowsPerExcel = ExportReportSplit.maxRowsPerExcel("rmitool.report.max.rows.per.excel");
+				int partNo = 1;
 				/*
 				 * GENERATE MULTIPLE ROWS SUCH THAT
 				 * item data + Document Id + multiple Rows for Applicable VIN List
@@ -746,6 +821,10 @@ public class RMIExportToolPrintUtils {
 							+"<TOK_SEPARATOR>"+innerLinkDetails.getSrcHrefPath()+"<TOK_SEPARATOR>"+innerLinkDetails.getPathToBeReplaced()
 							+"<TOK_SEPARATOR>"+innerLinkDetails.getProcessingStatus()+"<TOK_SEPARATOR>"+innerLinkDetails.getErrorMessage();
 
+					// counts as they stand BEFORE this row - the summary of an Excel that gets full covers only its own rows
+					long successBeforeRow = successCount;
+					long failureBeforeRow = failureCount;
+					String statusBeforeRow = reportStatus;
 					if(null!=innerLinkDetails.getProcessingStatus() && 
 							(innerLinkDetails.getProcessingStatus().equals(ScheduleConstants.STATUS_SUCCESS) || 
 									innerLinkDetails.getProcessingStatus().equals(ScheduleConstants.STATUS_SKIPPED)))
@@ -762,6 +841,32 @@ public class RMIExportToolPrintUtils {
 					}
 
 					// increment rowCount by 1
+					if(rowCount >= maxRowsPerExcel)
+					{
+						// this Excel is full - write it and continue the report in the next Excel
+						ExportReportSplit.closeFullPart(myWorkBook, myFile);
+						logger.info("Writing on "+myFile.getName()+" REPORT XLSX file Finished ...");
+						// summary row of the Excel just written - its own rows only
+						RMIExportToolReportSummaryDetails partSummaryDetails = new RMIExportToolReportSummaryDetails();
+						partSummaryDetails.setScheduleId(scheduleCode);
+						partSummaryDetails.setReportName(ExportReportSplit.partReportName("INNERLINKS TRANSACTION REPORT", partNo));
+						partSummaryDetails.setTotalCount(successBeforeRow+failureBeforeRow);
+						partSummaryDetails.setSuccessCount(successBeforeRow);
+						partSummaryDetails.setFailureCount(failureBeforeRow);
+						partSummaryDetails.setReportStatus(statusBeforeRow);
+						transactionDAO.createReportSummary(partSummaryDetails);
+						partSummaryDetails = null;
+						// the next Excel starts its own counts with this row
+						successCount = successCount-successBeforeRow;
+						failureCount = failureCount-failureBeforeRow;
+						reportStatus = (failureCount>0) ? ScheduleConstants.STATUS_FAILURE : ScheduleConstants.STATUS_SUCCESS;
+						partNo++;
+						myFile = new File(path + ExportReportSplit.partFileName(fName, partNo));
+						myWorkBook = new SXSSFWorkbook(100);
+						mySheet = myWorkBook.createSheet("Details");
+						ExportReportSplit.writeHeader(mySheet, headerLabels);
+						rowCount = 0;
+					}
 					rowCount++;
 					// Create a new Row
 					row = mySheet.createRow(rowCount);
@@ -802,8 +907,9 @@ public class RMIExportToolPrintUtils {
 				 */
 				RMIExportToolReportSummaryDetails summaryDetails = new RMIExportToolReportSummaryDetails();
 				summaryDetails.setScheduleId(scheduleCode);
-				summaryDetails.setReportName("INNERLINKS TRANSACTION REPORT");
-				summaryDetails.setTotalCount(totalCount);
+				summaryDetails.setReportName(ExportReportSplit.partReportName("INNERLINKS TRANSACTION REPORT", partNo));
+				// more than one Excel: this summary row is for the last Excel only
+				summaryDetails.setTotalCount((partNo>1) ? (successCount+failureCount) : totalCount);
 				summaryDetails.setSuccessCount(successCount);
 				summaryDetails.setFailureCount(failureCount);
 				summaryDetails.setReportStatus(reportStatus);
@@ -983,6 +1089,10 @@ public class RMIExportToolPrintUtils {
 				String headers="";
 				String[] tokens=null;
 				int rowCount = 0;
+				// one Excel holds at most this many data rows - a bigger report continues in fName_1.xlsx, fName_2.xlsx ...
+				int maxRowsPerExcel = ExportReportSplit.maxRowsPerExcel("rmitool.report.max.rows.per.excel");
+				int partNo = 1;
+				String[] headerLabels = null;
 				FileOutputStream os = null;
 				for(int Z=0;Z<viewContentList.size();Z++)
 				{
@@ -1029,6 +1139,7 @@ public class RMIExportToolPrintUtils {
 					fName =  scheduleCode+"_"+hierarchyDetails.getLocale().toUpperCase()+"_"+hierarchyDetails.getModelName().toUpperCase()+"_"+hierarchyDetails.getCarlineCode().toUpperCase()+"_SI_VC_DETAILS.xlsx";
 
 					myFile = new File(tPath+"/" +fName);
+					partNo = 1;
 					// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
 					myWorkBook = new SXSSFWorkbook(100);
 					// Create a new sheet
@@ -1041,6 +1152,7 @@ public class RMIExportToolPrintUtils {
 					headers="DOCUMENT_ID,LOCALE,CHANNEL_NAME,DOCUMENT_TYPE,DOCUMENT_TYPE_NAME,DOCUMENT_SUB_TYPE,DOCUMENT_SUB_TYPE_NAME,MODEL,CARLINE_CODE,CARLINE_NAME,WMI_CODE,"
 							+ "VDS_CODE,VIS_START_RANGE,VIS_END_RANGE,ESI_CATEGORY_NAME_1,ESI_CATEGORY_NAME_2,ESI_CATEGORY_NAME_3,TITLE,IM_DOC_MODIFIED_DATE,SI_NUMBER";
 
+					headerLabels = headers.split(",");
 					tokens=headers.split(",");
 					if(null!=tokens && tokens.length>0)
 					{
@@ -1097,6 +1209,18 @@ public class RMIExportToolPrintUtils {
 									"<TOK_SEPARATOR>"+details.getSiNumber();
 
 							// increment rowCount by 1
+							if(rowCount >= maxRowsPerExcel)
+							{
+								// this Excel is full - write it and continue the report in the next Excel
+								ExportReportSplit.closeFullPart(myWorkBook, myFile);
+								logger.info("Writing on "+myFile.getName()+" REPORT XLSX file Finished ...");
+								partNo++;
+								myFile = new File(tPath +"/"+ ExportReportSplit.partFileName(fName, partNo));
+								myWorkBook = new SXSSFWorkbook(100);
+								mySheet = myWorkBook.createSheet("Details");
+								ExportReportSplit.writeHeader(mySheet, headerLabels);
+								rowCount = 0;
+							}
 							rowCount++;
 							// Create a new Row
 							row = mySheet.createRow(rowCount);
@@ -1193,6 +1317,10 @@ public class RMIExportToolPrintUtils {
 				String headers="";
 				String[] tokens=null;
 				int rowCount = 0;
+				// one Excel holds at most this many data rows - a bigger report continues in fName_1.xlsx, fName_2.xlsx ...
+				int maxRowsPerExcel = ExportReportSplit.maxRowsPerExcel("rmitool.report.max.rows.per.excel");
+				int partNo = 1;
+				String[] headerLabels = null;
 				FileOutputStream os = null;
 				for(int Z=0;Z<viewContentList.size();Z++)
 				{
@@ -1237,6 +1365,7 @@ public class RMIExportToolPrintUtils {
 
 
 					myFile = new File(tPath +"/"+ fName);
+					partNo = 1;
 					// Create the workbook instance for XLSX file, KEEP 100 ROWS IN MEMMORY AND RET ON DISK
 					myWorkBook = new SXSSFWorkbook(100);
 					// Create a new sheet
@@ -1251,6 +1380,7 @@ public class RMIExportToolPrintUtils {
 							+ "DISPLAY_ORDER_LEVEL_1,DISPLAY_ORDER_LEVEL_2,DISPLAY_ORDER_LEVEL_3,DISPLAY_ORDER_LEVEL_4,DISPLAY_ORDER_LEVEL_5,DISPLAY_ORDER_LEVEL_6,"
 							+ "SEQUENCE_NO";
 
+					headerLabels = headers.split(",");
 					tokens=headers.split(",");
 					if(null!=tokens && tokens.length>0)
 					{
@@ -1310,6 +1440,18 @@ public class RMIExportToolPrintUtils {
 									"<TOK_SEPARATOR>"+details.getSequenceNo();
 
 							// increment rowCount by 1
+							if(rowCount >= maxRowsPerExcel)
+							{
+								// this Excel is full - write it and continue the report in the next Excel
+								ExportReportSplit.closeFullPart(myWorkBook, myFile);
+								logger.info("Writing on "+myFile.getName()+" REPORT XLSX file Finished ...");
+								partNo++;
+								myFile = new File(tPath +"/"+ ExportReportSplit.partFileName(fName, partNo));
+								myWorkBook = new SXSSFWorkbook(100);
+								mySheet = myWorkBook.createSheet("Details");
+								ExportReportSplit.writeHeader(mySheet, headerLabels);
+								rowCount = 0;
+							}
 							rowCount++;
 							// Create a new Row
 							row = mySheet.createRow(rowCount);

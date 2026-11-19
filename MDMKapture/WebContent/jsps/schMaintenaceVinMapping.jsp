@@ -173,7 +173,10 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 								</h4>
 								
 								<br />
-								<c:if test="${!empty schMaintenanceVINMappingBean.schVinMappingList }">
+								<c:if test="${schMaintenanceVINMappingBean.totalRecords > 0 }">
+								<p class="warningMessage">
+									<fmt:message key="label.sch.vin.mapping.paging.note"><fmt:param value="${schMaintenanceVINMappingBean.totalRecords }"/></fmt:message>
+								</p>
 								<table id="example" class="display historyTable" cellspacing="0"
 									width="100%">
 									<thead>
@@ -195,56 +198,11 @@ if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
 										</tr>
 									</thead>
 									<tbody>
-										<c:if test="${!empty schMaintenanceVINMappingBean.schVinMappingList }">
-											<c:forEach var="schVinMappingList" items="${schMaintenanceVINMappingBean.schVinMappingList }">
-												<tr <c:if test="${schVinMappingList.editableFlag eq true  }"> class="selected"</c:if>>
-													<td><c:out value="${schVinMappingList.srNo }" /> </td>
-													<td>
-														<label><c:out value="${schVinMappingList.locale }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.modelName }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.carlineCode }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.wmiCode }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.vdsCode }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.visStartRange }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.visEndRange }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.documentId }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.title }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.sourceFileName }" /></label>
-													</td>
-													<td>
-														<label><c:out value="${schVinMappingList.sourceFilePath }" /></label>
-													</td>
-													<td>
-														<fmt:formatDate value="${schVinMappingList.entryTime}"  pattern="yyyy/MM/dd HH:mm:ss"/>
-													</td>
-													<td>
-														<fmt:formatDate value="${schVinMappingList.updatedTime}"  pattern="yyyy/MM/dd HH:mm:ss"/>
-													</td>
-												</tr>
-											</c:forEach>
-										</c:if>
+										<!-- ROWS ARE PAGED FROM THE SERVER (SCHVIN_LIST_DATA) -->
 									</tbody>
 								</table>	
 								</c:if>
-								<c:if test="${empty schMaintenanceVINMappingBean.schVinMappingList }">
+								<c:if test="${schMaintenanceVINMappingBean.totalRecords <= 0 }">
 									<table cellspacing="0"
 											width="100%" class="noRecordTable">
 											<tr>
@@ -287,14 +245,14 @@ if(null!=document.getElementById("SCHVIN_File"))
 }
 </script>
 
-<c:if test="${!empty schMaintenanceVINMappingBean.schVinMappingList }">
+<c:if test="${schMaintenanceVINMappingBean.totalRecords > 0 }">
 <script type="text/javascript">
 var htmlContent="<div class=\"separator\"></div>";
 var exportLabel = "<fmt:message key="label.export"/>";
 htmlContent=htmlContent+"<button type=\"button\" style=\"float:right\" onclick=\"SCHVIN_export();\"  name=\"SCHVIN_Export\" id=\"SCHVIN_Export\" class=\"bluebutton cursorPointer\"><i class=\"downloadIcon\"></i>"+exportLabel+"</button>";
 </script>
 </c:if>
-<c:if test="${empty schMaintenanceVINMappingBean.schVinMappingList }">
+<c:if test="${schMaintenanceVINMappingBean.totalRecords <= 0 }">
 <script type="text/javascript">
 var htmlContent="";
 </script>
@@ -345,8 +303,28 @@ function loadDataTable()
 		domData="<\"top\"<\"toolbar\">fip>rt<\"bottom\"p><\"clear\">";
 	}
 	show=show+" ";
+	// rows, sorting and search come from the server one page at a time
+	var pageLength=$("#SCHVIN_DataTabel_displayPageLen").val();
+	var pageNo=$("#SCHVIN_DataTabel_displayPageNo").val();
+	var initLength = (null!=pageLength && pageLength!="") ? parseInt(pageLength) : 10;
+	var initStart = (null!=pageNo && pageNo!="") ? parseInt(pageNo)*initLength : 0;
+	$.fn.dataTable.ext.errMode = 'none';
+	$('#example').on('error.dt', function(e, settings, techNote, message) {
+		var json = settings.jqXHR ? settings.jqXHR.responseJSON : null;
+		mdm_show_errorMessage((null!=json && null!=json.error) ? json.error : "<fmt:message key="label.error.screen.text"/>");
+	});
 	$('#example').dataTable({
 		"bDestroy":true,
+		"serverSide": true,
+		"searchDelay": 500,
+		"pageLength": initLength,
+		"displayStart": initStart,
+		"ajax": {
+			"url": "<%=request.getContextPath() %>/schMainVinMapping",
+			"type": "GET",
+			"data": function(d) { d.SCHVIN_LIST_DATA = "Y"; }
+		},
+		"drawCallback": function() { SCHVIN_relabelPaging(); },
 		"dom": domData,
 		"pagingType": "input",
         /* Disable initial sort */
@@ -391,6 +369,12 @@ function loadDataTable()
 	
 	
 	$("div.toolbar").html(htmlContent);
+}
+
+function SCHVIN_relabelPaging()
+{
+	var of="<fmt:message key="label.of"/>";
+	var page = "<fmt:message key="label.page"/>";
 	// change pagination text
 	$('.paginate_page').text(page);
 	var pageOfVal=$('.paginate_of:first').text();
@@ -404,22 +388,6 @@ function loadDataTable()
 			pageOfVal = of+" "+afterValue;
 			$('.paginate_of').text(pageOfVal);
 		}
-	}	
-	
-	var table = $('#example').DataTable();
-	var pageNo=$("#SCHVIN_DataTabel_displayPageNo").val();
-	var pageLength=$("#SCHVIN_DataTabel_displayPageLen").val();
-	// first set pageLength
-	if(null!=pageLength && pageLength!="")
-	{
-		table.page.len(pageLength);
-		table.draw();
-	}
-	// then pageNo
-	if(null!=pageNo && pageNo!="")
-	{
-		var act = parseInt(pageNo);
-		table.page(act).draw(false);
 	}
 }
 

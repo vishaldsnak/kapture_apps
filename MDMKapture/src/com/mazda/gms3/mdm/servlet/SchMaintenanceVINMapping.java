@@ -11,7 +11,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -20,6 +22,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
@@ -47,6 +50,7 @@ import com.mazda.gms3.mdm.vo.EngineBookDetails;
 import com.mazda.gms3.mdm.vo.ModuleDetails;
 import com.mazda.gms3.mdm.vo.SchVINMappingDetails;
 import com.mazda.gms3.sst.utils.SSTUtils;
+import com.google.gson.Gson;
 
 /**
  * Servlet implementation class SchMaintenanceVINMapping
@@ -78,6 +82,14 @@ public class SchMaintenanceVINMapping extends HttpServlet {
 		 * Initialize bean
 		 */
 		SchMaintenanceVINMappingBean sessionBean = getSessionBean(request);
+		if(null!=request.getParameter("SCHVIN_LIST_DATA"))
+		{
+			/*
+			 * DATA TABLE (SERVER-SIDE PAGING) - ONE PAGE OF ROWS AS JSON
+			 */
+			writeSchVinMappingPage(request, response, sessionBean);
+			return;
+		}
 		try
 		{
 			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE"))
@@ -333,21 +345,122 @@ public class SchMaintenanceVINMapping extends HttpServlet {
 	}
 	
 	
+
+	/*
+	 * DATA TABLE SERVER-SIDE PAGING: draw / start / length / order[0][column] / order[0][dir] / search[value]
+	 * as sent by DataTables 1.10. Values are HTML-escaped, as c:out did when the rows were rendered in the JSP.
+	 */
+	private void writeSchVinMappingPage(HttpServletRequest request, HttpServletResponse response,
+			SchMaintenanceVINMappingBean sessionBean) throws IOException
+	{
+		Map<String, Object> json = new LinkedHashMap<String, Object>();
+		json.put("draw", parseIntParam(request, "draw", 0));
+		MessageProperties props = new MessageProperties(request.getSession().getAttribute("MDM_LS_Locale"));
+		String error = null;
+		try
+		{
+			String user = request.getHeader("iv-user");
+			if(ApplicationProperties.getProperty("wsl.check").equals("TRUE") && (null==user || "".equals(user.trim())))
+			{
+				error = props.getProperty("label.error.screen.text");
+			}
+			else
+			{
+				performAccessCheck(sessionBean, request);
+				if(sessionBean.isShowReadControls()==false && sessionBean.isShowWriteControls()==false)
+				{
+					error = props.getProperty("label.error.screen.text");
+				}
+			}
+			int start = parseIntParam(request, "start", -1);
+			int length = parseIntParam(request, "length", -1);
+			if(null==error && (start<0 || length<1))
+			{
+				error = props.getProperty("label.error.screen.text");
+			}
+			if(null==error)
+			{
+				int orderColumn = parseIntParam(request, "order[0][column]", -1);
+				boolean ascending = "asc".equalsIgnoreCase(request.getParameter("order[0][dir]"));
+				List<String> words = SchMaintenanceVINMappingDAO.getSearchWords(request.getParameter("search[value]"));
+				long total = SchMaintenanceVINMappingDAO.getSchVinMappingCount(new ArrayList<String>());
+				long filtered = words.isEmpty() ? total : SchMaintenanceVINMappingDAO.getSchVinMappingCount(words);
+				List<SchVINMappingDetails> page = SchMaintenanceVINMappingDAO.getSchVinMappingPage(start, length, orderColumn, ascending, words);
+				SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+				List<List<String>> data = new ArrayList<List<String>>();
+				for(SchVINMappingDetails d : page)
+				{
+					List<String> row = new ArrayList<String>();
+					row.add(String.valueOf(d.getSrNo()));
+					row.add(html(d.getLocale()));
+					row.add(html(d.getModelName()));
+					row.add(html(d.getCarlineCode()));
+					row.add(html(d.getWmiCode()));
+					row.add(html(d.getVdsCode()));
+					row.add(html(d.getVisStartRange()));
+					row.add(html(d.getVisEndRange()));
+					row.add(html(d.getDocumentId()));
+					row.add(html(d.getTitle()));
+					row.add(html(d.getSourceFileName()));
+					row.add(html(d.getSourceFilePath()));
+					row.add(null==d.getEntryTime() ? "" : sdf.format(d.getEntryTime()));
+					row.add(null==d.getUpdatedTime() ? "" : sdf.format(d.getUpdatedTime()));
+					data.add(row);
+				}
+				json.put("recordsTotal", total);
+				json.put("recordsFiltered", filtered);
+				json.put("data", data);
+			}
+		}
+		catch(Exception e)
+		{
+			Utilities.printStackTraceToLogs(SchMaintenanceVINMapping.class.getName(), "writeSchVinMappingPage()", e);
+			error = props.getProperty("label.error.screen.text");
+		}
+		if(null!=error)
+		{
+			json.put("recordsTotal", 0);
+			json.put("recordsFiltered", 0);
+			json.put("data", new ArrayList<Object>());
+			json.put("error", error);
+		}
+		response.setContentType("application/json; charset=UTF-8");
+		response.setHeader("Cache-Control", "no-store");
+		response.getWriter().write(new Gson().toJson(json));
+	}
+
+	private static int parseIntParam(HttpServletRequest request, String name, int whenMissing)
+	{
+		String value = request.getParameter(name);
+		if(null==value || "".equals(value.trim()))
+		{
+			return whenMissing;
+		}
+		try
+		{
+			return Integer.parseInt(value.trim());
+		}
+		catch(NumberFormatException e)
+		{
+			return whenMissing;
+		}
+	}
+
+	private static String html(String value)
+	{
+		return null==value ? "" : StringEscapeUtils.escapeHtml(value);
+	}
+
 	private static void getSchVinMappingList(SchMaintenanceVINMappingBean sessionBean)
 	{
 		try
 		{
-			sessionBean.setSchVinMappingList(new ArrayList<SchVINMappingDetails>());
-			ArrayList<SchVINMappingDetails> list = new ArrayList<SchVINMappingDetails>();
 			/*
-			 * IDENTIFY & FETCH ON LOCALE CODE
+			 * ONLY THE ROW COUNT - THE TABLE PAGES THE ROWS FROM THE SERVER (SCHVIN_LIST_DATA)
 			 */
-			list = SchMaintenanceVINMappingDAO.getSchVinMappingDetails();
-			if(null!=list && list.size()>0)
-			{
-				sessionBean.setSchVinMappingList(list);
-			}
-			list = null;
+			sessionBean.setSchVinMappingList(null);
+			sessionBean.setTotalRecords(0);
+			sessionBean.setTotalRecords(SchMaintenanceVINMappingDAO.getSchVinMappingCount(new ArrayList<String>()));
 		}
 		catch(Exception e)
 		{
@@ -1020,12 +1133,17 @@ public class SchMaintenanceVINMapping extends HttpServlet {
 		try
 		{
 
-			if(null!=sessionBean.getSchVinMappingList() && !"".equals(sessionBean.getSchVinMappingList().size()>0))
+			/*
+			 * FULL LIST READ AT EXPORT TIME (THE PAGE ONLY HOLDS ONE PAGE OF ROWS)
+			 */
+			List<SchVINMappingDetails> exportList = SchMaintenanceVINMappingDAO.getSchVinMappingDetails();
+			if(null!=exportList && exportList.size()>0)
 			{
 				/*
 				 * CALL FUNCTION TO GENERATE EXCEL FOR THE SELECTED ROWS
 				 */
-				writeEngineBookExcel(sessionBean.getSchVinMappingList());
+				writeEngineBookExcel(exportList);
+				exportList = null;
 				/*
 				 * PREARE VIN REORT PATH AND MAKE IT DOWNLOAD
 				 */

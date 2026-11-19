@@ -40,59 +40,8 @@ public class SchMaintenanceVINMappingDAO extends DBConnectionHelper{
 			SchVINMappingDetails details = null;
 			while(rs.next())
 			{
-				details = new SchVINMappingDetails();
+				details = readSchVinMappingRow(rs);
 				details.setSrNo(schVinList.size()+1);
-				details.setAutoId(rs.getLong("scm_id"));
-				details.setDmtScheduleId(rs.getLong("dmt_schedule_id"));
-				if(null!=rs.getString("scm_locale"))
-				{
-					details.setLocale(rs.getString("scm_locale").trim());
-				}
-				if(null!=rs.getString("scm_model_code"))
-				{
-					details.setCarlineCode(rs.getString("scm_model_code").trim());
-				}
-				if(null!=rs.getString("scm_model_name"))
-				{
-					details.setModelName(rs.getString("scm_model_name").trim());
-				}
-				if(null!=rs.getString("scm_wmi_code"))
-				{
-					details.setWmiCode(rs.getString("scm_wmi_code").trim());
-				}
-				if(null!=rs.getString("scm_vds_code"))
-				{
-					details.setVdsCode(rs.getString("scm_vds_code").trim());
-				}
-				if(null!=rs.getString("scm_vis_start_range"))
-				{
-					details.setVisStartRange(rs.getString("scm_vis_start_range").trim());
-				}
-				if(null!=rs.getString("scm_vis_end_range"))
-				{
-					details.setVisEndRange(rs.getString("scm_vis_end_range").trim());
-				}
-				if(null!=rs.getString("scm_source_file_name"))
-				{
-					details.setSourceFileName(rs.getString("scm_source_file_name").trim());
-				}
-				if(null!=rs.getString("scm_source_file_path"))
-				{
-					details.setSourceFilePath(rs.getString("scm_source_file_path").trim());
-				}
-				if(null!=rs.getString("scm_okm_doc_id"))
-				{
-					details.setDocumentId(rs.getString("scm_okm_doc_id").trim());
-				}
-				if(null!=rs.getString("scm_okm_doc_title"))
-				{
-					details.setTitle(rs.getString("scm_okm_doc_title").trim());
-				}
-				
-				details.setEntryTime(rs.getTimestamp("scm_creation_tmstp"));
-				details.setUpdatedTime(rs.getTimestamp("scm_modified_tmstp"));
-				// always show CheckBox
-				details.setShowCheckBox(true);
 				
 				schVinList.add(details);
 				details=  null;
@@ -118,6 +67,188 @@ public class SchMaintenanceVINMappingDAO extends DBConnectionHelper{
 		return schVinList;
 	}
 	
+
+	/*
+	 * SERVER-SIDE PAGING of the details table (43,610 rows on MC QA hung the browser when every row
+	 * was rendered into the page). Columns in the order of the JSP table; index 0 (#.) = default
+	 * order, last modified / created first.
+	 */
+	private static final String DEFAULT_ORDER_EXPR = "(CASE WHEN (scm_modified_tmstp) IS NOT NULL THEN "
+			+ "(scm_modified_tmstp) ELSE (scm_creation_tmstp) END)";
+	private static final String[] SORT_COLUMNS = { DEFAULT_ORDER_EXPR, "scm_locale", "scm_model_name",
+			"scm_model_code", "scm_wmi_code", "scm_vds_code", "scm_vis_start_range", "scm_vis_end_range",
+			"scm_okm_doc_id", "scm_okm_doc_title", "scm_source_file_name", "scm_source_file_path",
+			"scm_creation_tmstp", "scm_modified_tmstp" };
+	// every displayed column, dates as shown on screen; each search word must match somewhere in the row
+	private static final String SEARCH_EXPR = "LOWER(CONCAT_WS(' ', scm_locale, scm_model_name, scm_model_code, "
+			+ "scm_wmi_code, scm_vds_code, scm_vis_start_range, scm_vis_end_range, scm_okm_doc_id, scm_okm_doc_title, "
+			+ "scm_source_file_name, scm_source_file_path, DATE_FORMAT(scm_creation_tmstp, '%Y/%m/%d %H:%i:%s'), "
+			+ "DATE_FORMAT(scm_modified_tmstp, '%Y/%m/%d %H:%i:%s')))";
+
+	private static SchVINMappingDetails readSchVinMappingRow(ResultSet rs) throws SQLException
+	{
+		SchVINMappingDetails details = new SchVINMappingDetails();
+		details.setAutoId(rs.getLong("scm_id"));
+		details.setDmtScheduleId(rs.getLong("dmt_schedule_id"));
+		if(null!=rs.getString("scm_locale"))
+		{
+			details.setLocale(rs.getString("scm_locale").trim());
+		}
+		if(null!=rs.getString("scm_model_code"))
+		{
+			details.setCarlineCode(rs.getString("scm_model_code").trim());
+		}
+		if(null!=rs.getString("scm_model_name"))
+		{
+			details.setModelName(rs.getString("scm_model_name").trim());
+		}
+		if(null!=rs.getString("scm_wmi_code"))
+		{
+			details.setWmiCode(rs.getString("scm_wmi_code").trim());
+		}
+		if(null!=rs.getString("scm_vds_code"))
+		{
+			details.setVdsCode(rs.getString("scm_vds_code").trim());
+		}
+		if(null!=rs.getString("scm_vis_start_range"))
+		{
+			details.setVisStartRange(rs.getString("scm_vis_start_range").trim());
+		}
+		if(null!=rs.getString("scm_vis_end_range"))
+		{
+			details.setVisEndRange(rs.getString("scm_vis_end_range").trim());
+		}
+		if(null!=rs.getString("scm_source_file_name"))
+		{
+			details.setSourceFileName(rs.getString("scm_source_file_name").trim());
+		}
+		if(null!=rs.getString("scm_source_file_path"))
+		{
+			details.setSourceFilePath(rs.getString("scm_source_file_path").trim());
+		}
+		if(null!=rs.getString("scm_okm_doc_id"))
+		{
+			details.setDocumentId(rs.getString("scm_okm_doc_id").trim());
+		}
+		if(null!=rs.getString("scm_okm_doc_title"))
+		{
+			details.setTitle(rs.getString("scm_okm_doc_title").trim());
+		}
+		
+		details.setEntryTime(rs.getTimestamp("scm_creation_tmstp"));
+		details.setUpdatedTime(rs.getTimestamp("scm_modified_tmstp"));
+		// always show CheckBox
+		details.setShowCheckBox(true);
+		return details;
+	}
+
+	public static List<String> getSearchWords(String search)
+	{
+		List<String> words = new ArrayList<String>();
+		if(null!=search)
+		{
+			for(String w : search.trim().toLowerCase().split("\\s+"))
+			{
+				if(!"".equals(w))
+				{
+					words.add(w);
+				}
+			}
+		}
+		return words;
+	}
+
+	private static String searchClause(List<String> words)
+	{
+		StringBuilder where = new StringBuilder();
+		for(int i=0;i<words.size();i++)
+		{
+			where.append(i==0 ? " WHERE " : " AND ").append(SEARCH_EXPR).append(" LIKE ? ESCAPE '!'");
+		}
+		return where.toString();
+	}
+
+	private static int bindSearchWords(PreparedStatement pstmt, List<String> words) throws SQLException
+	{
+		int idx = 1;
+		for(String w : words)
+		{
+			pstmt.setString(idx++, "%" + w.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%");
+		}
+		return idx;
+	}
+
+	public static long getSchVinMappingCount(List<String> searchWords) throws Exception
+	{
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			conn = getConnection();
+			String sql = "SELECT COUNT(*) FROM gms3_dmt_schm_mapping" + searchClause(searchWords);
+			pstmt = conn.prepareStatement(sql);
+			bindSearchWords(pstmt, searchWords);
+			rs = pstmt.executeQuery();
+			return rs.next() ? rs.getLong(1) : 0;
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+			if(null!=conn)
+				conn.close();
+		}
+	}
+
+	public static ArrayList<SchVINMappingDetails> getSchVinMappingPage(int start, int length, int orderColumn,
+			boolean ascending, List<String> searchWords) throws Exception
+	{
+		ArrayList<SchVINMappingDetails> page = new ArrayList<SchVINMappingDetails>();
+		Connection conn = null;
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try
+		{
+			String order;
+			if(orderColumn<=0 || orderColumn>=SORT_COLUMNS.length)
+			{
+				// #. ascending = default order (latest first)
+				order = DEFAULT_ORDER_EXPR + ((orderColumn==0 && !ascending) ? " ASC" : " DESC");
+			}
+			else
+			{
+				order = SORT_COLUMNS[orderColumn] + (ascending ? " ASC" : " DESC");
+			}
+			conn = getConnection();
+			String sql = "SELECT * FROM gms3_dmt_schm_mapping" + searchClause(searchWords)
+					+ " ORDER BY " + order + ", scm_id DESC LIMIT ?, ?";
+			pstmt = conn.prepareStatement(sql);
+			int idx = bindSearchWords(pstmt, searchWords);
+			pstmt.setInt(idx++, start);
+			pstmt.setInt(idx, length);
+			rs = pstmt.executeQuery();
+			while(rs.next())
+			{
+				SchVINMappingDetails details = readSchVinMappingRow(rs);
+				details.setSrNo(start + page.size() + 1);
+				page.add(details);
+			}
+		}
+		finally
+		{
+			if(null!=rs)
+				rs.close();
+			if(null!=pstmt)
+				pstmt.close();
+			if(null!=conn)
+				conn.close();
+		}
+		return page;
+	}
+
 	public static List<SchVINMappingDetails> importSchVinMappingDetails(List<SchVINMappingDetails> list) throws SQLException
 	{
 		logger.info("importSchVinMappingDetails :: Method Starts.");
