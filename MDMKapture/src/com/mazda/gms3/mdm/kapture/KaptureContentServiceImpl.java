@@ -78,8 +78,6 @@ public class KaptureContentServiceImpl {
 	 */
 	private static final String WRITE_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
-	private static final String[] SLASH_DATE_FORMATS = { "MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy" };
-
 	private static final String F_ID = "id";
 
 	/*
@@ -505,8 +503,8 @@ public class KaptureContentServiceImpl {
 		payload.addProperty("articleState", created.getArticleState());
 		payload.addProperty("articleLatestState", "Published");
 		payload.addProperty("articleVersion", created.getArticleVersion());
-		addDate(payload, "expireDate", expireDate);
-		addDate(payload, "reviewDate", reviewDate);
+		addDate(payload, "expireDate", expireDate, locale);
+		addDate(payload, "reviewDate", reviewDate, locale);
 		payload.addProperty("pubFlag", Boolean.TRUE);
 		payload.addProperty("type", stringOf(article, "type"));
 		payload.addProperty("title", stringOf(article, "title"));
@@ -597,8 +595,8 @@ public class KaptureContentServiceImpl {
 		 * BLANK IS SENT AS JSON null, NOT AS "" - an empty string is a value and would
 		 * overwrite a date set elsewhere between the read and this write.
 		 */
-		addDate(payload, "expireDate", expireDate);
-		addDate(payload, "reviewDate", reviewDate);
+		addDate(payload, "expireDate", expireDate, locale);
+		addDate(payload, "reviewDate", reviewDate, locale);
 
 		if (identity.isPublished()) {
 			payload.addProperty("isUpdateArticle", Boolean.TRUE);
@@ -1064,11 +1062,12 @@ public class KaptureContentServiceImpl {
 		return details;
 	}
 
-	private static void addDate(JsonObject payload, String field, String value) {
+	/** @param documentLocale the locale of the version being written - decides MM/dd versus dd/MM */
+	private static void addDate(JsonObject payload, String field, String value, String documentLocale) {
 		if (null == value || "".equals(value.trim())) {
 			payload.add(field, JsonNull.INSTANCE);
 		} else {
-			payload.addProperty(field, toWriteFormat(value.trim()));
+			payload.addProperty(field, toWriteFormat(value.trim(), documentLocale));
 		}
 	}
 
@@ -1098,10 +1097,15 @@ public class KaptureContentServiceImpl {
 	 * and a value we cannot parse is not one we should be inventing a shape for.
 	 *
 	 * RAISE WITH THE API TEAM: a read endpoint whose output its own write endpoint refuses.
+	 *
+	 * THE SLASH FORM IS READ BY THE DOCUMENT LOCALE (KaptureDocumentDates): en_US MM/dd/yyyy, every
+	 * other locale dd/MM/yyyy (Kapture 24-Nov-2026). Reading every slash value as MM/dd swapped day
+	 * and month of dd/MM dates up to the 12th and sent the rest unchanged, which publish refuses.
 	 */
-	private static String toWriteFormat(String value) {
-		for (int i = 0; i < SLASH_DATE_FORMATS.length; i++) {
-			SimpleDateFormat in = new SimpleDateFormat(SLASH_DATE_FORMATS[i]);
+	private static String toWriteFormat(String value, String documentLocale) {
+		String[] slashFormats = KaptureDocumentDates.slashFormats(documentLocale);
+		for (int i = 0; i < slashFormats.length; i++) {
+			SimpleDateFormat in = new SimpleDateFormat(slashFormats[i]);
 			in.setLenient(false);
 			try {
 				Date parsed = in.parse(value);

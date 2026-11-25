@@ -111,6 +111,8 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 	private static final String API_MASTER_KEY = "masterCategoryRefKey";
 	private static final String API_PARENT_KEY = "parentCategroryRefKey";
 	private static final String API_SELECTED = "selected";
+	/** The ESI mapping on the same latest-article response - same entry fields as articlelistcategory. */
+	private static final String API_ESI_CATEGORY_ARRAY = "articleesicategory";
 
 	/** Set on SIVinDetails when the mapped categories could not be read at all. */
 	public static final String ERROR_CATEGORY_READ_FAILED = "CATEGORY_READ_FAILED";
@@ -948,6 +950,8 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			 */
 			String version = null;
 			boolean published = false;
+			// the channel id - a PATH parameter of latest-article, which supplies the categories below
+			String contentId = null;
 			/*
 			 * THE EFFECTIVE LOCALE, like every other read in this class - see LOCALE_PREDICATE.
 			 *
@@ -958,7 +962,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			 * performViewContentOperation WITHOUT LOGGING ANYTHING. The View Content refresh looked
 			 * like it was never invoked when in fact it could not find the document.
 			 */
-			String sql = "SELECT article_id, article_primary_locale, article_state, article_version,"
+			String sql = "SELECT article_id, contentid, article_primary_locale, article_state, article_version,"
 					+ " published_version, article_title, created_date, date_modified, published_date,"
 					+ " article_expire_date,"
 					+ " COALESCE(article_translated_locale, article_primary_locale) AS effective_locale"
@@ -973,6 +977,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			rs = pstmt.executeQuery();
 			if (rs.next()) {
 				docDetails.setDocumentId(safeTrim(rs.getString("article_id")));
+				contentId = safeTrim(rs.getString("contentid"));
 				/*
 				 * THE LOCALE THIS ROW IS, not its master's. gms3_vc_* rows are keyed by locale, so
 				 * storing the primary here would have written the translation's View Content under
@@ -989,14 +994,14 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 				docDetails.setPublishDate(rs.getTimestamp("published_date"));
 				/*
 				 * article_expire_date IS THE KAPTURE EQUIVALENT OF THE OLD DISPLAYENDDATE and is
-				 * read into the same field. Two formats occur in this column - MM/dd/yyyy HH:mm:ss
-				 * from the API and yyyy-MM-dd HH:mm:ss from the Authoring Tool - and toTimestamp()
-				 * accepts both. An unparseable value yields null, i.e. NEVER EXPIRES, which is the
+				 * read into the same field. Its format follows the DOCUMENT locale (effective_locale),
+				 * see toTimestamp(). An unparseable value yields null, i.e. NEVER EXPIRES, which is the
 				 * safe direction: a document stays visible rather than silently disappearing.
 				 */
-				docDetails.setDisplayEndDate(toTimestamp(rs.getString("article_expire_date")));
-				docDetails.setDocumentCreateDate(toTimestamp(rs.getString("created_date")));
-				docDetails.setDocumentLastModifiedDate(toTimestamp(rs.getString("date_modified")));
+				String dateLocale = rs.getString("effective_locale");
+				docDetails.setDisplayEndDate(toTimestamp(rs.getString("article_expire_date"), dateLocale));
+				docDetails.setDocumentCreateDate(toTimestamp(rs.getString("created_date"), dateLocale));
+				docDetails.setDocumentLastModifiedDate(toTimestamp(rs.getString("date_modified"), dateLocale));
 
 				/*
 				 * EXPIRY CHECK.
@@ -1067,30 +1072,25 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			pstmt.close(); pstmt = null;
 
 			/*
-			 * ALL MAPPED CATEGORIES, WHATEVER THE MASTER KEY. Read once and grouped, rather than
-			 * one query per master key, because the old version also worked off a single list.
+			 * ALL MAPPED CATEGORIES, WHATEVER THE MASTER KEY - FROM THE latest-article API, THE SAME
+			 * SOURCE THE SI VIN SEARCH SCREEN LISTS (getCategoriesList). Read once and grouped, as before.
+			 *
+			 * NOT k_article_category (changed 24-Nov-2026): that table keeps a set of rows for EVERY
+			 * version, and reading it by article_id + locale wrote one View Content row per version per
+			 * category (SI126623 on MC Dev: the same VIN range six times). The API returns the latest
+			 * version's mapping; the entries flagged selected=true are the mapping, the rest is the tree
+			 * around them. The ESI mapping comes from the same response (articleesicategory).
+			 *
+			 * A FAILED READ CHANGES NOTHING: an EMPTY details object is returned, every caller then
+			 * skips performViewContentOperation, and the document's existing View Content rows stay as
+			 * they are instead of being deleted with nothing written back.
 			 */
-			ArrayList<IMCategoryDetails> categoriesList = new ArrayList<IMCategoryDetails>();
-			sql = "SELECT categoryrefkey, categoryname, mastercategoryrefkey,"
-					+ " " + parentRefKeyColumn(conn) + " AS parentrefkey"
-					+ " FROM " + T_ARTICLE_CATEGORY + " WHERE article_id = ? AND locale = ?";
-			pstmt = conn.prepareStatement(sql);
-			pstmt.setString(1, docDetails.getDocumentId());
-			pstmt.setString(2, docDetails.getLocale());
-			rs = pstmt.executeQuery();
-			while (rs.next()) {
-				IMCategoryDetails cat = new IMCategoryDetails();
-				cat.setCategoryRefKey(safeTrim(rs.getString("categoryrefkey")));
-				cat.setCategoryName(safeTrim(rs.getString("categoryname")));
-				cat.setParentRefKey(safeTrim(rs.getString("parentrefkey")));
-				// the master key is carried in the unused-for-Kapture objectId slot so the
-				// grouping below needs no extra VO field
-				cat.setObjectId(safeTrim(rs.getString("mastercategoryrefkey")));
-				categoriesList.add(cat);
-				cat = null;
+			JsonObject article = readLatestArticle(docDetails.getDocumentId(), contentId, docDetails.getLocale());
+			if (null == article) {
+				return new MNAOViewContentDetails();
 			}
-			rs.close(); rs = null;
-			pstmt.close(); pstmt = null;
+			ArrayList<IMCategoryDetails> categoriesList = new ArrayList<IMCategoryDetails>(
+					selectedApiCategories(article, API_CATEGORY_ARRAY).values());
 
 			if (categoriesList.size() <= 0) {
 				// NO CATEGORIES FETCHED - DELETE DOCUMENT DATA FROM VIEW CONTENT TABLES
@@ -1114,7 +1114,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			}
 
 			// ---------------------------------------------------------------- ESI CATEGORIES
-			applyESICategories(docDetails, conn);
+			applyESICategories(docDetails, article);
 
 			// ------------------------------------------------- DOCUMENT TYPE AND SUB TYPE
 			String labelLocale = resolveLabelLocale(docDetails.getLocale(), "MNAO");
@@ -1293,6 +1293,13 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 		} catch (Exception e) {
 			Utilities.printStackTraceToLogs(FetchKaptureDataDAO.class.getName(),
 					"prepareViewContentData()", e);
+			/*
+			 * A HALF-BUILT OBJECT MUST NOT REACH performViewContentOperation - it would delete the
+			 * document's rows and write back an incomplete set. Empty = the caller skips the refresh.
+			 */
+			logger.info("prepareViewContentData :: {" + documentId + "} / {" + localeId
+					+ "} FAILED - View Content NOT refreshed, the existing rows are kept.");
+			docDetails = new MNAOViewContentDetails();
 		} finally {
 			closeQuietly(rs, pstmt);
 			if (null != conn) {
@@ -1323,32 +1330,19 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 	 * The level-1 code keeps the old shape: the reference key with a leading "ESI" stripped.
 	 * The level-3 code keeps the old rule too: characters 7-8 of an 8-character reference key.
 	 */
-	private static void applyESICategories(MNAOViewContentDetails docDetails, Connection conn) {
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
+	private static void applyESICategories(MNAOViewContentDetails docDetails, JsonObject article) {
 		try {
-			LinkedHashMap<String, IMCategoryDetails> byRefKey = new LinkedHashMap<String, IMCategoryDetails>();
-			String sql = "SELECT referencekey, categoryname, parentrefkey FROM "
-					+ T_ESI_ARTICLE_CATEGORIES + " WHERE article_id = ? AND locale = ?";
-			pstmt = conn.prepareStatement(sql);
-			pstmt.setString(1, docDetails.getDocumentId());
-			pstmt.setString(2, docDetails.getLocale());
-			rs = pstmt.executeQuery();
-			while (rs.next()) {
-				IMCategoryDetails cat = new IMCategoryDetails();
-				cat.setCategoryRefKey(safeTrim(rs.getString("referencekey")));
-				cat.setCategoryName(safeTrim(rs.getString("categoryname")));
-				cat.setParentRefKey(safeTrim(rs.getString("parentrefkey")));
-				// DROP THE ROOT ROW IF IT IS PRESENT - levels are counted BELOW it, and it is not
-				// always stored (see the note above)
-				if (!"".equals(cat.getCategoryRefKey())
-						&& !MASTER_KEY_ESI.equalsIgnoreCase(cat.getCategoryRefKey())) {
-					byRefKey.put(cat.getCategoryRefKey(), cat);
-				}
-				cat = null;
-			}
-			rs.close(); rs = null;
-			pstmt.close(); pstmt = null;
+			/*
+			 * FROM THE latest-article RESPONSE (articleesicategory), not k_esi_article_categories,
+			 * which is read by article_id + locale and so also holds mappings of older versions.
+			 * The MAPPED nodes are the selected=true ones; every node of the returned tree (selected
+			 * or not) is kept for the parent lookup, so the chain above the mapped leaf is complete
+			 * even when only the leaf is mapped.
+			 */
+			LinkedHashMap<String, IMCategoryDetails> byRefKey = selectedApiCategories(article, API_ESI_CATEGORY_ARRAY);
+			byRefKey.remove(MASTER_KEY_ESI);
+			LinkedHashMap<String, IMCategoryDetails> tree = allApiCategories(article, API_ESI_CATEGORY_ARRAY);
+			tree.remove(MASTER_KEY_ESI);
 
 			if (byRefKey.isEmpty()) {
 				return;
@@ -1379,7 +1373,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 			int guard = 0;
 			while (null != current && guard < MAX_HIERARCHY_DEPTH) {
 				chain.add(0, current);
-				current = byRefKey.get(current.getParentRefKey());
+				current = tree.get(current.getParentRefKey());
 				guard++;
 			}
 
@@ -1409,9 +1403,89 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 		} catch (Exception e) {
 			Utilities.printStackTraceToLogs(FetchKaptureDataDAO.class.getName(),
 					"applyESICategories()", e);
-		} finally {
-			closeQuietly(rs, pstmt);
 		}
+	}
+
+	/**
+	 * The latest version of the document in this locale, from latest-article - or null when it
+	 * cannot be read (logged). Not found is HTTP 200 with an EMPTY body, so an empty body is a
+	 * failure here too.
+	 */
+	private static JsonObject readLatestArticle(String documentId, String contentId, String locale) {
+		if (null == contentId || "".equals(contentId)) {
+			logger.info("prepareViewContentData :: NO CONTENT ID FOR {" + documentId + "} / {" + locale
+					+ "} - categories cannot be read, View Content NOT refreshed, the existing rows are kept.");
+			return null;
+		}
+		try {
+			KaptureApiResult read = new KaptureApiClient().latestArticle(documentId, contentId, locale,
+					"View Content categories");
+			if (!read.isOk() || null == read.body || "".equals(read.body.trim())) {
+				logger.info("prepareViewContentData :: CATEGORY READ FAILED FOR {" + documentId + "} / {" + locale
+						+ "} - HTTP " + read.httpStatus + " " + read.message
+						+ " - View Content NOT refreshed, the existing rows are kept.");
+				return null;
+			}
+			return new JsonParser().parse(read.body).getAsJsonObject();
+		} catch (Exception e) {
+			Utilities.printStackTraceToLogs(FetchKaptureDataDAO.class.getName(), "readLatestArticle()", e);
+			logger.info("prepareViewContentData :: CATEGORY READ FAILED FOR {" + documentId + "} / {" + locale
+					+ "} - View Content NOT refreshed, the existing rows are kept.");
+			return null;
+		}
+	}
+
+	/** The MAPPED entries (selected=true) of a category array of the read, keyed by reference key. */
+	private static LinkedHashMap<String, IMCategoryDetails> selectedApiCategories(JsonObject article, String field) {
+		return apiCategories(article, field, true);
+	}
+
+	/** Every entry of a category array of the read (the tree around the mapping), keyed by reference key. */
+	private static LinkedHashMap<String, IMCategoryDetails> allApiCategories(JsonObject article, String field) {
+		return apiCategories(article, field, false);
+	}
+
+	/**
+	 * Entries of articlelistcategory / articleesicategory in the shape the View Content code works
+	 * with. The master key goes into the objectId slot, as the k_article_category read did.
+	 * KEYED BY REFERENCE KEY, so a repeated node can never become a repeated row.
+	 * The array comes back as a single OBJECT when it has one entry (see the update-article-tab
+	 * contract), so both shapes are read.
+	 */
+	private static LinkedHashMap<String, IMCategoryDetails> apiCategories(JsonObject article, String field,
+			boolean selectedOnly) {
+		LinkedHashMap<String, IMCategoryDetails> out = new LinkedHashMap<String, IMCategoryDetails>();
+		if (null == article || !article.has(field) || article.get(field).isJsonNull()) {
+			return out;
+		}
+		JsonArray nodes;
+		if (article.get(field).isJsonArray()) {
+			nodes = article.getAsJsonArray(field);
+		} else {
+			nodes = new JsonArray();
+			nodes.add(article.get(field));
+		}
+		for (int i = 0; i < nodes.size(); i++) {
+			JsonElement element = nodes.get(i);
+			if (null == element || !element.isJsonObject()) {
+				continue;
+			}
+			JsonObject node = element.getAsJsonObject();
+			if (selectedOnly && !jsonFlag(node, API_SELECTED)) {
+				continue;
+			}
+			String refKey = jsonText(node, API_REF_KEY);
+			if ("".equals(refKey) || out.containsKey(refKey)) {
+				continue;
+			}
+			IMCategoryDetails cat = new IMCategoryDetails();
+			cat.setCategoryRefKey(refKey);
+			cat.setCategoryName(jsonText(node, API_CATEGORY_NAME));
+			cat.setParentRefKey(jsonText(node, API_PARENT_KEY));
+			cat.setObjectId(jsonText(node, API_MASTER_KEY));
+			out.put(refKey, cat);
+		}
+		return out;
 	}
 
 	/**
@@ -1451,16 +1525,22 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 	}
 
 	/**
-	 * k_article stores created_date / date_modified as VARCHAR in MM/dd/yyyy HH:mm:ss, whereas the
-	 * old CONTENTTEXT columns were real timestamps and the VO still expects Timestamp.
+	 * k_article stores created_date / date_modified / article_expire_date as VARCHAR in the format of
+	 * the DOCUMENT locale = COALESCE(article_translated_locale, article_primary_locale) - see
+	 * KaptureDocumentDates (Kapture 24-Nov-2026): en_US MM/dd/yyyy HH:mm:ss, ja_JP yyyy-MM-dd
+	 * HH:mm:ss, every other locale dd/MM/yyyy HH:mm:ss. Reading every slash value as MM/dd (the old
+	 * rule) swapped day and month of dd/MM dates up to the 12th and dropped the rest.
+	 * The old CONTENTTEXT columns were real timestamps and the VO still expects Timestamp.
 	 * An unparseable or empty value yields null rather than an exception.
 	 */
-	private static Timestamp toTimestamp(String value) {
+	private static Timestamp toTimestamp(String value, String documentLocale) {
 		if (null == value || "".equals(value.trim())) {
 			return null;
 		}
 		String text = value.trim();
-		String[] patterns = new String[] { "MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy", "yyyy-MM-dd HH:mm:ss" };
+		String[] patterns = (text.indexOf('/') > 0)
+				? com.mazda.gms3.mdm.kapture.KaptureDocumentDates.slashFormats(documentLocale)
+				: new String[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd" };
 		for (int i = 0; i < patterns.length; i++) {
 			try {
 				SimpleDateFormat sdf = new SimpleDateFormat(patterns[i]);
@@ -1470,7 +1550,7 @@ public class FetchKaptureDataDAO extends DBConnectionHelper {
 				// try the next pattern
 			}
 		}
-		logger.info("toTimestamp :: could not parse {" + text + "}");
+		logger.info("toTimestamp :: could not parse {" + text + "} for locale {" + documentLocale + "}");
 		return null;
 	}
 

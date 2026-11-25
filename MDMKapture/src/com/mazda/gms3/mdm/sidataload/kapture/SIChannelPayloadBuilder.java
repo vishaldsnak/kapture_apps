@@ -214,8 +214,8 @@ public class SIChannelPayloadBuilder {
 		 * BLANK GOES AS JSON null, NOT AS "". An empty string is a value and would overwrite a date
 		 * somebody set between the read and this write.
 		 */
-		addDate(payload, "expireDate", stringOf(article, "expireDate"));
-		addDate(payload, "reviewDate", stringOf(article, "reviewDate"));
+		addDate(payload, "expireDate", stringOf(article, "expireDate"), locale);
+		addDate(payload, "reviewDate", stringOf(article, "reviewDate"), locale);
 
 		if (identity.isPublished()) {
 			payload.addProperty("isUpdateArticle", Boolean.TRUE);
@@ -378,16 +378,15 @@ public class SIChannelPayloadBuilder {
 		return array;
 	}
 
-	private static void addDate(JsonObject payload, String field, String value) {
+	/** @param documentLocale the locale of the version being written - decides MM/dd versus dd/MM */
+	private static void addDate(JsonObject payload, String field, String value, String documentLocale) {
 		if (null == value || "".equals(value.trim())) {
 			payload.add(field, com.google.gson.JsonNull.INSTANCE);
 		} else {
-			payload.addProperty(field, toWriteFormat(value.trim()));
+			payload.addProperty(field, toWriteFormat(value.trim(), documentLocale));
 		}
 	}
 
-	/** The slash forms the read APIs emit - see toWriteFormat(). */
-	private static final String[] SLASH_DATE_FORMATS = { "MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy" };
 
 	private static final String WRITE_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
@@ -413,10 +412,14 @@ public class SIChannelPayloadBuilder {
 	 * ANYTHING NOT IN THE SLASH FORM IS PASSED THROUGH UNTOUCHED, including an already-hyphenated
 	 * value and anything unrecognisable - dd/MM and MM/dd cannot be told apart for the first twelve
 	 * days of a month, so guessing at an unknown shape could move a date by months in silence.
+	 *
+	 * THE SLASH FORM IS READ BY THE DOCUMENT LOCALE (KaptureDocumentDates): en_US MM/dd/yyyy, every
+	 * other locale dd/MM/yyyy (Kapture 24-Nov-2026) - never guessed from the value.
 	 */
-	private static String toWriteFormat(String value) {
-		for (int i = 0; i < SLASH_DATE_FORMATS.length; i++) {
-			java.text.SimpleDateFormat in = new java.text.SimpleDateFormat(SLASH_DATE_FORMATS[i]);
+	private static String toWriteFormat(String value, String documentLocale) {
+		String[] slashFormats = com.mazda.gms3.mdm.kapture.KaptureDocumentDates.slashFormats(documentLocale);
+		for (int i = 0; i < slashFormats.length; i++) {
+			java.text.SimpleDateFormat in = new java.text.SimpleDateFormat(slashFormats[i]);
 			// STRICT - lenient parsing rolls 13/01/2026 forward into 2027 instead of failing
 			in.setLenient(false);
 			try {

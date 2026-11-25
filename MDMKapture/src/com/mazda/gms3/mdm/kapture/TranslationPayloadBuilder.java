@@ -117,7 +117,7 @@ public class TranslationPayloadBuilder {
 		payload.add(rootNode, mergedNode);
 
 		normaliseLists(payload);
-		normaliseDates(payload);
+		normaliseDates(payload, locale);
 		return payload.toString();
 	}
 
@@ -177,7 +177,7 @@ public class TranslationPayloadBuilder {
 		payload.addProperty("userEmail", client.getUserEmail());
 
 		normaliseLists(payload);
-		normaliseDates(payload);
+		normaliseDates(payload, locale);
 		return payload.toString();
 	}
 
@@ -227,9 +227,8 @@ public class TranslationPayloadBuilder {
 
 	private static final String WRITE_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
-	/** Read leniently - the format the read uses first, then the one the write side wants. */
-	private static final String[] READ_DATE_FORMATS = {
-			"MM/dd/yyyy HH:mm:ss", "MM/dd/yyyy", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd" };
+	/** Already in the write format (ja_JP documents) - tried after the document locale's slash form. */
+	private static final String[] HYPHEN_DATE_FORMATS = { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd" };
 
 	/**
 	 * Puts every date the payload carries into the format the write side parses.
@@ -241,7 +240,7 @@ public class TranslationPayloadBuilder {
 	 * month - dd/MM and MM/dd are indistinguishable for the first twelve days - and a refusal that
 	 * names the field is a better outcome than a document quietly expiring on the wrong day.
 	 */
-	private static void normaliseDates(JsonObject payload) {
+	private static void normaliseDates(JsonObject payload, String documentLocale) {
 		for (int i = 0; i < DATE_FIELDS.length; i++) {
 			String field = DATE_FIELDS[i];
 			if (!payload.has(field)) {
@@ -252,7 +251,7 @@ public class TranslationPayloadBuilder {
 				payload.add(field, com.google.gson.JsonNull.INSTANCE);
 				continue;
 			}
-			String written = toWriteFormat(value.trim());
+			String written = toWriteFormat(value.trim(), documentLocale);
 			if (null == written) {
 				logger.info("normaliseDates :: {" + field + "} = {" + value
 						+ "} is in no recognised format - sent unchanged.");
@@ -262,11 +261,21 @@ public class TranslationPayloadBuilder {
 		}
 	}
 
-	/** The value in yyyy-MM-dd HH:mm:ss, or null if it is in none of the formats we know. */
-	private static String toWriteFormat(String value) {
-		for (int i = 0; i < READ_DATE_FORMATS.length; i++) {
+	/**
+	 * The value in yyyy-MM-dd HH:mm:ss, or null if it is in none of the formats we know.
+	 *
+	 * THE SLASH FORM IS READ BY THE DOCUMENT LOCALE (KaptureDocumentDates): en_US MM/dd/yyyy, every
+	 * other locale dd/MM/yyyy (Kapture 24-Nov-2026). This screen is MME - all dd/MM - so reading
+	 * every slash value as MM/dd swapped day and month up to the 12th and left the rest unchanged.
+	 */
+	private static String toWriteFormat(String value, String documentLocale) {
+		String[] slash = KaptureDocumentDates.slashFormats(documentLocale);
+		String[] formats = new String[slash.length + HYPHEN_DATE_FORMATS.length];
+		System.arraycopy(slash, 0, formats, 0, slash.length);
+		System.arraycopy(HYPHEN_DATE_FORMATS, 0, formats, slash.length, HYPHEN_DATE_FORMATS.length);
+		for (int i = 0; i < formats.length; i++) {
 			try {
-				SimpleDateFormat reader = new SimpleDateFormat(READ_DATE_FORMATS[i]);
+				SimpleDateFormat reader = new SimpleDateFormat(formats[i]);
 				// STRICT - lenient parsing turns 13/01/2026 into January 2027 rather than failing
 				reader.setLenient(false);
 				Date parsed = reader.parse(value);
