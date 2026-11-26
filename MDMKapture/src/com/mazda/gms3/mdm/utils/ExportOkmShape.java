@@ -45,7 +45,8 @@ import org.xml.sax.InputSource;
  *    the file is not there; a SIZE already in the XML is passed as is. An empty attachment stays empty.
  *  - SECURITY = "" on the configured nodes that have a value (no field-level security in Kapture); one already in the
  *    XML is passed as is.
- *  - NO date is converted (user 2026-11-12): every date value in the channel node is passed exactly as Kapture wrote it.
+ *  - NO date in the channel node is converted (user 2026-11-12, confirmed 2026-11-25: TSB_ISSUE_DATE /
+ *    FIRST_PUBLICATION_DATE / MOST_RECENT_REVISION_DATE come from Kapture as yyyy-MM-dd HH:mm:ss <zone>).
  *  - children put in the order of the legacy OKM EXPORT files (not the OKM authoring order, which differs per
  *    document): the first element of each listed name in list order, then repeats and unlisted names as they were.
  *  - nodes Kapture has and OKM had not are passed as is; nodes OKM had and Kapture has not are not added.
@@ -53,10 +54,11 @@ import org.xml.sax.InputSource;
  * HEADER (toOkmDocument - RMI Export and MNAO Data Export; the Bulk Extract builds its own header):
  *  &lt;CONTENT RECORDID=""&gt; then MASTERIDENTIFIER .. PUBLISHEDTIME rebuilt from the Kapture header, the channel
  *  node, the configured empty nodes after it (WD META), CATEGORIES. Every other Kapture header node is dropped.
- *  DATES AS IS (user 2026-11-12): STARTTIMESTAMP = displayOn, CREATEDATE = createdDate, LASTMODIFIEDTIMESTAMP =
- *  dateModified, PUBLISHEDTIMESTAMP = publishedDate, each exactly as Kapture wrote it - no format, no time zone.
- *  OKM's derived values (*_MILLIS, STARTDATE/TIME, LASTMODIFIEDDATE/TIME, PUBLISHEDDATE/TIME) have no Kapture value
- *  and are blank. A START / CREATE / LASTMODIFIED block is written only when Kapture has its date (legacy left a
+ *  DATES IN THE OKM FORMAT (user 2026-11-25, replaces the 2026-11-12 "as is" rule): STARTTIMESTAMP = displayOn,
+ *  CREATEDATE = createdDate, LASTMODIFIEDTIMESTAMP = dateModified, PUBLISHEDTIMESTAMP = publishedDate, converted by
+ *  OkmExportDates (k_article text read by the document locale = the export locale) to the OKM TIMESTAMP, and the
+ *  derived *_MILLIS, STARTDATE/TIME, LASTMODIFIEDDATE/TIME, PUBLISHEDDATE/TIME filled as OKM did. CREATEDATE has no
+ *  local DATE / TIME node (as OKM). A value that cannot be read is written as is. A START / CREATE / LASTMODIFIED block is written only when Kapture has its date (legacy left a
  *  missing block out); the PUBLISHED block is always written, blank when Kapture has no publishedDate.
  *  Ids with no Kapture source (RECORDID, TYPE_GUID where not configured) are blank; a value in the Kapture XML
  *  would be passed as is. LOCALEVALUE = the locale code.
@@ -396,18 +398,19 @@ public final class ExportOkmShape {
 			add(out, root, "LOCALEVALUE", locale, cdataNodes);
 			add(out, root, "VERSION", firstNonBlank(text(header.get("publishedVersion")), text(header.get("articleVersion"))), cdataNodes);
 
-			// dates exactly as Kapture wrote them; OKM's derived values (_MILLIS, local DATE / TIME) blank - see class comment
+			// dates in the OKM format, k_article text read by the document locale (user 2026-11-25) - see class comment
+			OkmExportDates dates = new OkmExportDates(props, true);
 			String start = text(header.get("displayOn"));
 			String created = text(header.get("createdDate"));
 			String modified = text(header.get("dateModified"));
 			if (null != start) {
-				addDateBlock(out, root, cdataNodes, start, "STARTTIMESTAMP", "STARTTIMESTAMP_MILLIS", "STARTDATE", "STARTTIME");
+				addDateBlock(out, root, cdataNodes, dates.block(start, locale), "STARTTIMESTAMP", "STARTTIMESTAMP_MILLIS", "STARTDATE", "STARTTIME");
 			}
 			if (null != created) {
-				addDateBlock(out, root, cdataNodes, created, "CREATEDATE", "CREATEDATE_MILLIS");
+				addDateBlock(out, root, cdataNodes, dates.block(created, locale), "CREATEDATE", "CREATEDATE_MILLIS");
 			}
 			if (null != modified) {
-				addDateBlock(out, root, cdataNodes, modified, "LASTMODIFIEDTIMESTAMP", "LASTMODIFIEDTIMESTAMP_MILLIS", "LASTMODIFIEDDATE", "LASTMODIFIEDTIME");
+				addDateBlock(out, root, cdataNodes, dates.block(modified, locale), "LASTMODIFIEDTIMESTAMP", "LASTMODIFIEDTIMESTAMP_MILLIS", "LASTMODIFIEDDATE", "LASTMODIFIEDTIME");
 			}
 			String metaPrefix = metaPaths.get(channelName);
 			if (null != metaPrefix && null != documentId) {
@@ -417,7 +420,7 @@ public final class ExportOkmShape {
 					add(out, root, "METARESOURCEPATH", metaPrefix + folder + "/" + documentId + "/", cdataNodes);
 				}
 			}
-			addDateBlock(out, root, cdataNodes, text(header.get("publishedDate")), "PUBLISHEDTIMESTAMP", "PUBLISHEDTIMESTAMP_MILLIS", "PUBLISHEDDATE", "PUBLISHEDTIME");
+			addDateBlock(out, root, cdataNodes, dates.block(text(header.get("publishedDate")), locale), "PUBLISHEDTIMESTAMP", "PUBLISHEDTIMESTAMP_MILLIS", "PUBLISHEDDATE", "PUBLISHEDTIME");
 			if (null != channel) {
 				root.appendChild(out.importNode(channel, true));
 			}
@@ -442,10 +445,10 @@ public final class ExportOkmShape {
 		}
 	}
 
-	/** The first name gets the Kapture value as is; the others (OKM-derived values) are written blank. */
-	private static void addDateBlock(Document out, Element root, List<String> cdataNodes, String value, String... names) {
+	/** names[i] gets values[i] (TIMESTAMP, _MILLIS, local DATE, local TIME - OkmExportDates.block); blank values stay empty. */
+	private static void addDateBlock(Document out, Element root, List<String> cdataNodes, String[] values, String... names) {
 		for (int i = 0; i < names.length; i++) {
-			add(out, root, names[i], 0 == i ? value : null, cdataNodes);
+			add(out, root, names[i], i < values.length ? values[i] : null, cdataNodes);
 		}
 	}
 
